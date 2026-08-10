@@ -93,6 +93,31 @@ runner.test('buildStoryEventCatalog 只含名字/ID/触发条件/描述，不含
   assert(catalog.unassigned.length === 1 && catalog.unassigned[0].id === '003', '未分类事件应单独成组');
 });
 
+// ---------- 节点启停 ----------
+runner.test('停用节点：目录排除其子树与事件，未分类保留', () => {
+  const c = fresh();
+  const { vol1, ch1 } = makeStory(c);
+  ctx.toggleStoryNodeEnabled(c, ch1.id);
+  const catalog = ctx.buildStoryEventCatalog(c);
+  assert(catalog.nodes.length === 1, '根节点仍在目录');
+  assert(catalog.nodes[0].children.length === 0, '停用子节点不应出现在目录');
+  assert(catalog.unassigned.length === 1 && catalog.unassigned[0].id === '003', '未分类事件应保留');
+  const active = ctx.getStoryActiveScripts(c);
+  assert(active.length === 1 && active[0].id === '003', '停用节点下的事件不应参与预筛');
+});
+
+runner.test('停用整棵子树：后代节点与事件一并排除', () => {
+  const c = fresh();
+  const vol1 = ctx.createStoryNode(c, { name: '第一卷' });
+  const ch1 = ctx.createStoryNode(c, { name: '第一章', parentId: vol1.id });
+  ctx.createStoryScript(c, { id: '001', name: '雨夜', nodeId: ch1.id, content: 'x' });
+  ctx.toggleStoryNodeEnabled(c, vol1.id);
+  const catalog = ctx.buildStoryEventCatalog(c);
+  assert(catalog.nodes.length === 0, '停用根节点后整棵树不应出现');
+  assert(catalog.unassigned.length === 0, '未分类事件不应凭空出现');
+  assert(ctx.getStoryActiveScripts(c).length === 0, '整棵子树的事件不应参与预筛');
+});
+
 // ---------- 提示词 ----------
 runner.test('getStoryGatePrompt 空设置回退默认，保存后优先自定义', () => {
   const c = fresh();

@@ -8,6 +8,7 @@ let storyExpanded = new Set();   // 已展开的节点 id
 let storyImportTargetNodeId = '';  // 节点行「导入事件」的目标节点
 let storyEditorSession = 0;        // 编辑器会话号：异步导入完成后若会话已变则放弃接管
 let storyAddMenuContext = null;   // 「＋」菜单上下文：{ root: true } 或 { nodeId }
+let storyImportModeResolve = null;  // 导入方式选择浮层的回调（resolve 'merge' | 'replace' | null）
 
 function storyToastr(kind, message) {
   try {
@@ -52,6 +53,7 @@ function openStoryWorkbench() {
 function closeStoryWorkbench() {
   const dialog = getStoryWorkbench();
   if (!dialog) return;
+  closeStoryImportMode();
   closeStoryEditor();
   closeStoryAddMenu();
   dialog.classList.remove('is-open');
@@ -131,6 +133,7 @@ function buildStoryNodeRow(node, depth, expanded, childCount) {
   const row = document.createElement('div');
   row.className = 'kaleido-story__row kaleido-story__row--node';
   row.style.setProperty('--depth', String(depth));
+  const enabled = node.enabled !== false;
   row.innerHTML = `
     <button type="button" class="kaleido-story__chevron${childCount > 0 ? '' : ' is-empty'}" data-action="toggle" data-id="${escapeHtml(node.id)}" title="展开 / 收起" aria-label="展开 / 收起">
       <span class="${STORY_CHEVRON_ICON_CLASS}"></span>
@@ -138,6 +141,7 @@ function buildStoryNodeRow(node, depth, expanded, childCount) {
     <span class="kaleido-story__row-icon"><span class="${expanded ? STORY_NODE_OPEN_ICON_CLASS : STORY_NODE_ICON_CLASS}"></span></span>
     <span class="kaleido-story__row-name" title="${escapeHtml(node.description || node.name)}">${escapeHtml(node.name)}</span>
     <span class="kaleido-story__row-count">${childCount} 项</span>
+    <button type="button" class="kaleido-story__switch${enabled ? '' : ' is-off'}" data-action="toggle-enabled" data-id="${escapeHtml(node.id)}" role="switch" aria-checked="${enabled}" title="${enabled ? '点击关闭：本节点及其子节点、事件不再参与剧情预筛' : '点击激活：本节点及其子节点、事件重新参与剧情预筛'}" aria-label="启用 / 关闭节点"><span class="kaleido-story__switch-thumb"></span></button>
     <span class="kaleido-story__row-actions">
       <button type="button" class="kaleido-story__icon-btn" data-action="add-menu" data-id="${escapeHtml(node.id)}" title="新建节点 / 事件" aria-label="新建节点 / 事件"><span class="${STORY_ADD_CHILD_ICON_CLASS}"></span></button>
       <button type="button" class="kaleido-story__icon-btn" data-action="import-script" data-id="${escapeHtml(node.id)}" title="导入事件文件" aria-label="导入事件文件"><span class="${STORY_IMPORT_ICON_CLASS}"></span></button>
@@ -146,6 +150,7 @@ function buildStoryNodeRow(node, depth, expanded, childCount) {
     </span>
   `;
   if (expanded) row.classList.add('is-expanded');
+  if (!enabled) row.classList.add('is-disabled');
   return row;
 }
 
@@ -469,18 +474,49 @@ async function handleStoryImportFile(file) {
     const bundle = parseStoryBundleFile(text);
     const ctx = getContextSafe();
     if (!ctx) return;
-    const source = bundle.character ? `（来自「${bundle.character}」）` : '';
-    const ok = globalThis.confirm
-      ? globalThis.confirm(`将导入 ${bundle.nodes.length} 个节点、${bundle.scripts.length} 个事件${source}。同 id 条目会被更新，其余追加。是否继续？`)
-      : true;
-    if (!ok) return;
-    const stats = mergeStoryBundleInto(ctx, bundle);
+    const mode = await storyAskImportMode(bundle);
+    if (!mode) {
+      storyToastr('info', '已取消导入');
+      return;
+    }
+    const stats = mergeStoryBundleInto(ctx, bundle, { replace: mode === 'replace' });
     renderStoryTree();
     refreshHomeStoryStatus();
-    storyToastr('success', `导入完成：新增 ${stats.addedNodes} 节点 / ${stats.addedScripts} 事件，更新 ${stats.updatedNodes} 节点 / ${stats.updatedScripts} 事件`);
+    if (mode === 'replace') {
+      storyToastr('success', `覆盖导入完成：已整体替换为 ${stats.addedNodes} 节点 / ${stats.addedScripts} 事件`);
+    } else {
+      storyToastr('success', `合并导入完成：新增 ${stats.addedNodes} 节点 / ${stats.addedScripts} 事件，更新 ${stats.updatedNodes} 节点 / ${stats.updatedScripts} 事件`);
+    }
   } catch (error) {
     storyToastr('error', `导入失败：${String(error?.message || error)}`);
   }
+}
+
+// 导入方式选择浮层：整包导入前询问「合并 / 覆盖」，返回 'merge' | 'replace' | null（取消）。
+function storyAskImportMode(bundle) {
+  const overlay = document.getElementById(STORY_IMPORT_MODE_ID);
+  if (!overlay) return Promise.resolve('merge');
+  const desc = document.getElementById(STORY_IMPORT_MODE_DESC_ID);
+  if (desc) {
+    const source = bundle.character ? `（来自「${bundle.character}」）` : '';
+    desc.textContent = `将导入 ${bundle.nodes.length} 个节点、${bundle.scripts.length} 个事件${source}。请选择处理方式：合并 = 同 id 更新、其余追加；覆盖 = 清空当前剧情脉络后整体替换。`;
+  }
+  overlay.hidden = false;
+  return new Promise((resolve) => {
+    storyImportModeResolve = (mode) => {
+      storyImportModeResolve = null;
+      overlay.hidden = true;
+      resolve(mode);
+    };
+  });
+}
+
+// 结束导入方式选择：mode 为 null / 缺省时视为取消（工作台关闭时也会调用）。
+function closeStoryImportMode(mode) {
+  if (storyImportModeResolve) storyImportModeResolve(mode || null);
+  storyImportModeResolve = null;
+  const overlay = document.getElementById(STORY_IMPORT_MODE_ID);
+  if (overlay) overlay.hidden = true;
 }
 
 function handleStoryExportBundle() {
@@ -583,6 +619,16 @@ function initStorySection() {
           </div>
         </div>
       </div>
+      <div id="${STORY_IMPORT_MODE_ID}" class="kaleido-story__import-mode" hidden role="dialog" aria-label="选择导入方式">
+        <div class="kaleido-story__import-mode-card">
+          <div class="kaleido-story__import-mode-title">选择导入方式</div>
+          <div id="${STORY_IMPORT_MODE_DESC_ID}" class="kaleido-story__import-mode-desc"></div>
+          <div class="kaleido-story__import-mode-actions">
+            <button type="button" id="${STORY_IMPORT_MODE_MERGE_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--primary" title="同 id 条目更新，其余追加">🔀 合并导入</button>
+            <button type="button" id="${STORY_IMPORT_MODE_REPLACE_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--ghost" title="清空当前剧情脉络后整体替换">📦 覆盖导入</button>
+          </div>
+        </div>
+      </div>
       <div id="${STORY_ADD_MENU_ID}" class="kaleido-story__add-menu" hidden role="menu" aria-label="新建">
         <button type="button" id="${STORY_ADD_MENU_NODE_ID}" class="kaleido-story__add-menu-item" role="menuitem" data-kind="node">
           <span class="${STORY_NODE_ICON_CLASS}"></span> 新建节点
@@ -623,6 +669,14 @@ function initStorySection() {
   });
   document.getElementById(STORY_EXPORT_BTN_ID)?.addEventListener('click', handleStoryExportBundle);
 
+  document.getElementById(STORY_IMPORT_MODE_MERGE_ID)?.addEventListener('click', () => closeStoryImportMode('merge'));
+  document.getElementById(STORY_IMPORT_MODE_REPLACE_ID)?.addEventListener('click', () => closeStoryImportMode('replace'));
+  document.getElementById(STORY_IMPORT_MODE_ID)?.addEventListener('click', (event) => {
+    // 只认点击遮罩（卡片内部点击不取消）
+    const overlay = document.getElementById(STORY_IMPORT_MODE_ID);
+    if (event.target === overlay) closeStoryImportMode();
+  });
+
   const treeBody = document.getElementById(STORY_TREE_BODY_ID);
   treeBody?.addEventListener('click', (event) => {
     const button = event.target instanceof Element ? event.target.closest('[data-action]') : null;
@@ -635,6 +689,17 @@ function initStorySection() {
     switch (action) {
       case 'toggle': {
         storyToggleNode(id);
+        break;
+      }
+      case 'toggle-enabled': {
+        const node = toggleStoryNodeEnabled(ctx, id);
+        if (node) {
+          storyToastr('info', node.enabled === false
+            ? `节点「${node.name}」已关闭：其子节点与事件不再参与剧情预筛`
+            : `节点「${node.name}」已激活`);
+        }
+        renderStoryTree();
+        refreshHomeStoryStatus();
         break;
       }
       case 'add-menu': {

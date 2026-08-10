@@ -2,7 +2,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '0.7.1';
+const MODULE_VERSION = '0.7.2';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 
 // ---------- DOM ID / class ----------
@@ -95,6 +95,10 @@ const STORY_TREE_ID = 'kaleido-story-tree';
 const STORY_TREE_BODY_ID = 'kaleido-story-tree-body';
 const STORY_ROOT_ADD_ID = 'kaleido-story-root-add';
 const STORY_IMPORT_SCRIPT_INPUT_ID = 'kaleido-story-import-script-input';
+const STORY_IMPORT_MODE_ID = 'kaleido-story-import-mode';
+const STORY_IMPORT_MODE_DESC_ID = 'kaleido-story-import-mode-desc';
+const STORY_IMPORT_MODE_MERGE_ID = 'kaleido-story-import-mode-merge';
+const STORY_IMPORT_MODE_REPLACE_ID = 'kaleido-story-import-mode-replace';
 const STORY_ADD_MENU_ID = 'kaleido-story-add-menu';
 const STORY_ADD_MENU_KEY = '__kaleido_story_add_menu_key__';
 const STORY_ADD_MENU_NODE_ID = 'kaleido-story-add-menu-node';
@@ -3397,6 +3401,7 @@ function createStoryNode(ctx, data) {
     parentId,
     name: String(data?.name || '').trim() || '未命名节点',
     description: String(data?.description || '').trim(),
+    enabled: data?.enabled === false ? false : true,
     createdAt: now,
     updatedAt: now,
   };
@@ -3412,6 +3417,7 @@ function updateStoryNode(ctx, id, data) {
   if (data && typeof data === 'object') {
     if (data.name !== undefined) node.name = String(data.name).trim() || node.name;
     if (data.description !== undefined) node.description = String(data.description).trim();
+    if (data.enabled !== undefined) node.enabled = Boolean(data.enabled);
     if (data.parentId !== undefined) {
       const nextParent = String(data.parentId).trim();
       if (nextParent === '' || nextParent === id || isStoryNodeAncestor(ctx, id, nextParent)) {
@@ -3427,6 +3433,37 @@ function updateStoryNode(ctx, id, data) {
   node.updatedAt = nowIso();
   saveStoryData(ctx);
   return node;
+}
+
+// 节点启用开关：关闭后本节点及其子节点、事件不再参与剧情预筛；再点一次重新激活。
+function toggleStoryNodeEnabled(ctx, id) {
+  ensureStoryCardData(ctx);
+  const node = getStoryNodeById(ctx, id);
+  if (!node) return null;
+  node.enabled = node.enabled === false;
+  node.updatedAt = nowIso();
+  saveStoryData(ctx);
+  return node;
+}
+
+// 节点是否激活：自身或任一祖先被关闭则视为停用（子树整体停用）。
+function isStoryNodeActive(ctx, node) {
+  let current = node || null;
+  let guard = 0;
+  while (current && guard < 1000) {
+    if (current.enabled === false) return false;
+    current = String(current.parentId || '') ? getStoryNodeById(ctx, current.parentId) : null;
+    guard += 1;
+  }
+  return true;
+}
+
+// 当前参与预筛的事件：挂接节点（或任一祖先）被关闭的事件不返回；未分类事件恒有效。
+function getStoryActiveScripts(ctx) {
+  return getStoryScripts(ctx).filter((script) => {
+    if (!script.nodeId || !getStoryNodeById(ctx, script.nodeId)) return true;
+    return isStoryNodeActive(ctx, getStoryNodeById(ctx, script.nodeId));
+  });
 }
 
 // 事件 ID：默认从 001 开始逐次递增；excludeId 为正在编辑的事件自身 id（不计入）。
@@ -3815,7 +3852,7 @@ function serializeStoryBundle(ctx) {
   const characterName = character ? String(character.name || character.avatar || '').trim() : '';
   const lines = [];
   lines.push('# 万华镜（Kaleidoscope）剧情脉络导出');
-  lines.push('# 在「剧情脉络 → 导入 剧情脉络」中可重新导入；同 id 条目会被更新，其余追加。');
+  lines.push('# 在「剧情脉络 → 导入 剧情脉络」中可重新导入：合并（同 id 更新、其余追加）或覆盖（清空后整体替换）。');
   lines.push(`format: ${STORY_BUNDLE_FORMAT}`);
   lines.push(`version: ${STORY_BUNDLE_VERSION}`);
   if (characterName) {
@@ -3830,6 +3867,7 @@ function serializeStoryBundle(ctx) {
       lines.push(`    parentId: ${yamlScalar(node.parentId || '')}`);
       lines.push(`    name: ${yamlScalar(node.name)}`);
       lines.push(`    description: ${yamlScalar(node.description || '')}`);
+      lines.push(`    enabled: ${node.enabled === false ? 'false' : 'true'}`);
     }
   }
   if (scripts.length === 0) {
@@ -3916,11 +3954,16 @@ function parseStoryBundleFile(text) {
   };
 }
 
-// 合并导入：同 id 更新，其余追加；脚本引用的节点不存在时转为「未分类」。
-function mergeStoryBundleInto(ctx, bundle) {
+// 导入：默认合并（同 id 更新、其余追加）；options.replace 为覆盖模式（清空现有内容后整体替换）。
+// 脚本引用的节点不存在时转为「未分类」。
+function mergeStoryBundleInto(ctx, bundle, options) {
   ensureStoryCardData(ctx);
   const nodes = getStoryNodes(ctx);
   const scripts = getStoryScripts(ctx);
+  if (options?.replace) {
+    nodes.length = 0;
+    scripts.length = 0;
+  }
   const now = nowIso();
   const stats = { addedNodes: 0, updatedNodes: 0, addedScripts: 0, updatedScripts: 0 };
 
@@ -3933,6 +3976,8 @@ function mergeStoryBundleInto(ctx, bundle) {
     if (existing) {
       existing.name = String(raw.name ?? '').trim() || existing.name;
       existing.description = String(raw.description ?? existing.description ?? '').trim();
+      // 导入文件未写 enabled 时按「默认启用」处理（文件对启停状态有最终决定权）
+      existing.enabled = typeof raw.enabled === 'boolean' ? raw.enabled : true;
       existing.updatedAt = now;
       node = existing;
       stats.updatedNodes += 1;
@@ -3941,6 +3986,7 @@ function mergeStoryBundleInto(ctx, bundle) {
         id,
         name: String(raw.name || '').trim() || '未命名节点',
         description: String(raw.description || '').trim(),
+        enabled: typeof raw.enabled === 'boolean' ? raw.enabled : true,
         createdAt: now,
         updatedAt: now,
       };
@@ -4087,12 +4133,14 @@ function getStoryGateRecentMessages(count, ctx) {
 
 // 事件目录：节点（含层级与说明）+ 事件（只含名字 / ID / 触发条件 / 描述，不含正文）。
 // 这是 Gate 的唯一候选集，刻意不携带事件正文，避免预筛阶段泄露内容、放大输入体积。
+// 被关闭的节点（含其子树与事件）不进入目录，也不参与本轮预筛。
 function buildStoryEventCatalog(ctx) {
   const nodes = getStoryNodes(ctx);
   const scripts = getStoryScripts(ctx);
   const nodeMap = new Map(nodes.map((node) => [node.id, node]));
   const childrenOf = (parentId) => nodes
     .filter((node) => String(node.parentId || '') === String(parentId || ''))
+    .filter((node) => isStoryNodeActive(ctx, node))
     .sort(byStoryCreatedAt);
   const scriptsOf = (nodeId) => scripts
     .filter((script) => script.nodeId === nodeId)
@@ -4112,6 +4160,7 @@ function buildStoryEventCatalog(ctx) {
   });
   const roots = nodes
     .filter((node) => !String(node.parentId || ''))
+    .filter((node) => isStoryNodeActive(ctx, node))
     .sort(byStoryCreatedAt);
   const unassigned = scripts
     .filter((script) => !String(script.nodeId || '') || !nodeMap.has(script.nodeId))
@@ -4259,7 +4308,8 @@ async function runStoryGatePipeline(ctx, settings) {
   const startedAt = Date.now();
   const controller = new AbortController();
   const deadline = setTimeout(() => controller.abort(), STORY_GATE_TIMEOUT_MS);
-  const scripts = getStoryScripts(ctx);
+  // 只取「激活」事件：节点（或任一祖先）被关闭的事件不参与本轮预筛。
+  const scripts = getStoryActiveScripts(ctx);
   const record = {
     triggeredAt: new Date().toISOString(),
     durationMs: 0,
@@ -4488,6 +4538,7 @@ let storyExpanded = new Set();   // 已展开的节点 id
 let storyImportTargetNodeId = '';  // 节点行「导入事件」的目标节点
 let storyEditorSession = 0;        // 编辑器会话号：异步导入完成后若会话已变则放弃接管
 let storyAddMenuContext = null;   // 「＋」菜单上下文：{ root: true } 或 { nodeId }
+let storyImportModeResolve = null;  // 导入方式选择浮层的回调（resolve 'merge' | 'replace' | null）
 
 function storyToastr(kind, message) {
   try {
@@ -4532,6 +4583,7 @@ function openStoryWorkbench() {
 function closeStoryWorkbench() {
   const dialog = getStoryWorkbench();
   if (!dialog) return;
+  closeStoryImportMode();
   closeStoryEditor();
   closeStoryAddMenu();
   dialog.classList.remove('is-open');
@@ -4611,6 +4663,7 @@ function buildStoryNodeRow(node, depth, expanded, childCount) {
   const row = document.createElement('div');
   row.className = 'kaleido-story__row kaleido-story__row--node';
   row.style.setProperty('--depth', String(depth));
+  const enabled = node.enabled !== false;
   row.innerHTML = `
     <button type="button" class="kaleido-story__chevron${childCount > 0 ? '' : ' is-empty'}" data-action="toggle" data-id="${escapeHtml(node.id)}" title="展开 / 收起" aria-label="展开 / 收起">
       <span class="${STORY_CHEVRON_ICON_CLASS}"></span>
@@ -4618,6 +4671,7 @@ function buildStoryNodeRow(node, depth, expanded, childCount) {
     <span class="kaleido-story__row-icon"><span class="${expanded ? STORY_NODE_OPEN_ICON_CLASS : STORY_NODE_ICON_CLASS}"></span></span>
     <span class="kaleido-story__row-name" title="${escapeHtml(node.description || node.name)}">${escapeHtml(node.name)}</span>
     <span class="kaleido-story__row-count">${childCount} 项</span>
+    <button type="button" class="kaleido-story__switch${enabled ? '' : ' is-off'}" data-action="toggle-enabled" data-id="${escapeHtml(node.id)}" role="switch" aria-checked="${enabled}" title="${enabled ? '点击关闭：本节点及其子节点、事件不再参与剧情预筛' : '点击激活：本节点及其子节点、事件重新参与剧情预筛'}" aria-label="启用 / 关闭节点"><span class="kaleido-story__switch-thumb"></span></button>
     <span class="kaleido-story__row-actions">
       <button type="button" class="kaleido-story__icon-btn" data-action="add-menu" data-id="${escapeHtml(node.id)}" title="新建节点 / 事件" aria-label="新建节点 / 事件"><span class="${STORY_ADD_CHILD_ICON_CLASS}"></span></button>
       <button type="button" class="kaleido-story__icon-btn" data-action="import-script" data-id="${escapeHtml(node.id)}" title="导入事件文件" aria-label="导入事件文件"><span class="${STORY_IMPORT_ICON_CLASS}"></span></button>
@@ -4626,6 +4680,7 @@ function buildStoryNodeRow(node, depth, expanded, childCount) {
     </span>
   `;
   if (expanded) row.classList.add('is-expanded');
+  if (!enabled) row.classList.add('is-disabled');
   return row;
 }
 
@@ -4949,18 +5004,49 @@ async function handleStoryImportFile(file) {
     const bundle = parseStoryBundleFile(text);
     const ctx = getContextSafe();
     if (!ctx) return;
-    const source = bundle.character ? `（来自「${bundle.character}」）` : '';
-    const ok = globalThis.confirm
-      ? globalThis.confirm(`将导入 ${bundle.nodes.length} 个节点、${bundle.scripts.length} 个事件${source}。同 id 条目会被更新，其余追加。是否继续？`)
-      : true;
-    if (!ok) return;
-    const stats = mergeStoryBundleInto(ctx, bundle);
+    const mode = await storyAskImportMode(bundle);
+    if (!mode) {
+      storyToastr('info', '已取消导入');
+      return;
+    }
+    const stats = mergeStoryBundleInto(ctx, bundle, { replace: mode === 'replace' });
     renderStoryTree();
     refreshHomeStoryStatus();
-    storyToastr('success', `导入完成：新增 ${stats.addedNodes} 节点 / ${stats.addedScripts} 事件，更新 ${stats.updatedNodes} 节点 / ${stats.updatedScripts} 事件`);
+    if (mode === 'replace') {
+      storyToastr('success', `覆盖导入完成：已整体替换为 ${stats.addedNodes} 节点 / ${stats.addedScripts} 事件`);
+    } else {
+      storyToastr('success', `合并导入完成：新增 ${stats.addedNodes} 节点 / ${stats.addedScripts} 事件，更新 ${stats.updatedNodes} 节点 / ${stats.updatedScripts} 事件`);
+    }
   } catch (error) {
     storyToastr('error', `导入失败：${String(error?.message || error)}`);
   }
+}
+
+// 导入方式选择浮层：整包导入前询问「合并 / 覆盖」，返回 'merge' | 'replace' | null（取消）。
+function storyAskImportMode(bundle) {
+  const overlay = document.getElementById(STORY_IMPORT_MODE_ID);
+  if (!overlay) return Promise.resolve('merge');
+  const desc = document.getElementById(STORY_IMPORT_MODE_DESC_ID);
+  if (desc) {
+    const source = bundle.character ? `（来自「${bundle.character}」）` : '';
+    desc.textContent = `将导入 ${bundle.nodes.length} 个节点、${bundle.scripts.length} 个事件${source}。请选择处理方式：合并 = 同 id 更新、其余追加；覆盖 = 清空当前剧情脉络后整体替换。`;
+  }
+  overlay.hidden = false;
+  return new Promise((resolve) => {
+    storyImportModeResolve = (mode) => {
+      storyImportModeResolve = null;
+      overlay.hidden = true;
+      resolve(mode);
+    };
+  });
+}
+
+// 结束导入方式选择：mode 为 null / 缺省时视为取消（工作台关闭时也会调用）。
+function closeStoryImportMode(mode) {
+  if (storyImportModeResolve) storyImportModeResolve(mode || null);
+  storyImportModeResolve = null;
+  const overlay = document.getElementById(STORY_IMPORT_MODE_ID);
+  if (overlay) overlay.hidden = true;
 }
 
 function handleStoryExportBundle() {
@@ -5063,6 +5149,16 @@ function initStorySection() {
           </div>
         </div>
       </div>
+      <div id="${STORY_IMPORT_MODE_ID}" class="kaleido-story__import-mode" hidden role="dialog" aria-label="选择导入方式">
+        <div class="kaleido-story__import-mode-card">
+          <div class="kaleido-story__import-mode-title">选择导入方式</div>
+          <div id="${STORY_IMPORT_MODE_DESC_ID}" class="kaleido-story__import-mode-desc"></div>
+          <div class="kaleido-story__import-mode-actions">
+            <button type="button" id="${STORY_IMPORT_MODE_MERGE_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--primary" title="同 id 条目更新，其余追加">🔀 合并导入</button>
+            <button type="button" id="${STORY_IMPORT_MODE_REPLACE_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--ghost" title="清空当前剧情脉络后整体替换">📦 覆盖导入</button>
+          </div>
+        </div>
+      </div>
       <div id="${STORY_ADD_MENU_ID}" class="kaleido-story__add-menu" hidden role="menu" aria-label="新建">
         <button type="button" id="${STORY_ADD_MENU_NODE_ID}" class="kaleido-story__add-menu-item" role="menuitem" data-kind="node">
           <span class="${STORY_NODE_ICON_CLASS}"></span> 新建节点
@@ -5103,6 +5199,14 @@ function initStorySection() {
   });
   document.getElementById(STORY_EXPORT_BTN_ID)?.addEventListener('click', handleStoryExportBundle);
 
+  document.getElementById(STORY_IMPORT_MODE_MERGE_ID)?.addEventListener('click', () => closeStoryImportMode('merge'));
+  document.getElementById(STORY_IMPORT_MODE_REPLACE_ID)?.addEventListener('click', () => closeStoryImportMode('replace'));
+  document.getElementById(STORY_IMPORT_MODE_ID)?.addEventListener('click', (event) => {
+    // 只认点击遮罩（卡片内部点击不取消）
+    const overlay = document.getElementById(STORY_IMPORT_MODE_ID);
+    if (event.target === overlay) closeStoryImportMode();
+  });
+
   const treeBody = document.getElementById(STORY_TREE_BODY_ID);
   treeBody?.addEventListener('click', (event) => {
     const button = event.target instanceof Element ? event.target.closest('[data-action]') : null;
@@ -5115,6 +5219,17 @@ function initStorySection() {
     switch (action) {
       case 'toggle': {
         storyToggleNode(id);
+        break;
+      }
+      case 'toggle-enabled': {
+        const node = toggleStoryNodeEnabled(ctx, id);
+        if (node) {
+          storyToastr('info', node.enabled === false
+            ? `节点「${node.name}」已关闭：其子节点与事件不再参与剧情预筛`
+            : `节点「${node.name}」已激活`);
+        }
+        renderStoryTree();
+        refreshHomeStoryStatus();
         break;
       }
       case 'add-menu': {

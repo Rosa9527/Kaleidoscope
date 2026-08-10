@@ -254,6 +254,23 @@ runner.test('展开/收起节点', () => {
   click(actionButton(rowByName('第一卷'), 'toggle')); // 恢复展开，供后续用例
 });
 
+// ---------- 节点启停滑块 ----------
+runner.test('节点行滑块：点击关闭再点击激活', () => {
+  const vol1 = ui.getStoryRootNodes(hostCtx)[0];
+  let row = rowByName('第一卷');
+  let slider = row.querySelector('[data-action="toggle-enabled"]');
+  assert(slider, '节点行应有启用滑块');
+  assert(slider.getAttribute('aria-checked') === 'true', '初始应为启用');
+  click(slider);
+  assert(ui.getStoryNodeById(hostCtx, vol1.id).enabled === false, '点击后节点应关闭');
+  row = rowByName('第一卷');
+  assert(row.classList.contains('is-disabled'), '停用行应有 is-disabled 样式');
+  assert(row.querySelector('[data-action="toggle-enabled"]').getAttribute('aria-checked') === 'false', '滑块应显示关闭');
+  click(row.querySelector('[data-action="toggle-enabled"]'));
+  assert(ui.getStoryNodeById(hostCtx, vol1.id).enabled !== false, '再次点击应重新激活');
+  assert(!rowByName('第一卷').classList.contains('is-disabled'), '激活后应移除 is-disabled 样式');
+});
+
 // ---------- 事件：新建 / 编辑 / 删除 ----------
 runner.test('第一章下新建事件「雨夜事件」', () => {
   const vol1 = ui.getStoryRootNodes(hostCtx)[0];
@@ -395,13 +412,17 @@ runner.test('整包导入合并', async () => {
     '',
   ].join('\n');
   await importViaFileInput('kaleido-story-import-input', 'bundle.yaml', yaml);
+  assert(!$('kaleido-story-import-mode').hidden, '整包导入应先弹出导入方式选择');
+  assert($('kaleido-story-import-mode-desc').textContent.includes('将导入 1 个节点、1 个事件'), '选择浮层应说明导入内容');
+  click($('kaleido-story-import-mode-merge'));
+  await flush();
+  assert($('kaleido-story-import-mode').hidden, '选择后浮层应关闭');
   assert(ui.getStoryNodes(hostCtx).length === beforeNodes + 1, '应新增 1 节点');
   assert(ui.getStoryScripts(hostCtx).length === beforeScripts + 1, '应新增 1 事件');
   const vol2 = ui.getStoryNodeById(hostCtx, 'n-imported-1');
   assert(vol2 && vol2.name === '第二卷', '第二卷应导入');
   assert(ui.getStoryScriptById(hostCtx, 's-imported-1').nodeId === 'n-imported-1', '事件应归属第二卷');
   assert(rowNames().includes('第二卷'), '树应显示第二卷');
-  assert(confirms.some((msg) => msg.includes('将导入 1 个节点、1 个事件')), '导入前应询问确认');
 });
 
 runner.test('整包导出文件名使用角色卡名', () => {
@@ -431,8 +452,11 @@ runner.test('整包导入识别格式标记并提示来源角色卡', async () =
     '',
   ].join('\n');
   await importViaFileInput('kaleido-story-import-input', '剧情脉络: 辉夜大小姐.yaml', yaml);
+  assert(!$('kaleido-story-import-mode').hidden, '整包导入应先弹出导入方式选择');
+  assert($('kaleido-story-import-mode-desc').textContent.includes('来自「辉夜大小姐」'), '导入方式浮层应提示来源角色卡名');
+  click($('kaleido-story-import-mode-merge'));
+  await flush();
   assert(ui.getStoryNodes(hostCtx).length === beforeNodes + 1, '应新增 1 节点');
-  assert(confirms.some((msg) => msg.includes('来自「辉夜大小姐」')), '确认提示应包含来源角色卡名');
 });
 
 // ---------- 删除 ----------
@@ -607,6 +631,39 @@ runner.test('工作台头部显示角色卡绑定徽标', () => {
   delete hostCtx.characters;
   delete hostCtx.characterId;
   delete hostCtx.writeExtensionField;
+});
+
+// ---------- 整包：覆盖导入 ----------
+runner.test('整包导入覆盖模式：清空现有内容后整体替换', async () => {
+  ui.openStoryWorkbench();
+  clearToasts();
+  const yaml = [
+    'format: kaleidoscope-story',
+    'version: 1',
+    'nodes:',
+    '  - id: n-replace-1',
+    '    parentId: ""',
+    '    name: 终章',
+    '    description: ""',
+    'scripts:',
+    '  - id: s-replace-1',
+    '    nodeId: n-replace-1',
+    '    name: 决战',
+    '    trigger: 到达最终战场',
+    '    description: ""',
+    '    content: |-',
+    '      风云变色。',
+    '',
+  ].join('\n');
+  await importViaFileInput('kaleido-story-import-input', '终章.yaml', yaml);
+  assert(!$('kaleido-story-import-mode').hidden, '应弹出导入方式选择');
+  click($('kaleido-story-import-mode-replace'));
+  await flush();
+  assert(ui.getStoryNodes(hostCtx).length === 1 && ui.getStoryNodes(hostCtx)[0].id === 'n-replace-1', '覆盖后应只剩导入的节点');
+  assert(ui.getStoryScripts(hostCtx).length === 1 && ui.getStoryScripts(hostCtx)[0].id === 's-replace-1', '覆盖后应只剩导入的事件');
+  assert(rowNames().includes('终章'), '树应显示导入节点');
+  assert(toasts.some(([kind, msg]) => kind === 'success' && msg.includes('覆盖导入完成')), '应提示覆盖导入完成');
+  assert($('kaleido-story-import-mode').hidden, '选择后浮层应关闭');
 });
 
 runner.run();

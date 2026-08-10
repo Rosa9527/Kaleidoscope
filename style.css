@@ -872,6 +872,56 @@ select.kaleido-input {
   padding-left: calc(30px + var(--depth, 0) * 20px);
 }
 
+/* 节点启用滑块：点击关闭（整棵子树停用），再点激活 */
+.kaleido-story__switch {
+  flex: none;
+  position: relative;
+  width: 30px;
+  height: 16px;
+  padding: 0;
+  background: rgba(59, 51, 42, 0.3);
+  border: 1px solid rgba(59, 51, 42, 0.35);
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.kaleido-story__switch-thumb {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--k-paper-light);
+  box-shadow: 0 1px 2px rgba(59, 51, 42, 0.4);
+  transition: transform 0.18s ease;
+}
+
+.kaleido-story__switch:not(.is-off) {
+  background: var(--k-cinnabar);
+  border-color: var(--k-cinnabar-deep);
+}
+
+.kaleido-story__switch:not(.is-off) .kaleido-story__switch-thumb {
+  transform: translateX(14px);
+}
+
+.kaleido-story__switch:hover {
+  border-color: var(--k-cinnabar);
+  box-shadow: 0 0 0 2px rgba(166, 58, 46, 0.12);
+}
+
+/* 停用节点整行淡化，提示其子树不参与预筛 */
+.kaleido-story__row--node.is-disabled .kaleido-story__row-name,
+.kaleido-story__row--node.is-disabled .kaleido-story__row-count {
+  color: rgba(59, 51, 42, 0.4);
+}
+
+.kaleido-story__row--node.is-disabled .kaleido-story__row-icon {
+  color: rgba(59, 51, 42, 0.38);
+}
+
 .kaleido-story__chevron {
   flex: none;
   width: 22px;
@@ -1054,6 +1104,55 @@ select.kaleido-input {
   width: 16px;
   text-align: center;
   color: var(--k-gold);
+}
+
+/* 导入方式选择浮层：整包导入时询问合并 / 覆盖 */
+.kaleido-story__import-mode[hidden] {
+  display: none !important;
+}
+
+.kaleido-story__import-mode {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(25, 19, 11, 0.38);
+}
+
+.kaleido-story__import-mode-card {
+  width: min(380px, calc(100% - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: var(--k-paper);
+  border: 1.5px solid rgba(59, 51, 42, 0.55);
+  border-top: 3px solid var(--k-cinnabar);
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(59, 51, 42, 0.35);
+}
+
+.kaleido-story__import-mode-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.kaleido-story__import-mode-desc {
+  font-size: 12px;
+  line-height: 1.7;
+  color: rgba(59, 51, 42, 0.62);
+}
+
+.kaleido-story__import-mode-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.kaleido-story__import-mode-actions .kaleido-btn {
+  flex: 1;
 }
 
 /* 编辑器（桌面：右侧浮层；移动端：全幅覆盖） */
@@ -1910,6 +2009,23 @@ select.kaleido-input {
     font-size: 13px;
   }
 
+  .kaleido-story__switch {
+    width: 40px;
+    height: 22px;
+    border-radius: 11px;
+  }
+
+  .kaleido-story__switch-thumb {
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+  }
+
+  .kaleido-story__switch:not(.is-off) .kaleido-story__switch-thumb {
+    transform: translateX(18px);
+  }
+
   .kaleido-story__row-badge {
     max-width: 96px;
   }
@@ -1973,7 +2089,8 @@ select.kaleido-input {
   .kaleido-story-dialog .kaleido-btn,
   .kaleido-story-dialog .kaleido-icon-btn,
   .kaleido-story-dialog .kaleido-story__icon-btn,
-  .kaleido-story-dialog .kaleido-story__chevron {
+  .kaleido-story-dialog .kaleido-story__chevron,
+  .kaleido-story-dialog .kaleido-story__switch {
     touch-action: manipulation;
   }
 }

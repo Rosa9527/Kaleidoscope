@@ -1,7 +1,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '0.7.1';
+const MODULE_VERSION = '0.7.2';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 
 // ---------- DOM ID / class ----------
@@ -94,6 +94,10 @@ const STORY_TREE_ID = 'kaleido-story-tree';
 const STORY_TREE_BODY_ID = 'kaleido-story-tree-body';
 const STORY_ROOT_ADD_ID = 'kaleido-story-root-add';
 const STORY_IMPORT_SCRIPT_INPUT_ID = 'kaleido-story-import-script-input';
+const STORY_IMPORT_MODE_ID = 'kaleido-story-import-mode';
+const STORY_IMPORT_MODE_DESC_ID = 'kaleido-story-import-mode-desc';
+const STORY_IMPORT_MODE_MERGE_ID = 'kaleido-story-import-mode-merge';
+const STORY_IMPORT_MODE_REPLACE_ID = 'kaleido-story-import-mode-replace';
 const STORY_ADD_MENU_ID = 'kaleido-story-add-menu';
 const STORY_ADD_MENU_KEY = '__kaleido_story_add_menu_key__';
 const STORY_ADD_MENU_NODE_ID = 'kaleido-story-add-menu-node';

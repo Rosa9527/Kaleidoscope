@@ -45,12 +45,14 @@ function getStoryGateRecentMessages(count, ctx) {
 
 // 事件目录：节点（含层级与说明）+ 事件（只含名字 / ID / 触发条件 / 描述，不含正文）。
 // 这是 Gate 的唯一候选集，刻意不携带事件正文，避免预筛阶段泄露内容、放大输入体积。
+// 被关闭的节点（含其子树与事件）不进入目录，也不参与本轮预筛。
 function buildStoryEventCatalog(ctx) {
   const nodes = getStoryNodes(ctx);
   const scripts = getStoryScripts(ctx);
   const nodeMap = new Map(nodes.map((node) => [node.id, node]));
   const childrenOf = (parentId) => nodes
     .filter((node) => String(node.parentId || '') === String(parentId || ''))
+    .filter((node) => isStoryNodeActive(ctx, node))
     .sort(byStoryCreatedAt);
   const scriptsOf = (nodeId) => scripts
     .filter((script) => script.nodeId === nodeId)
@@ -70,6 +72,7 @@ function buildStoryEventCatalog(ctx) {
   });
   const roots = nodes
     .filter((node) => !String(node.parentId || ''))
+    .filter((node) => isStoryNodeActive(ctx, node))
     .sort(byStoryCreatedAt);
   const unassigned = scripts
     .filter((script) => !String(script.nodeId || '') || !nodeMap.has(script.nodeId))
@@ -217,7 +220,8 @@ async function runStoryGatePipeline(ctx, settings) {
   const startedAt = Date.now();
   const controller = new AbortController();
   const deadline = setTimeout(() => controller.abort(), STORY_GATE_TIMEOUT_MS);
-  const scripts = getStoryScripts(ctx);
+  // 只取「激活」事件：节点（或任一祖先）被关闭的事件不参与本轮预筛。
+  const scripts = getStoryActiveScripts(ctx);
   const record = {
     triggeredAt: new Date().toISOString(),
     durationMs: 0,

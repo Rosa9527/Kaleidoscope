@@ -211,6 +211,7 @@ function createStoryNode(ctx, data) {
     parentId,
     name: String(data?.name || '').trim() || '未命名节点',
     description: String(data?.description || '').trim(),
+    enabled: data?.enabled === false ? false : true,
     createdAt: now,
     updatedAt: now,
   };
@@ -226,6 +227,7 @@ function updateStoryNode(ctx, id, data) {
   if (data && typeof data === 'object') {
     if (data.name !== undefined) node.name = String(data.name).trim() || node.name;
     if (data.description !== undefined) node.description = String(data.description).trim();
+    if (data.enabled !== undefined) node.enabled = Boolean(data.enabled);
     if (data.parentId !== undefined) {
       const nextParent = String(data.parentId).trim();
       if (nextParent === '' || nextParent === id || isStoryNodeAncestor(ctx, id, nextParent)) {
@@ -241,6 +243,37 @@ function updateStoryNode(ctx, id, data) {
   node.updatedAt = nowIso();
   saveStoryData(ctx);
   return node;
+}
+
+// 节点启用开关：关闭后本节点及其子节点、事件不再参与剧情预筛；再点一次重新激活。
+function toggleStoryNodeEnabled(ctx, id) {
+  ensureStoryCardData(ctx);
+  const node = getStoryNodeById(ctx, id);
+  if (!node) return null;
+  node.enabled = node.enabled === false;
+  node.updatedAt = nowIso();
+  saveStoryData(ctx);
+  return node;
+}
+
+// 节点是否激活：自身或任一祖先被关闭则视为停用（子树整体停用）。
+function isStoryNodeActive(ctx, node) {
+  let current = node || null;
+  let guard = 0;
+  while (current && guard < 1000) {
+    if (current.enabled === false) return false;
+    current = String(current.parentId || '') ? getStoryNodeById(ctx, current.parentId) : null;
+    guard += 1;
+  }
+  return true;
+}
+
+// 当前参与预筛的事件：挂接节点（或任一祖先）被关闭的事件不返回；未分类事件恒有效。
+function getStoryActiveScripts(ctx) {
+  return getStoryScripts(ctx).filter((script) => {
+    if (!script.nodeId || !getStoryNodeById(ctx, script.nodeId)) return true;
+    return isStoryNodeActive(ctx, getStoryNodeById(ctx, script.nodeId));
+  });
 }
 
 // 事件 ID：默认从 001 开始逐次递增；excludeId 为正在编辑的事件自身 id（不计入）。
@@ -629,7 +662,7 @@ function serializeStoryBundle(ctx) {
   const characterName = character ? String(character.name || character.avatar || '').trim() : '';
   const lines = [];
   lines.push('# 万华镜（Kaleidoscope）剧情脉络导出');
-  lines.push('# 在「剧情脉络 → 导入 剧情脉络」中可重新导入；同 id 条目会被更新，其余追加。');
+  lines.push('# 在「剧情脉络 → 导入 剧情脉络」中可重新导入：合并（同 id 更新、其余追加）或覆盖（清空后整体替换）。');
   lines.push(`format: ${STORY_BUNDLE_FORMAT}`);
   lines.push(`version: ${STORY_BUNDLE_VERSION}`);
   if (characterName) {
@@ -644,6 +677,7 @@ function serializeStoryBundle(ctx) {
       lines.push(`    parentId: ${yamlScalar(node.parentId || '')}`);
       lines.push(`    name: ${yamlScalar(node.name)}`);
       lines.push(`    description: ${yamlScalar(node.description || '')}`);
+      lines.push(`    enabled: ${node.enabled === false ? 'false' : 'true'}`);
     }
   }
   if (scripts.length === 0) {
@@ -730,11 +764,16 @@ function parseStoryBundleFile(text) {
   };
 }
 
-// 合并导入：同 id 更新，其余追加；脚本引用的节点不存在时转为「未分类」。
-function mergeStoryBundleInto(ctx, bundle) {
+// 导入：默认合并（同 id 更新、其余追加）；options.replace 为覆盖模式（清空现有内容后整体替换）。
+// 脚本引用的节点不存在时转为「未分类」。
+function mergeStoryBundleInto(ctx, bundle, options) {
   ensureStoryCardData(ctx);
   const nodes = getStoryNodes(ctx);
   const scripts = getStoryScripts(ctx);
+  if (options?.replace) {
+    nodes.length = 0;
+    scripts.length = 0;
+  }
   const now = nowIso();
   const stats = { addedNodes: 0, updatedNodes: 0, addedScripts: 0, updatedScripts: 0 };
 
@@ -747,6 +786,8 @@ function mergeStoryBundleInto(ctx, bundle) {
     if (existing) {
       existing.name = String(raw.name ?? '').trim() || existing.name;
       existing.description = String(raw.description ?? existing.description ?? '').trim();
+      // 导入文件未写 enabled 时按「默认启用」处理（文件对启停状态有最终决定权）
+      existing.enabled = typeof raw.enabled === 'boolean' ? raw.enabled : true;
       existing.updatedAt = now;
       node = existing;
       stats.updatedNodes += 1;
@@ -755,6 +796,7 @@ function mergeStoryBundleInto(ctx, bundle) {
         id,
         name: String(raw.name || '').trim() || '未命名节点',
         description: String(raw.description || '').trim(),
+        enabled: typeof raw.enabled === 'boolean' ? raw.enabled : true,
         createdAt: now,
         updatedAt: now,
       };

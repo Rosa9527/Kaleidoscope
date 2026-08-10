@@ -284,6 +284,92 @@ runner.test('同 id 二次导入为更新而非重复', () => {
   assert(ctx.getStoryScriptById(c, 's1').content === '新', '内容应已更新');
 });
 
+// ---------- 节点启停 ----------
+runner.test('新建节点默认启用，开关可切换，updateStoryNode 支持 enabled', () => {
+  const c = fresh();
+  const node = ctx.createStoryNode(c, { name: '第一卷' });
+  assert(node.enabled !== false, '新节点默认应启用');
+  ctx.toggleStoryNodeEnabled(c, node.id);
+  assert(ctx.getStoryNodeById(c, node.id).enabled === false, '第一次点击应关闭');
+  ctx.toggleStoryNodeEnabled(c, node.id);
+  assert(ctx.getStoryNodeById(c, node.id).enabled !== false, '第二次点击应重新激活');
+  ctx.updateStoryNode(c, node.id, { enabled: false });
+  assert(ctx.getStoryNodeById(c, node.id).enabled === false, 'updateStoryNode 应支持 enabled');
+  ctx.updateStoryNode(c, node.id, { name: '改名' });
+  assert(ctx.getStoryNodeById(c, node.id).enabled === false, '不传 enabled 不应重置状态');
+});
+
+runner.test('停用节点：子树与事件被排除，未分类事件保留', () => {
+  const c = fresh();
+  const { vol1, ch1 } = makeTree(c);
+  ctx.createStoryScript(c, { name: '无主事件', content: '孤本' });
+  ctx.toggleStoryNodeEnabled(c, ch1.id);
+  const active = ctx.getStoryActiveScripts(c);
+  assert(active.length === 1 && active[0].name === '无主事件', '停用节点下的事件应排除，未分类保留');
+  assert(!ctx.isStoryNodeActive(c, ch1), '停用节点自身应判定为非激活');
+  assert(ctx.isStoryNodeActive(c, vol1), '父节点不受子节点停用影响');
+  ctx.toggleStoryNodeEnabled(c, vol1.id);
+  const afterRoot = ctx.getStoryActiveScripts(c);
+  assert(afterRoot.length === 1 && afterRoot[0].name === '无主事件', '停用根节点后整棵子树的事件都应排除，未分类保留');
+});
+
+runner.test('整包导出每个节点都写 enabled，往返保留启停状态', () => {
+  const c = fresh();
+  const node = ctx.createStoryNode(c, { name: '第一卷' });
+  ctx.toggleStoryNodeEnabled(c, node.id);
+  const yaml = ctx.serializeStoryBundle(c);
+  assert(yaml.includes('enabled: false'), '停用节点应写入 enabled: false');
+  const bundle = ctx.parseStoryBundleFile(yaml);
+  const c2 = fresh();
+  const stats = ctx.mergeStoryBundleInto(c2, bundle);
+  assert(stats.addedNodes === 1, '应新增 1 节点');
+  assert(ctx.getStoryNodeById(c2, node.id).enabled === false, '导入后应保持停用');
+  const c3 = fresh();
+  ctx.createStoryNode(c3, { name: '正常' });
+  const yaml3 = ctx.serializeStoryBundle(c3);
+  assert(yaml3.includes('enabled: true'), '启用节点也应写入 enabled: true');
+  const bundle3 = ctx.parseStoryBundleFile(yaml3);
+  const c4 = fresh();
+  ctx.mergeStoryBundleInto(c4, bundle3);
+  assert(ctx.getStoryNodeById(c4, ctx.getStoryNodes(c3)[0].id).enabled !== false, 'enabled: true 往返后应保持启用');
+});
+
+runner.test('合并导入：包中显式停用生效，缺失 enabled 默认启用', () => {
+  const c = fresh();
+  const node = ctx.createStoryNode(c, { name: 'A' });
+  ctx.mergeStoryBundleInto(c, {
+    nodes: [{ id: node.id, name: 'A', enabled: false }],
+    scripts: [],
+  });
+  assert(ctx.getStoryNodeById(c, node.id).enabled === false, '包中显式 enabled: false 应生效');
+  ctx.mergeStoryBundleInto(c, { nodes: [{ id: node.id, name: 'A' }], scripts: [] });
+  assert(ctx.getStoryNodeById(c, node.id).enabled !== false, '包中缺失 enabled 应默认启用');
+  ctx.mergeStoryBundleInto(c, {
+    nodes: [{ id: node.id, name: 'A', enabled: true }],
+    scripts: [],
+  });
+  assert(ctx.getStoryNodeById(c, node.id).enabled !== false, '包中显式 enabled: true 应保持启用');
+});
+
+runner.test('覆盖导入：清空现有内容后整体替换', () => {
+  const c = fresh();
+  ctx.createStoryNode(c, { name: '旧节点' });
+  ctx.createStoryScript(c, { name: '旧事件', content: 'x' });
+  const stats = ctx.mergeStoryBundleInto(c, {
+    nodes: [{ id: 'n-new', name: '新节点' }],
+    scripts: [{ id: 's-new', name: '新事件', nodeId: 'n-new', content: 'y' }],
+  }, { replace: true });
+  assert(stats.addedNodes === 1 && stats.addedScripts === 1, '覆盖后统计按导入内容计');
+  assert(ctx.getStoryNodes(c).length === 1 && ctx.getStoryNodes(c)[0].id === 'n-new', '旧节点应被清空');
+  assert(ctx.getStoryScripts(c).length === 1 && ctx.getStoryScripts(c)[0].id === 's-new', '旧事件应被清空');
+  ctx.mergeStoryBundleInto(c, {
+    nodes: [{ id: 'n-new', name: '新节点（修订）' }],
+    scripts: [],
+  }, { replace: true });
+  assert(ctx.getStoryNodes(c).length === 1 && ctx.getStoryNodes(c)[0].name === '新节点（修订）', '重复覆盖应仍为替换语义');
+  assert(ctx.getStoryScripts(c).length === 0, '第二次覆盖应清空事件');
+});
+
 runner.test('脚本引用的节点不存在时转未分类', () => {
   const c = fresh();
   ctx.mergeStoryBundleInto(c, {
