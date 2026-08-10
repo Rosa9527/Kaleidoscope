@@ -176,6 +176,15 @@ function initDraggableSphere(sphere) {
 }
 
 // ---------- 面板 ----------
+// 移动端（≤640px）面板全屏铺满，不做浮窗定位 / 拖拽。
+function isMobileViewport() {
+  try {
+    return Boolean(window.matchMedia && window.matchMedia('(max-width: 640px)').matches);
+  } catch {
+    return false;
+  }
+}
+
 function clampPanelPosition(dialog, left, top) {
   const width = dialog?.offsetWidth || 360;
   const height = dialog?.offsetHeight || 420;
@@ -190,6 +199,8 @@ function clampPanelPosition(dialog, left, top) {
 function setPanelPosition(panel, left, top) {
   const dialog = panel?.querySelector('.kaleido-panel__dialog');
   if (!panel || !dialog) return;
+  // 移动端全屏：位置交给 CSS（inset 0），不写内联 left/top，避免盖掉全屏布局。
+  if (isMobileViewport()) return;
   const next = clampPanelPosition(dialog, left, top);
   dialog.style.left = `${next.left}px`;
   dialog.style.top = `${next.top}px`;
@@ -228,6 +239,7 @@ function initDraggablePanel(panel) {
   handles.forEach((handle) =>
     handle.addEventListener('pointerdown', (event) => {
       if (event.button !== 0) return;
+      if (isMobileViewport()) return;
       // 指针落在标题栏内的按钮上（返回/关闭）时，不启动拖拽、不捕获指针，
       // 否则 setPointerCapture 会把后续 click 重定向到标题栏，按钮点击失效。
       const target = event.target;

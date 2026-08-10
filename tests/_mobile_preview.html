@@ -1,3 +1,8 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Kaleidoscope Mobile Preview</title>
+<style>
 /* =========================================================
    万华镜（Kaleidoscope）· 古风典雅 + 万花筒意象
    宣纸底 + 墨色描边 + 朱砂印章 + 鎏金点缀；
@@ -2063,3 +2068,392 @@ select.kaleido-input {
     color: var(--k-ink);
   }
 }
+
+</style>
+<style>
+  body { margin: 0; background: #8c8271; font-family: sans-serif; }
+  .kaleido-sphere { display: flex; }
+</style>
+</head><body>
+<div id="kaleido-panel" class="kaleido-panel is-open" aria-hidden="false" data-drag-ready="true" data-views-ready="true" data-api-ready="true" data-log-ready="true" data-preset-ready="true" data-left="664" data-top="24" data-positioned="true">
+    <div class="kaleido-panel__dialog" role="dialog" aria-label="万华镜" style="left: 664px; top: 24px;">
+      <div class="kaleido-panel__header kaleido-drag-handle">
+        <button type="button" id="kaleido-panel-back" class="kaleido-panel__back" aria-label="返回" title="返回" style="visibility:hidden">←</button>
+        <span class="kaleido-panel__logo" aria-hidden="true"><span class="fa-solid fa-fan"></span></span>
+        <span id="kaleido-panel-title" class="kaleido-panel__title">万华镜</span>
+        <button type="button" class="kaleido-panel__close" aria-label="关闭" title="关闭">✕</button>
+      </div>
+      <div class="kaleido-panel__body">
+        <section id="kaleido-home-view" class="kaleido-view is-active" aria-hidden="false">
+          <div class="kaleido-home__hero">
+            <p class="kaleido-home__slogan"><span class="kaleido-home__slogan-first" aria-hidden="true">镜</span>中万象，皆是文章</p>
+            <button type="button" id="kaleido-home-log-button" class="kaleido-home__log-btn" title="系统日志：后台运行记录与网络请求" aria-label="系统日志">
+              <span class="fa-solid fa-book"></span>
+              <span id="kaleido-home-log-badge" class="kaleido-home__log-badge" data-state="idle" hidden="" title=""></span>
+            </button>
+          </div>
+          <div class="kaleido-home__grid">
+            <button type="button" id="kaleido-home-api-card" class="kaleido-home__card" title="配置 AI 接口，引擎的基石">
+              <span class="kaleido-home__card-icon"><span class="fa-solid fa-link"></span></span>
+              <span class="kaleido-home__card-text">
+                <span class="kaleido-home__card-title">API 连接</span>
+                <span id="kaleido-home-api-status" class="kaleido-home__card-status" data-state="idle">尚未连接</span>
+              </span>
+            </button>
+            <button type="button" id="kaleido-home-story-card" class="kaleido-home__card" title="剧情脉络：节点与事件的工作台">
+              <span class="kaleido-home__card-icon"><span class="fa-solid fa-scroll"></span></span>
+              <span class="kaleido-home__card-text">
+                <span class="kaleido-home__card-title">剧情脉络</span>
+                <span id="kaleido-home-story-status" class="kaleido-home__card-status" data-state="idle" title="未绑定角色（群聊/未选角色）：数据存全局设置，不随角色卡导入导出">尚未添加</span>
+              </span>
+            </button>
+            <button type="button" id="kaleido-home-preset-card" class="kaleido-home__card" title="预设模版：修改与重置默认提示词">
+              <span class="kaleido-home__card-icon"><span class="fa-solid fa-file-lines"></span></span>
+              <span class="kaleido-home__card-text">
+                <span class="kaleido-home__card-title">预设模版</span>
+                <span id="kaleido-home-preset-status" class="kaleido-home__card-status" data-state="idle">默认配置</span>
+              </span>
+            </button>
+            <button type="button" id="kaleido-home-inject-card" class="kaleido-home__card" title="剧情预筛：点击发送时自动挑选并注入本轮事件">
+              <span class="kaleido-home__card-icon"><span class="fa-solid fa-arrow-right-to-bracket"></span></span>
+              <span class="kaleido-home__card-text">
+                <span class="kaleido-home__card-title">注入实录</span>
+                <span id="kaleido-home-inject-status" class="kaleido-home__card-status" data-state="idle">尚未运行</span>
+              </span>
+            </button>
+          </div>
+        </section>
+        <section id="kaleido-api-view" class="kaleido-view" aria-hidden="true">
+          <div class="kaleido-api">
+            <div class="kaleido-api__head">
+              <span class="kaleido-api__title">API 连接</span>
+              <span id="kaleido-api-status" class="kaleido-api__status" data-state="idle">尚未连接</span>
+            </div>
+            <label class="kaleido-api__field" for="kaleido-api-url">
+              <span class="kaleido-api__label">Base URL</span>
+              <input id="kaleido-api-url" class="kaleido-input" type="text" placeholder="https://api.openai.com/v1" autocomplete="off" spellcheck="false">
+            </label>
+            <label class="kaleido-api__field" for="kaleido-api-key">
+              <span class="kaleido-api__label">API Key</span>
+              <span class="kaleido-api__key-row">
+                <input id="kaleido-api-key" class="kaleido-input" type="password" placeholder="sk-..." autocomplete="off" spellcheck="false">
+                <button type="button" id="kaleido-api-key-toggle" class="kaleido-icon-btn" title="显示密钥" aria-label="显示密钥">👁</button>
+              </span>
+            </label>
+            <div class="kaleido-api__actions">
+              <button type="button" id="kaleido-api-connect" class="kaleido-btn kaleido-btn--primary">连接并拉取模型</button>
+            </div>
+            <div class="kaleido-api__field">
+              <span class="kaleido-api__label">模型</span>
+              <select id="kaleido-api-model-list" class="kaleido-input"><option value="">请先连接并拉取模型</option></select>
+              <input id="kaleido-api-model" class="kaleido-input" type="text" placeholder="或手动填写模型名称" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="kaleido-api__field">
+              <span class="kaleido-api__label">限制并发</span>
+              <div class="kaleido-api__concurrency-row">
+                <button type="button" id="kaleido-api-concurrency-toggle" class="kaleido-btn kaleido-api__concurrency-toggle is-active" title="点击关闭并发限制">🔀 并发限制：开</button>
+                <input id="kaleido-api-concurrency-input" class="kaleido-input kaleido-api__concurrency-input" type="number" min="1" max="10" step="1" placeholder="3" autocomplete="off" aria-label="并发上限">
+              </div>
+              <p class="kaleido-api__hint">同时最多发送的 AI 请求数（默认 3）；多出的请求会排队等待前面的请求完成后再发送。</p>
+            </div>
+            <div class="kaleido-api__field">
+              <span class="kaleido-api__label">思考强度</span>
+              <select id="kaleido-api-reasoning-effort" class="kaleido-input" title="控制带思考能力模型的思考强度（reasoning_effort）">
+                <option value="">默认（不发送）</option>
+                <option value="none">关闭思考</option>
+                <option value="low">低</option>
+                <option value="medium">中</option>
+                <option value="high">高</option>
+                <option value="max">最大</option>
+              </select>
+              <p class="kaleido-api__hint">仅对带思考能力的模型生效；「关闭思考」可避免模型把输出预算花在思考上导致正文为空。</p>
+            </div>
+            <div class="kaleido-api__divider" aria-hidden="true"></div>
+            <div class="kaleido-api__head">
+              <span class="kaleido-api__title">剧情预筛</span>
+              <span id="kaleido-gate-status" class="kaleido-api__status" data-state="ok">已启用</span>
+            </div>
+            <p class="kaleido-api__hint">点击发送时，AI 先读取剧情脉络（节点与事件的名字 / ID / 触发条件 / 描述）与最近 4 条消息，挑选本轮应触发的事件，再把事件正文注入上下文。</p>
+            <div class="kaleido-api__field">
+              <span class="kaleido-api__label">启用剧情预筛</span>
+              <button type="button" id="kaleido-gate-toggle" class="kaleido-btn kaleido-api__concurrency-toggle is-active" title="点击关闭剧情预筛">🎬 剧情预筛：开</button>
+            </div>
+            <div class="kaleido-api__field">
+              <span class="kaleido-api__label">预筛提示词</span>
+              <textarea id="kaleido-gate-prompt" class="kaleido-input kaleido-gate__prompt" rows="8" spellcheck="false" placeholder="留空使用默认提示词"></textarea>
+              <div class="kaleido-api__actions">
+                <button type="button" id="kaleido-gate-prompt-reset" class="kaleido-btn" title="恢复为内置默认提示词">恢复默认</button>
+              </div>
+            </div>
+            <p class="kaleido-api__hint">填入接口地址与 API Key 后点「连接并拉取模型」，再从列表选择模型；不支持模型列表的渠道可直接手动填写模型名称。</p>
+          </div>
+        </section>
+        <section id="kaleido-log-view" class="kaleido-view" aria-hidden="true">
+          <div class="kaleido-log">
+            <div class="kaleido-log__chips" role="group" aria-label="按级别筛选日志">
+              <button type="button" class="kaleido-log__chip is-active" data-level="">全部 <span class="kaleido-log__chip-count" data-level="">0</span></button>
+              <button type="button" class="kaleido-log__chip" data-level="debug">调试 <span class="kaleido-log__chip-count" data-level="debug">0</span></button>
+              <button type="button" class="kaleido-log__chip" data-level="info">信息 <span class="kaleido-log__chip-count" data-level="info">0</span></button>
+              <button type="button" class="kaleido-log__chip" data-level="warn">警告 <span class="kaleido-log__chip-count" data-level="warn">0</span></button>
+              <button type="button" class="kaleido-log__chip" data-level="error">错误 <span class="kaleido-log__chip-count" data-level="error">0</span></button>
+            </div>
+            <div class="kaleido-log__tools">
+              <input id="kaleido-log-search" class="kaleido-input kaleido-log__search" type="search" placeholder="🔍 搜索日志内容…" autocomplete="off" spellcheck="false">
+              <select id="kaleido-log-source" class="kaleido-input kaleido-log__source" title="按来源筛选日志">
+                <option value="">全部来源</option>
+                <option value="network">网络请求</option>
+                <option value="kaleido">万华镜</option>
+                <option value="console">控制台</option>
+                <option value="event">宿主事件</option>
+                <option value="external">外部扩展</option>
+                <option value="window">页面错误</option>
+                <option value="promise">Promise 拒绝</option>
+              </select>
+              <select id="kaleido-log-max" class="kaleido-input kaleido-log__max" title="内存中保留的日志条数，超出自动丢弃最旧">
+                <option value="500">500 条</option>
+                <option value="2000" selected="">2000 条</option>
+                <option value="5000">5000 条</option>
+                <option value="10000">10000 条</option>
+              </select>
+            </div>
+            <div class="kaleido-log__actions">
+              <button type="button" id="kaleido-log-pause" class="kaleido-log__action" title="暂停：新日志先缓存（+N），不追加到列表；点「继续」一次性显示">⏸ 暂停</button>
+              <button type="button" id="kaleido-log-autoscroll" class="kaleido-log__action is-active" title="跟随：钉在底部，新日志自动滚到底部（点一下关闭）">⏬ 跟随</button>
+              <button type="button" id="kaleido-log-clear" class="kaleido-log__action" title="清空缓冲中的所有日志">🧹 清空</button>
+              <button type="button" id="kaleido-log-copy" class="kaleido-log__action" title="复制全部日志为纯文本">📋 复制</button>
+              <button type="button" id="kaleido-log-export" class="kaleido-log__action" title="导出完整 JSON 日志文件">💾 导出</button>
+              <button type="button" id="kaleido-log-fullbody-export" class="kaleido-log__action" title="导出最近 5 次对话请求的完整请求体/响应体（未截断）">📦 完整请求体</button>
+              <button type="button" id="kaleido-log-noise" class="kaleido-log__action is-active" title="过滤已知噪音（世界书扫描 / 宏变量 dump / 正则跳过 / 事件总线 / 内部保存 / 非模型网络调用 / 宿主扩展更新检查报错）">🔇 过滤噪音</button>
+            </div>
+            <div class="kaleido-log__console">
+              <div id="kaleido-log-list" class="kaleido-log__list" role="log" aria-live="off" aria-label="运行日志"><div class="kaleido-log__empty">暂无日志 —— 后台日志会自动记录到这里。</div><div class="kaleido-log__row kaleido-log__row--info"><span class="kaleido-log__time">12:00:01</span><span class="kaleido-log__level">info</span><span class="kaleido-log__source">system</span><span class="kaleido-log__text">面板已打开</span></div><div class="kaleido-log__row kaleido-log__row--debug"><span class="kaleido-log__time">12:00:05</span><span class="kaleido-log__level">debug</span><span class="kaleido-log__source">gate</span><span class="kaleido-log__text">剧情预筛完成：命中 2 个事件</span></div><div class="kaleido-log__row kaleido-log__row--warn"><span class="kaleido-log__time">12:00:06</span><span class="kaleido-log__level">warn</span><span class="kaleido-log__source">fetch</span><span class="kaleido-log__text">POST /api/backends/chat-completions/generate 200 (812ms)</span></div><div class="kaleido-log__row kaleido-log__row--error"><span class="kaleido-log__time">12:00:09</span><span class="kaleido-log__level">error</span><span class="kaleido-log__source">page</span><span class="kaleido-log__text">Uncaught TypeError: xxx is not a function</span></div></div>
+              <button type="button" id="kaleido-log-back-to-latest" class="kaleido-log__back" hidden="">↓ 回到最新</button>
+            </div>
+            <div class="kaleido-log__status">
+              <span id="kaleido-log-status">共 0 条</span>
+              <span id="kaleido-log-paused-badge" class="kaleido-log__paused" title="暂停期间新日志只入内存（+N），点「继续」后一次性显示" hidden="">已暂停 · 新增 +0</span>
+            </div>
+          </div>
+        </section>
+        <section id="kaleido-preset-view" class="kaleido-view" aria-hidden="true">
+          <div class="kaleido-preset">
+            <p class="kaleido-preset__note">各子系统提示词按标签页切换编辑，改完点「💾 保存」；「↺ 恢复默认」可还原出厂内容。</p>
+            <div id="kaleido-preset-tabs" class="kaleido-preset__tabs" role="tablist" aria-label="选择要编辑的提示词">
+              
+                <button type="button" class="kaleido-preset__tab is-active" role="tab" aria-selected="true" data-prompt-key="storyGate" title="剧情预筛提示词">剧情预筛</button>
+              
+            </div>
+            <div class="kaleido-preset__editor">
+              <div class="kaleido-preset__meta">
+                <span id="kaleido-preset-status" class="kaleido-preset__status" data-state="default">默认内容</span>
+                <span id="kaleido-preset-count" class="kaleido-preset__count">1228 字 · 34 行</span>
+              </div>
+              <textarea id="kaleido-preset-text" class="kaleido-input kaleido-preset__text" spellcheck="false" aria-label="提示词内容" placeholder="（提示词内容为空）"></textarea>
+              <div class="kaleido-preset__actions">
+                <button type="button" id="kaleido-preset-reset" class="kaleido-btn kaleido-btn--ghost" disabled="">↺ 恢复默认</button>
+                <button type="button" id="kaleido-preset-save" class="kaleido-btn" disabled="">💾 保存</button>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section id="kaleido-inject-view" class="kaleido-view" aria-hidden="true">
+          <div class="kaleido-inject">
+            <p class="kaleido-inject__note">展示最近一轮「剧情预筛」的完整结果：预筛原文（Gate 返回）、本轮触发的事件，以及最终注入上下文的提示词原文。</p>
+            <div id="kaleido-inject-summary" class="kaleido-inject__summary" hidden=""></div>
+            <div id="kaleido-inject-empty" class="kaleido-inject__empty" hidden="">还没有预筛记录：开启「剧情预筛」并发送消息后，这里会展示最近一轮的结果。</div>
+            <div class="kaleido-inject__gate-head" hidden="">
+              <span class="kaleido-panel__section-title">预筛原文（Gate 返回）</span>
+            </div>
+            <pre id="kaleido-inject-gate-text" class="kaleido-inject__gate-text" hidden=""></pre>
+            <div class="kaleido-inject__events-head" hidden="">
+              <span class="kaleido-panel__section-title">本轮触发的事件</span>
+            </div>
+            <div id="kaleido-inject-events" class="kaleido-inject__events" hidden=""></div>
+            <div class="kaleido-inject__inject-head" hidden="">
+              <span class="kaleido-panel__section-title">注入提示词原文</span>
+              <button type="button" id="kaleido-inject-copy" class="kaleido-btn kaleido-btn--ghost kaleido-inject__copy">⧉ 复制</button>
+            </div>
+            <pre id="kaleido-inject-text" class="kaleido-inject__inject-text" hidden=""></pre>
+          </div>
+        </section>
+      </div>
+      <div class="kaleido-panel__footer">
+        <span class="kaleido-panel__version">v0.7.0</span>
+        <span class="kaleido-panel__slogan">镜中万象 · 皆是文章</span>
+      </div>
+    </div>
+  </div><div id="kaleido-story-dialog" class="kaleido-story-dialog" aria-hidden="true">
+    <div class="kaleido-story-dialog__inner" role="dialog" aria-label="剧情脉络工作台">
+      <div class="kaleido-story-dialog__header">
+        <span class="kaleido-story-dialog__title"><span class="fa-solid fa-scroll"></span> 剧情脉络</span>
+        <span id="kaleido-story-binding" class="kaleido-story__binding" data-state="idle" title="群聊或未选角色：剧情数据保存在全局设置，不随角色卡导入导出">未绑定角色</span>
+        <div class="kaleido-story-dialog__toolbar">
+          <button type="button" id="kaleido-story-import-btn" class="kaleido-btn kaleido-btn--mini">导入 剧情脉络</button>
+          <button type="button" id="kaleido-story-export-btn" class="kaleido-btn kaleido-btn--mini kaleido-btn--ghost">导出 剧情脉络</button>
+          <button type="button" id="kaleido-story-close-btn" class="kaleido-icon-btn" title="关闭工作台" aria-label="关闭工作台">✕</button>
+        </div>
+      </div>
+      <div class="kaleido-story-dialog__body">
+        <div id="kaleido-story-tree" class="kaleido-story__tree">
+          <div class="kaleido-story__tree-actions">
+            <button type="button" id="kaleido-story-root-add" class="kaleido-btn kaleido-btn--mini kaleido-btn--primary" title="新建节点或事件">＋ 新建</button>
+            <span class="kaleido-story__tree-hint">节点可层层嵌套 · 事件挂在节点下</span>
+          </div>
+          <div id="kaleido-story-tree-body" class="kaleido-story__tree-body"><div class="kaleido-story__row kaleido-story__row--node is-expanded">
+    <button type="button" class="kaleido-story__chevron"><span>▶</span></button>
+    <span class="kaleido-story__row-icon"><span class="fa-solid fa-folder"></span></span>
+    <span class="kaleido-story__row-name">第一卷 · 初入江湖</span>
+    <span class="kaleido-story__row-trigger">故事开篇，主角踏入江湖。</span>
+    <span class="kaleido-story__row-count">2</span>
+    <span class="kaleido-story__row-actions">
+      <button type="button" class="kaleido-story__icon-btn" title="编辑">✎</button>
+      <button type="button" class="kaleido-story__icon-btn" title="导入事件">⇪</button>
+      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除">🗑</button>
+    </span></div><div class="kaleido-story__row kaleido-story__row--node is-expanded">
+    <button type="button" class="kaleido-story__chevron"><span>▶</span></button>
+    <span class="kaleido-story__row-icon"><span class="fa-solid fa-folder"></span></span>
+    <span class="kaleido-story__row-name">第一章 · 客栈风波</span>
+    <span class="kaleido-story__row-trigger">在客栈遭遇恶霸挑衅。</span>
+    <span class="kaleido-story__row-count">2</span>
+    <span class="kaleido-story__row-actions">
+      <button type="button" class="kaleido-story__icon-btn" title="编辑">✎</button>
+      <button type="button" class="kaleido-story__icon-btn" title="导入事件">⇪</button>
+      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除">🗑</button>
+    </span></div><div class="kaleido-story__row kaleido-story__row--script">
+      <button type="button" class="kaleido-story__chevron is-empty"></button>
+      <span class="kaleido-story__row-icon kaleido-story__row-icon--script"><span class="fa-solid fa-scroll"></span></span>
+      <span class="kaleido-story__row-name">客栈初遇</span>
+      <span class="kaleido-story__row-trigger">玩家进入客栈时</span>
+      <span class="kaleido-story__row-badge">s1</span>
+      <span class="kaleido-story__row-actions">
+        <button type="button" class="kaleido-story__icon-btn" title="编辑">✎</button>
+        <button type="button" class="kaleido-story__icon-btn" title="导出">⇩</button>
+        <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除">🗑</button>
+      </span></div><div class="kaleido-story__row kaleido-story__row--node is-expanded">
+    <button type="button" class="kaleido-story__chevron"><span>▶</span></button>
+    <span class="kaleido-story__row-icon"><span class="fa-solid fa-folder"></span></span>
+    <span class="kaleido-story__row-name">第二章 · 月下剑影</span>
+    <span class="kaleido-story__row-trigger">月夜与神秘剑客对峙。</span>
+    <span class="kaleido-story__row-count">2</span>
+    <span class="kaleido-story__row-actions">
+      <button type="button" class="kaleido-story__icon-btn" title="编辑">✎</button>
+      <button type="button" class="kaleido-story__icon-btn" title="导入事件">⇪</button>
+      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除">🗑</button>
+    </span></div><div class="kaleido-story__row kaleido-story__row--script">
+      <button type="button" class="kaleido-story__chevron is-empty"></button>
+      <span class="kaleido-story__row-icon kaleido-story__row-icon--script"><span class="fa-solid fa-scroll"></span></span>
+      <span class="kaleido-story__row-name">神秘剑客邀战</span>
+      <span class="kaleido-story__row-trigger">月夜触发</span>
+      <span class="kaleido-story__row-badge">s2</span>
+      <span class="kaleido-story__row-actions">
+        <button type="button" class="kaleido-story__icon-btn" title="编辑">✎</button>
+        <button type="button" class="kaleido-story__icon-btn" title="导出">⇩</button>
+        <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除">🗑</button>
+      </span></div><div class="kaleido-story__row kaleido-story__row--node is-expanded">
+    <button type="button" class="kaleido-story__chevron"><span>▶</span></button>
+    <span class="kaleido-story__row-icon"><span class="fa-solid fa-folder"></span></span>
+    <span class="kaleido-story__row-name">第二卷 · 武林大会</span>
+    <span class="kaleido-story__row-trigger">天下英豪齐聚。</span>
+    <span class="kaleido-story__row-count">2</span>
+    <span class="kaleido-story__row-actions">
+      <button type="button" class="kaleido-story__icon-btn" title="编辑">✎</button>
+      <button type="button" class="kaleido-story__icon-btn" title="导入事件">⇪</button>
+      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除">🗑</button>
+    </span></div><div class="kaleido-story__row kaleido-story__row--script">
+      <button type="button" class="kaleido-story__chevron is-empty"></button>
+      <span class="kaleido-story__row-icon kaleido-story__row-icon--script"><span class="fa-solid fa-scroll"></span></span>
+      <span class="kaleido-story__row-name">掌门宣布大会</span>
+      <span class="kaleido-story__row-trigger">大会开幕</span>
+      <span class="kaleido-story__row-badge">s3</span>
+      <span class="kaleido-story__row-actions">
+        <button type="button" class="kaleido-story__icon-btn" title="编辑">✎</button>
+        <button type="button" class="kaleido-story__icon-btn" title="导出">⇩</button>
+        <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除">🗑</button>
+      </span></div></div>
+        </div>
+        <div id="kaleido-story-editor" class="kaleido-story-dialog__editor" hidden="">
+          <div class="kaleido-story__editor-head">
+            <span id="kaleido-story-editor-title" class="kaleido-story__editor-title">新建节点</span>
+            <span class="kaleido-story__editor-spacer"></span>
+            <button type="button" id="kaleido-story-editor-cancel" class="kaleido-icon-btn" title="取消" aria-label="取消">✕</button>
+          </div>
+          <div id="kaleido-story-node-fields">
+            <label class="kaleido-api__field" for="kaleido-story-node-name">
+              <span class="kaleido-api__label">节点名称 *</span>
+              <input id="kaleido-story-node-name" class="kaleido-input" type="text" placeholder="填写节点名称" autocomplete="off" spellcheck="false">
+            </label>
+            <label class="kaleido-api__field" for="kaleido-story-node-parent">
+              <span class="kaleido-api__label">上级节点</span>
+              <select id="kaleido-story-node-parent" class="kaleido-input">
+                <option value="">（顶层 · 根节点）</option>
+              </select>
+            </label>
+            <label class="kaleido-api__field" for="kaleido-story-node-desc">
+              <span class="kaleido-api__label">节点说明</span>
+              <textarea id="kaleido-story-node-desc" class="kaleido-input kaleido-story__textarea kaleido-story__textarea--small" rows="3" placeholder="这个节点下的剧情大概讲什么（可选）"></textarea>
+            </label>
+          </div>
+          <div id="kaleido-story-script-fields" hidden="">
+            <label class="kaleido-api__field" for="kaleido-story-script-name">
+              <span class="kaleido-api__label">事件名称 *</span>
+              <input id="kaleido-story-script-name" class="kaleido-input" type="text" placeholder="填写事件名称" autocomplete="off" spellcheck="false">
+            </label>
+            <label class="kaleido-api__field" for="kaleido-story-script-id">
+              <span class="kaleido-api__label">事件 ID *</span>
+              <input id="kaleido-story-script-id" class="kaleido-input" type="text" placeholder="如：001（默认自动递增）" autocomplete="off" spellcheck="false">
+            </label>
+            <label class="kaleido-api__field" for="kaleido-story-script-trigger">
+              <span class="kaleido-api__label">触发条件</span>
+              <input id="kaleido-story-script-trigger" class="kaleido-input" type="text" placeholder="如：玩家第一次到达新手村" autocomplete="off" spellcheck="false">
+            </label>
+            <label class="kaleido-api__field" for="kaleido-story-script-desc">
+              <span class="kaleido-api__label">事件说明</span>
+              <textarea id="kaleido-story-script-desc" class="kaleido-input kaleido-story__textarea kaleido-story__textarea--small" rows="2" placeholder="这个事件的用途（可选）"></textarea>
+            </label>
+            <label class="kaleido-api__field" for="kaleido-story-script-node-select">
+              <span class="kaleido-api__label">所属节点</span>
+              <select id="kaleido-story-script-node-select" class="kaleido-input">
+                <option value="">未分类</option>
+              </select>
+            </label>
+            <label class="kaleido-api__field" for="kaleido-story-script-content">
+              <span class="kaleido-api__label">事件内容 *</span>
+              <textarea id="kaleido-story-script-content" class="kaleido-input kaleido-story__textarea" rows="9" placeholder="{{事件正文}}" spellcheck="false"></textarea>
+            </label>
+          </div>
+          <div class="kaleido-story__editor-actions">
+            <button type="button" id="kaleido-story-editor-export" class="kaleido-btn kaleido-btn--mini kaleido-btn--ghost" hidden="">导出事件</button>
+            <span class="kaleido-story__editor-spacer"></span>
+            <button type="button" id="kaleido-story-editor-save" class="kaleido-btn kaleido-btn--mini kaleido-btn--primary">保存</button>
+          </div>
+        </div>
+      </div>
+      <div id="kaleido-story-add-menu" class="kaleido-story__add-menu" hidden="" role="menu" aria-label="新建">
+        <button type="button" id="kaleido-story-add-menu-node" class="kaleido-story__add-menu-item" role="menuitem" data-kind="node">
+          <span class="fa-solid fa-folder"></span> 新建节点
+        </button>
+        <button type="button" id="kaleido-story-add-menu-script" class="kaleido-story__add-menu-item" role="menuitem" data-kind="script">
+          <span class="fa-solid fa-scroll"></span> 新建事件
+        </button>
+      </div>
+      <input id="kaleido-story-import-input" type="file" accept=".yaml,.yml,text/yaml,application/x-yaml" hidden="">
+      <input id="kaleido-story-import-script-input" type="file" accept=".yaml,.yml,text/yaml,application/x-yaml" hidden="">
+    </div>
+  </div>
+<script>
+  window.__showView = (id) => {
+    document.querySelectorAll('.kaleido-view').forEach(v => v.classList.toggle('is-active', v.id === id));
+    document.querySelectorAll('.kaleido-view').forEach(v => v.setAttribute('aria-hidden', v.classList.contains('is-active') ? 'false' : 'true'));
+    const dlg = document.querySelector('.kaleido-panel__dialog');
+    if (dlg) dlg.classList.toggle('is-log-mode', id === 'kaleido-log-view');
+  };
+  const map = { 'API 连接': 'kaleido-api-view', '剧情脉络': null, '系统日志': 'kaleido-log-view', '提示词模板': 'kaleido-preset-view', '注入实录': 'kaleido-inject-view' };
+  document.addEventListener('click', (e) => {
+    const card = e.target.closest('.kaleido-home__card');
+    if (!card) return;
+    const target = card.querySelector('.kaleido-home__card-title')?.textContent;
+    const id = map[target];
+    if (id) window.__showView(id);
+  });
+</script>
+</body></html>

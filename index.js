@@ -2,7 +2,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '0.7.0';
+const MODULE_VERSION = '0.7.1';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 
 // ---------- DOM ID / class ----------
@@ -1229,6 +1229,15 @@ function initDraggableSphere(sphere) {
 }
 
 // ---------- 面板 ----------
+// 移动端（≤640px）面板全屏铺满，不做浮窗定位 / 拖拽。
+function isMobileViewport() {
+  try {
+    return Boolean(window.matchMedia && window.matchMedia('(max-width: 640px)').matches);
+  } catch {
+    return false;
+  }
+}
+
 function clampPanelPosition(dialog, left, top) {
   const width = dialog?.offsetWidth || 360;
   const height = dialog?.offsetHeight || 420;
@@ -1243,6 +1252,8 @@ function clampPanelPosition(dialog, left, top) {
 function setPanelPosition(panel, left, top) {
   const dialog = panel?.querySelector('.kaleido-panel__dialog');
   if (!panel || !dialog) return;
+  // 移动端全屏：位置交给 CSS（inset 0），不写内联 left/top，避免盖掉全屏布局。
+  if (isMobileViewport()) return;
   const next = clampPanelPosition(dialog, left, top);
   dialog.style.left = `${next.left}px`;
   dialog.style.top = `${next.top}px`;
@@ -1281,6 +1292,7 @@ function initDraggablePanel(panel) {
   handles.forEach((handle) =>
     handle.addEventListener('pointerdown', (event) => {
       if (event.button !== 0) return;
+      if (isMobileViewport()) return;
       // 指针落在标题栏内的按钮上（返回/关闭）时，不启动拖拽、不捕获指针，
       // 否则 setPointerCapture 会把后续 click 重定向到标题栏，按钮点击失效。
       const target = event.target;
@@ -4598,7 +4610,7 @@ function renderStoryNodeRows(container, ctx, node, depth) {
 function buildStoryNodeRow(node, depth, expanded, childCount) {
   const row = document.createElement('div');
   row.className = 'kaleido-story__row kaleido-story__row--node';
-  row.style.paddingLeft = `${10 + depth * 20}px`;
+  row.style.setProperty('--depth', String(depth));
   row.innerHTML = `
     <button type="button" class="kaleido-story__chevron${childCount > 0 ? '' : ' is-empty'}" data-action="toggle" data-id="${escapeHtml(node.id)}" title="展开 / 收起" aria-label="展开 / 收起">
       <span class="${STORY_CHEVRON_ICON_CLASS}"></span>
@@ -4607,10 +4619,10 @@ function buildStoryNodeRow(node, depth, expanded, childCount) {
     <span class="kaleido-story__row-name" title="${escapeHtml(node.description || node.name)}">${escapeHtml(node.name)}</span>
     <span class="kaleido-story__row-count">${childCount} 项</span>
     <span class="kaleido-story__row-actions">
-      <button type="button" class="kaleido-story__icon-btn" data-action="add-menu" data-id="${escapeHtml(node.id)}" title="新建节点 / 事件"><span class="${STORY_ADD_CHILD_ICON_CLASS}"></span></button>
-      <button type="button" class="kaleido-story__icon-btn" data-action="import-script" data-id="${escapeHtml(node.id)}" title="导入事件文件"><span class="${STORY_IMPORT_ICON_CLASS}"></span></button>
-      <button type="button" class="kaleido-story__icon-btn" data-action="edit" data-id="${escapeHtml(node.id)}" title="编辑节点"><span class="${STORY_EDIT_ICON_CLASS}"></span></button>
-      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" data-action="delete" data-id="${escapeHtml(node.id)}" title="删除节点"><span class="${STORY_DELETE_ICON_CLASS}"></span></button>
+      <button type="button" class="kaleido-story__icon-btn" data-action="add-menu" data-id="${escapeHtml(node.id)}" title="新建节点 / 事件" aria-label="新建节点 / 事件"><span class="${STORY_ADD_CHILD_ICON_CLASS}"></span></button>
+      <button type="button" class="kaleido-story__icon-btn" data-action="import-script" data-id="${escapeHtml(node.id)}" title="导入事件文件" aria-label="导入事件文件"><span class="${STORY_IMPORT_ICON_CLASS}"></span></button>
+      <button type="button" class="kaleido-story__icon-btn" data-action="edit" data-id="${escapeHtml(node.id)}" title="编辑节点" aria-label="编辑节点"><span class="${STORY_EDIT_ICON_CLASS}"></span></button>
+      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" data-action="delete" data-id="${escapeHtml(node.id)}" title="删除节点" aria-label="删除节点"><span class="${STORY_DELETE_ICON_CLASS}"></span></button>
     </span>
   `;
   if (expanded) row.classList.add('is-expanded');
@@ -4620,7 +4632,7 @@ function buildStoryNodeRow(node, depth, expanded, childCount) {
 function buildStoryScriptRow(script, depth) {
   const row = document.createElement('div');
   row.className = 'kaleido-story__row kaleido-story__row--script';
-  row.style.paddingLeft = `${30 + depth * 20}px`;
+  row.style.setProperty('--depth', String(depth));
   const ctx = getContextSafe();
   const node = script.nodeId ? getStoryNodeById(ctx, script.nodeId) : null;
   const badge = node ? escapeHtml(node.name) : '未分类';
@@ -4630,9 +4642,9 @@ function buildStoryScriptRow(script, depth) {
     ${script.trigger ? `<span class="kaleido-story__row-trigger" title="${escapeHtml(script.trigger)}">${escapeHtml(script.trigger)}</span>` : ''}
     <span class="kaleido-story__row-badge">${badge}</span>
     <span class="kaleido-story__row-actions">
-      <button type="button" class="kaleido-story__icon-btn" data-action="edit-script" data-id="${escapeHtml(script.id)}" title="编辑事件"><span class="${STORY_EDIT_ICON_CLASS}"></span></button>
-      <button type="button" class="kaleido-story__icon-btn" data-action="export-script" data-id="${escapeHtml(script.id)}" title="导出事件"><span class="${STORY_EXPORT_ICON_CLASS}"></span></button>
-      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" data-action="delete-script" data-id="${escapeHtml(script.id)}" title="删除事件"><span class="${STORY_DELETE_ICON_CLASS}"></span></button>
+      <button type="button" class="kaleido-story__icon-btn" data-action="edit-script" data-id="${escapeHtml(script.id)}" title="编辑事件" aria-label="编辑事件"><span class="${STORY_EDIT_ICON_CLASS}"></span></button>
+      <button type="button" class="kaleido-story__icon-btn" data-action="export-script" data-id="${escapeHtml(script.id)}" title="导出事件" aria-label="导出事件"><span class="${STORY_EXPORT_ICON_CLASS}"></span></button>
+      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" data-action="delete-script" data-id="${escapeHtml(script.id)}" title="删除事件" aria-label="删除事件"><span class="${STORY_DELETE_ICON_CLASS}"></span></button>
     </span>
   `;
   return row;
