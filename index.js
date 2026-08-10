@@ -2,7 +2,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '0.7.2';
+const MODULE_VERSION = '0.7.3';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 
 // ---------- DOM ID / class ----------
@@ -34,11 +34,6 @@ const API_MODEL_ID = 'kaleido-api-model';
 const API_CONCURRENCY_TOGGLE_ID = 'kaleido-api-concurrency-toggle';
 const API_CONCURRENCY_INPUT_ID = 'kaleido-api-concurrency-input';
 const API_REASONING_EFFORT_ID = 'kaleido-api-reasoning-effort';
-// 剧情预筛（API 连接页设置区）
-const GATE_TOGGLE_ID = 'kaleido-gate-toggle';
-const GATE_PROMPT_ID = 'kaleido-gate-prompt';
-const GATE_PROMPT_RESET_ID = 'kaleido-gate-prompt-reset';
-const GATE_STATUS_ID = 'kaleido-gate-status';
 // 首页「注入实录」卡片 + 注入实录视图
 const HOME_INJECT_CARD_ID = 'kaleido-home-inject-card';
 const HOME_INJECT_STATUS_ID = 'kaleido-home-inject-status';
@@ -81,6 +76,9 @@ const PRESET_SAVE_ID = 'kaleido-preset-save';
 const PRESET_RESET_ID = 'kaleido-preset-reset';
 const PRESET_STATUS_ID = 'kaleido-preset-status';
 const PRESET_COUNT_ID = 'kaleido-preset-count';
+// 剧情预筛（预设模版设置区）
+const PRESET_GATE_TOGGLE_ID = 'kaleido-preset-gate-toggle';
+const PRESET_GATE_STATUS_ID = 'kaleido-preset-gate-status';
 
 // 剧情脉络（Storyline）· 可视化工作台
 const STORY_DIALOG_ID = 'kaleido-story-dialog';
@@ -1492,23 +1490,6 @@ function createPanel() {
               </select>
               <p class="kaleido-api__hint">仅对带思考能力的模型生效；「关闭思考」可避免模型把输出预算花在思考上导致正文为空。</p>
             </div>
-            <div class="kaleido-api__divider" aria-hidden="true"></div>
-            <div class="kaleido-api__head">
-              <span class="kaleido-api__title">剧情预筛</span>
-              <span id="${GATE_STATUS_ID}" class="kaleido-api__status" data-state="idle">未启用</span>
-            </div>
-            <p class="kaleido-api__hint">点击发送时，AI 先读取剧情脉络（节点与事件的名字 / ID / 触发条件 / 描述）与最近 4 条消息，挑选本轮应触发的事件，再把事件正文注入上下文。</p>
-            <div class="kaleido-api__field">
-              <span class="kaleido-api__label">启用剧情预筛</span>
-              <button type="button" id="${GATE_TOGGLE_ID}" class="kaleido-btn kaleido-api__concurrency-toggle" title="开启/关闭剧情预筛">🎬 剧情预筛：开</button>
-            </div>
-            <div class="kaleido-api__field">
-              <span class="kaleido-api__label">预筛提示词</span>
-              <textarea id="${GATE_PROMPT_ID}" class="kaleido-input kaleido-gate__prompt" rows="8" spellcheck="false" placeholder="留空使用默认提示词"></textarea>
-              <div class="kaleido-api__actions">
-                <button type="button" id="${GATE_PROMPT_RESET_ID}" class="kaleido-btn" title="恢复为内置默认提示词">恢复默认</button>
-              </div>
-            </div>
             <p class="kaleido-api__hint">填入接口地址与 API Key 后点「连接并拉取模型」，再从列表选择模型；不支持模型列表的渠道可直接手动填写模型名称。</p>
           </div>
         </section>
@@ -1561,6 +1542,17 @@ function createPanel() {
         </section>
         <section id="${PRESET_VIEW_ID}" class="kaleido-view" aria-hidden="true">
           <div class="kaleido-preset">
+            <div class="kaleido-preset__gate">
+              <div class="kaleido-preset__gate-head">
+                <span class="kaleido-preset__gate-title">剧情预筛</span>
+                <span id="${PRESET_GATE_STATUS_ID}" class="kaleido-preset__status" data-state="idle">未启用</span>
+              </div>
+              <p class="kaleido-preset__gate-hint">点击发送时，AI 先读取剧情脉络（节点与事件的名字 / ID / 触发条件 / 描述）与最近 4 条消息，挑选本轮应触发的事件，再把事件正文注入上下文。</p>
+              <div class="kaleido-preset__gate-row">
+                <span class="kaleido-preset__gate-label">启用剧情预筛</span>
+                <button type="button" id="${PRESET_GATE_TOGGLE_ID}" class="kaleido-btn kaleido-api__concurrency-toggle" title="开启/关闭剧情预筛">🎬 剧情预筛：开</button>
+              </div>
+            </div>
             <p class="kaleido-preset__note">各子系统提示词按标签页切换编辑，改完点「💾 保存」；「↺ 恢复默认」可还原出厂内容。</p>
             <div id="${PRESET_TABS_ID}" class="kaleido-preset__tabs" role="tablist" aria-label="选择要编辑的提示词">
               ${Object.entries(PRESET_META).map(([key, meta]) => `
@@ -1741,50 +1733,6 @@ function clampApiConcurrencyLimit(value) {
   return Math.min(10, Math.max(1, Math.floor(num)));
 }
 
-// ---------- 剧情预筛设置 ----------
-function renderGateControl() {
-  const toggle = document.getElementById(GATE_TOGGLE_ID);
-  const status = document.getElementById(GATE_STATUS_ID);
-  if (!toggle && !status) return;
-  const ctx = getContextSafe();
-  const settings = ctx ? getSettings(ctx) : null;
-  if (!settings) return;
-  const enabled = settings.storyGateEnabled !== false;
-  if (toggle) {
-    toggle.textContent = enabled ? '🎬 剧情预筛：开' : '🎬 剧情预筛：关';
-    toggle.classList.toggle('is-active', enabled);
-    toggle.title = enabled ? '点击关闭剧情预筛' : '点击开启剧情预筛';
-  }
-  if (status) {
-    status.textContent = enabled ? '已启用' : '未启用';
-    status.dataset.state = enabled ? 'ok' : 'idle';
-  }
-}
-
-function toggleStoryGate() {
-  const ctx = getContextSafe();
-  if (!ctx) return;
-  const settings = getSettings(ctx);
-  settings.storyGateEnabled = !(settings.storyGateEnabled !== false);
-  saveSettings(ctx);
-  renderGateControl();
-  refreshHomeInjectStatus();
-  logApp('info', settings.storyGateEnabled ? '剧情预筛已开启' : '剧情预筛已关闭');
-  globalThis.toastr?.info?.('剧情预筛已' + (settings.storyGateEnabled ? '开启' : '关闭'), '[' + MODULE_DISPLAY_NAME + ']');
-}
-
-function resetStoryGatePrompt() {
-  const ctx = getContextSafe();
-  if (!ctx) return;
-  const settings = getSettings(ctx);
-  settings.storyGatePrompt = '';
-  saveSettings(ctx);
-  const promptArea = document.getElementById(GATE_PROMPT_ID);
-  if (promptArea) promptArea.value = DEFAULT_STORY_GATE_PROMPT;
-  logApp('info', '剧情预筛提示词已恢复默认');
-  globalThis.toastr?.info?.('剧情预筛提示词已恢复默认', '[' + MODULE_DISPLAY_NAME + ']');
-}
-
 function applyApiSettingsToForm(ctx) {
   const settings = getSettings(ctx);
   const setValue = (id, value) => {
@@ -1797,10 +1745,7 @@ function applyApiSettingsToForm(ctx) {
   setValue(API_MODEL_ID, settings.model);
   const effortSelect = document.getElementById(API_REASONING_EFFORT_ID);
   if (effortSelect) effortSelect.value = String(settings.apiReasoningEffort || '');
-  const promptArea = document.getElementById(GATE_PROMPT_ID);
-  if (promptArea) promptArea.value = getStoryGatePrompt(ctx);
   renderApiConcurrencyControl();
-  renderGateControl();
   populateModelList(settings);
   if (settings.modelOptions.length > 0) {
     setApiStatus(`已缓存 ${settings.modelOptions.length} 个模型`, 'ok');
@@ -1874,16 +1819,6 @@ function initApiSection(panel) {
     saveSettings(ctx);
     logApp('info', '思考强度已设置', settings.apiReasoningEffort || '默认（不发送）');
   });
-
-  document.getElementById(GATE_TOGGLE_ID)?.addEventListener('click', toggleStoryGate);
-  document.getElementById(GATE_PROMPT_ID)?.addEventListener('input', (event) => {
-    const ctx = getCtx();
-    if (!ctx) return;
-    const settings = getSettings(ctx);
-    settings.storyGatePrompt = String(event.target?.value || '');
-    saveSettings(ctx);
-  });
-  document.getElementById(GATE_PROMPT_RESET_ID)?.addEventListener('click', resetStoryGatePrompt);
 
   try {
     const ctx = getCtx();
@@ -2755,7 +2690,7 @@ initNetworkCapture();
 // ===== 万华镜（Kaleidoscope）预设模版：默认提示词编辑 =====
 // 参考 SoulLink 的预设系统：标签页切换各子系统提示词，改完点「保存」，
 // 「恢复默认」还原出厂内容。存储沿用各提示词在 settings 中的既有字段
-// （空字符串 = 使用内置默认），与 API 连接页的提示词编辑区保持同一数据源。
+// （空字符串 = 使用内置默认）。剧情预筛的启用开关与提示词编辑统一收口在这里。
 let presetActiveKey = PRESET_DEFAULT_KEY;
 const presetUnsaved = {};
 
@@ -2813,6 +2748,38 @@ function renderPresetEditor() {
   if (!textarea) return;
   textarea.value = presetUnsaved[presetActiveKey] !== undefined ? presetUnsaved[presetActiveKey] : getPresetSavedText(presetActiveKey, ctx);
   updatePresetStatus(presetActiveKey);
+}
+
+// ---------- 剧情预筛设置（自 API 连接页迁移） ----------
+function renderPresetGateControl() {
+  const toggle = document.getElementById(PRESET_GATE_TOGGLE_ID);
+  const status = document.getElementById(PRESET_GATE_STATUS_ID);
+  if (!toggle && !status) return;
+  const ctx = getContextSafe();
+  const settings = ctx ? getSettings(ctx) : null;
+  if (!settings) return;
+  const enabled = settings.storyGateEnabled !== false;
+  if (toggle) {
+    toggle.textContent = enabled ? '🎬 剧情预筛：开' : '🎬 剧情预筛：关';
+    toggle.classList.toggle('is-active', enabled);
+    toggle.title = enabled ? '点击关闭剧情预筛' : '点击开启剧情预筛';
+  }
+  if (status) {
+    status.textContent = enabled ? '已启用' : '未启用';
+    status.dataset.state = enabled ? 'ok' : 'idle';
+  }
+}
+
+function toggleStoryGate() {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const settings = getSettings(ctx);
+  settings.storyGateEnabled = !(settings.storyGateEnabled !== false);
+  saveSettings(ctx);
+  renderPresetGateControl();
+  refreshHomeInjectStatus();
+  logApp('info', settings.storyGateEnabled ? '剧情预筛已开启' : '剧情预筛已关闭');
+  globalThis.toastr?.info?.('剧情预筛已' + (settings.storyGateEnabled ? '开启' : '关闭'), '[' + MODULE_DISPLAY_NAME + ']');
 }
 
 // 首页「预设模版」卡片状态：已自定义的提示词份数。
@@ -2896,8 +2863,10 @@ function initPresetSection(panel) {
 
   document.getElementById(PRESET_SAVE_ID)?.addEventListener('click', () => savePreset(presetActiveKey));
   document.getElementById(PRESET_RESET_ID)?.addEventListener('click', () => resetPreset(presetActiveKey));
+  document.getElementById(PRESET_GATE_TOGGLE_ID)?.addEventListener('click', toggleStoryGate);
 
   renderPresetEditor();
+  renderPresetGateControl();
   refreshHomePresetStatus();
   panel.dataset.presetReady = 'true';
   logApp('info', '预设模版已就绪');

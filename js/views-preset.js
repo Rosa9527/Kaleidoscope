@@ -1,7 +1,7 @@
 // ===== 万华镜（Kaleidoscope）预设模版：默认提示词编辑 =====
 // 参考 SoulLink 的预设系统：标签页切换各子系统提示词，改完点「保存」，
 // 「恢复默认」还原出厂内容。存储沿用各提示词在 settings 中的既有字段
-// （空字符串 = 使用内置默认），与 API 连接页的提示词编辑区保持同一数据源。
+// （空字符串 = 使用内置默认）。剧情预筛的启用开关与提示词编辑统一收口在这里。
 let presetActiveKey = PRESET_DEFAULT_KEY;
 const presetUnsaved = {};
 
@@ -59,6 +59,38 @@ function renderPresetEditor() {
   if (!textarea) return;
   textarea.value = presetUnsaved[presetActiveKey] !== undefined ? presetUnsaved[presetActiveKey] : getPresetSavedText(presetActiveKey, ctx);
   updatePresetStatus(presetActiveKey);
+}
+
+// ---------- 剧情预筛设置（自 API 连接页迁移） ----------
+function renderPresetGateControl() {
+  const toggle = document.getElementById(PRESET_GATE_TOGGLE_ID);
+  const status = document.getElementById(PRESET_GATE_STATUS_ID);
+  if (!toggle && !status) return;
+  const ctx = getContextSafe();
+  const settings = ctx ? getSettings(ctx) : null;
+  if (!settings) return;
+  const enabled = settings.storyGateEnabled !== false;
+  if (toggle) {
+    toggle.textContent = enabled ? '🎬 剧情预筛：开' : '🎬 剧情预筛：关';
+    toggle.classList.toggle('is-active', enabled);
+    toggle.title = enabled ? '点击关闭剧情预筛' : '点击开启剧情预筛';
+  }
+  if (status) {
+    status.textContent = enabled ? '已启用' : '未启用';
+    status.dataset.state = enabled ? 'ok' : 'idle';
+  }
+}
+
+function toggleStoryGate() {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const settings = getSettings(ctx);
+  settings.storyGateEnabled = !(settings.storyGateEnabled !== false);
+  saveSettings(ctx);
+  renderPresetGateControl();
+  refreshHomeInjectStatus();
+  logApp('info', settings.storyGateEnabled ? '剧情预筛已开启' : '剧情预筛已关闭');
+  globalThis.toastr?.info?.('剧情预筛已' + (settings.storyGateEnabled ? '开启' : '关闭'), '[' + MODULE_DISPLAY_NAME + ']');
 }
 
 // 首页「预设模版」卡片状态：已自定义的提示词份数。
@@ -142,8 +174,10 @@ function initPresetSection(panel) {
 
   document.getElementById(PRESET_SAVE_ID)?.addEventListener('click', () => savePreset(presetActiveKey));
   document.getElementById(PRESET_RESET_ID)?.addEventListener('click', () => resetPreset(presetActiveKey));
+  document.getElementById(PRESET_GATE_TOGGLE_ID)?.addEventListener('click', toggleStoryGate);
 
   renderPresetEditor();
+  renderPresetGateControl();
   refreshHomePresetStatus();
   panel.dataset.presetReady = 'true';
   logApp('info', '预设模版已就绪');

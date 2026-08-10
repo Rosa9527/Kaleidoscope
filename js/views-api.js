@@ -106,50 +106,6 @@ function clampApiConcurrencyLimit(value) {
   return Math.min(10, Math.max(1, Math.floor(num)));
 }
 
-// ---------- 剧情预筛设置 ----------
-function renderGateControl() {
-  const toggle = document.getElementById(GATE_TOGGLE_ID);
-  const status = document.getElementById(GATE_STATUS_ID);
-  if (!toggle && !status) return;
-  const ctx = getContextSafe();
-  const settings = ctx ? getSettings(ctx) : null;
-  if (!settings) return;
-  const enabled = settings.storyGateEnabled !== false;
-  if (toggle) {
-    toggle.textContent = enabled ? '🎬 剧情预筛：开' : '🎬 剧情预筛：关';
-    toggle.classList.toggle('is-active', enabled);
-    toggle.title = enabled ? '点击关闭剧情预筛' : '点击开启剧情预筛';
-  }
-  if (status) {
-    status.textContent = enabled ? '已启用' : '未启用';
-    status.dataset.state = enabled ? 'ok' : 'idle';
-  }
-}
-
-function toggleStoryGate() {
-  const ctx = getContextSafe();
-  if (!ctx) return;
-  const settings = getSettings(ctx);
-  settings.storyGateEnabled = !(settings.storyGateEnabled !== false);
-  saveSettings(ctx);
-  renderGateControl();
-  refreshHomeInjectStatus();
-  logApp('info', settings.storyGateEnabled ? '剧情预筛已开启' : '剧情预筛已关闭');
-  globalThis.toastr?.info?.('剧情预筛已' + (settings.storyGateEnabled ? '开启' : '关闭'), '[' + MODULE_DISPLAY_NAME + ']');
-}
-
-function resetStoryGatePrompt() {
-  const ctx = getContextSafe();
-  if (!ctx) return;
-  const settings = getSettings(ctx);
-  settings.storyGatePrompt = '';
-  saveSettings(ctx);
-  const promptArea = document.getElementById(GATE_PROMPT_ID);
-  if (promptArea) promptArea.value = DEFAULT_STORY_GATE_PROMPT;
-  logApp('info', '剧情预筛提示词已恢复默认');
-  globalThis.toastr?.info?.('剧情预筛提示词已恢复默认', '[' + MODULE_DISPLAY_NAME + ']');
-}
-
 function applyApiSettingsToForm(ctx) {
   const settings = getSettings(ctx);
   const setValue = (id, value) => {
@@ -162,10 +118,7 @@ function applyApiSettingsToForm(ctx) {
   setValue(API_MODEL_ID, settings.model);
   const effortSelect = document.getElementById(API_REASONING_EFFORT_ID);
   if (effortSelect) effortSelect.value = String(settings.apiReasoningEffort || '');
-  const promptArea = document.getElementById(GATE_PROMPT_ID);
-  if (promptArea) promptArea.value = getStoryGatePrompt(ctx);
   renderApiConcurrencyControl();
-  renderGateControl();
   populateModelList(settings);
   if (settings.modelOptions.length > 0) {
     setApiStatus(`已缓存 ${settings.modelOptions.length} 个模型`, 'ok');
@@ -239,16 +192,6 @@ function initApiSection(panel) {
     saveSettings(ctx);
     logApp('info', '思考强度已设置', settings.apiReasoningEffort || '默认（不发送）');
   });
-
-  document.getElementById(GATE_TOGGLE_ID)?.addEventListener('click', toggleStoryGate);
-  document.getElementById(GATE_PROMPT_ID)?.addEventListener('input', (event) => {
-    const ctx = getCtx();
-    if (!ctx) return;
-    const settings = getSettings(ctx);
-    settings.storyGatePrompt = String(event.target?.value || '');
-    saveSettings(ctx);
-  });
-  document.getElementById(GATE_PROMPT_RESET_ID)?.addEventListener('click', resetStoryGatePrompt);
 
   try {
     const ctx = getCtx();

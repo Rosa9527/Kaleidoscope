@@ -435,23 +435,6 @@ function createPanel() {
               </select>
               <p class="kaleido-api__hint">仅对带思考能力的模型生效；「关闭思考」可避免模型把输出预算花在思考上导致正文为空。</p>
             </div>
-            <div class="kaleido-api__divider" aria-hidden="true"></div>
-            <div class="kaleido-api__head">
-              <span class="kaleido-api__title">剧情预筛</span>
-              <span id="${GATE_STATUS_ID}" class="kaleido-api__status" data-state="idle">未启用</span>
-            </div>
-            <p class="kaleido-api__hint">点击发送时，AI 先读取剧情脉络（节点与事件的名字 / ID / 触发条件 / 描述）与最近 4 条消息，挑选本轮应触发的事件，再把事件正文注入上下文。</p>
-            <div class="kaleido-api__field">
-              <span class="kaleido-api__label">启用剧情预筛</span>
-              <button type="button" id="${GATE_TOGGLE_ID}" class="kaleido-btn kaleido-api__concurrency-toggle" title="开启/关闭剧情预筛">🎬 剧情预筛：开</button>
-            </div>
-            <div class="kaleido-api__field">
-              <span class="kaleido-api__label">预筛提示词</span>
-              <textarea id="${GATE_PROMPT_ID}" class="kaleido-input kaleido-gate__prompt" rows="8" spellcheck="false" placeholder="留空使用默认提示词"></textarea>
-              <div class="kaleido-api__actions">
-                <button type="button" id="${GATE_PROMPT_RESET_ID}" class="kaleido-btn" title="恢复为内置默认提示词">恢复默认</button>
-              </div>
-            </div>
             <p class="kaleido-api__hint">填入接口地址与 API Key 后点「连接并拉取模型」，再从列表选择模型；不支持模型列表的渠道可直接手动填写模型名称。</p>
           </div>
         </section>
@@ -504,6 +487,17 @@ function createPanel() {
         </section>
         <section id="${PRESET_VIEW_ID}" class="kaleido-view" aria-hidden="true">
           <div class="kaleido-preset">
+            <div class="kaleido-preset__gate">
+              <div class="kaleido-preset__gate-head">
+                <span class="kaleido-preset__gate-title">剧情预筛</span>
+                <span id="${PRESET_GATE_STATUS_ID}" class="kaleido-preset__status" data-state="idle">未启用</span>
+              </div>
+              <p class="kaleido-preset__gate-hint">点击发送时，AI 先读取剧情脉络（节点与事件的名字 / ID / 触发条件 / 描述）与最近 4 条消息，挑选本轮应触发的事件，再把事件正文注入上下文。</p>
+              <div class="kaleido-preset__gate-row">
+                <span class="kaleido-preset__gate-label">启用剧情预筛</span>
+                <button type="button" id="${PRESET_GATE_TOGGLE_ID}" class="kaleido-btn kaleido-api__concurrency-toggle" title="开启/关闭剧情预筛">🎬 剧情预筛：开</button>
+              </div>
+            </div>
             <p class="kaleido-preset__note">各子系统提示词按标签页切换编辑，改完点「💾 保存」；「↺ 恢复默认」可还原出厂内容。</p>
             <div id="${PRESET_TABS_ID}" class="kaleido-preset__tabs" role="tablist" aria-label="选择要编辑的提示词">
               ${Object.entries(PRESET_META).map(([key, meta]) => `

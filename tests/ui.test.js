@@ -561,7 +561,27 @@ runner.test('恢复默认还原出厂内容', () => {
   assert($('kaleido-home-preset-status').textContent === '默认配置', '首页卡片状态应回到默认配置');
 });
 
+runner.test('预设模版剧情预筛开关：默认开启，点击切换并同步状态', () => {
+  const toggle = $('kaleido-preset-gate-toggle');
+  const status = $('kaleido-preset-gate-status');
+  assert(toggle, '预设模版应有剧情预筛开关');
+  assert(status, '预设模版应有剧情预筛状态徽标');
+  assert(ui.getSettings(hostCtx).storyGateEnabled !== false, '默认应启用剧情预筛');
+  assert(status.textContent === '已启用', '默认状态应为已启用');
+  assert(toggle.classList.contains('is-active'), '默认开关应为激活态');
+
+  click(toggle);
+  assert(ui.getSettings(hostCtx).storyGateEnabled === false, '点击后应关闭剧情预筛');
+  assert(status.textContent === '未启用', '状态应变为未启用');
+  assert(!toggle.classList.contains('is-active'), '开关应取消激活态');
+
+  click(toggle);
+  assert(ui.getSettings(hostCtx).storyGateEnabled !== false, '再次点击应重新开启');
+  assert(status.textContent === '已启用', '状态应回到已启用');
+});
+
 // ---------- 注入实录 ----------
+
 runner.test('注入实录卡片打开视图并展示触发与注入内容', () => {
   sandbox['__kaleido_story_gate_last_round__'] = {
     triggeredAt: new Date().toISOString(),

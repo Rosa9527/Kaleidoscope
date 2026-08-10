@@ -577,20 +577,6 @@
   border-top: 1px dashed rgba(184, 134, 47, 0.5);
 }
 
-/* 剧情预筛：分区分隔线 + 提示词编辑区 */
-.kaleido-api__divider {
-  height: 1px;
-  margin: 18px 0 14px;
-  background: linear-gradient(90deg, transparent, rgba(184, 134, 47, 0.55), transparent);
-}
-
-.kaleido-input.kaleido-gate__prompt {
-  min-height: 140px;
-  resize: vertical;
-  line-height: 1.7;
-  font-size: 12px;
-}
-
 /* ---------- 通用控件 ---------- */
 .kaleido-input {
   width: 100%;
@@ -1314,6 +1300,49 @@ select.kaleido-input {
   background: rgba(184, 134, 47, 0.12);
   border: 1.5px dashed rgba(184, 134, 47, 0.55);
   border-radius: 4px;
+}
+
+/* 剧情预筛：启用开关区（自 API 连接页迁移） */
+.kaleido-preset__gate {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(95, 157, 201, 0.08);
+  border: 1.5px solid rgba(95, 157, 201, 0.45);
+  border-radius: 4px;
+}
+
+.kaleido-preset__gate-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.kaleido-preset__gate-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.kaleido-preset__gate-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: rgba(59, 51, 42, 0.6);
+}
+
+.kaleido-preset__gate-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.kaleido-preset__gate-label {
+  font-size: 12.5px;
+  font-weight: 700;
 }
 
 .kaleido-preset__tabs {

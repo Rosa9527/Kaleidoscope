@@ -1,7 +1,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '0.7.2';
+const MODULE_VERSION = '0.7.3';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 
 // ---------- DOM ID / class ----------
@@ -33,11 +33,6 @@ const API_MODEL_ID = 'kaleido-api-model';
 const API_CONCURRENCY_TOGGLE_ID = 'kaleido-api-concurrency-toggle';
 const API_CONCURRENCY_INPUT_ID = 'kaleido-api-concurrency-input';
 const API_REASONING_EFFORT_ID = 'kaleido-api-reasoning-effort';
-// 剧情预筛（API 连接页设置区）
-const GATE_TOGGLE_ID = 'kaleido-gate-toggle';
-const GATE_PROMPT_ID = 'kaleido-gate-prompt';
-const GATE_PROMPT_RESET_ID = 'kaleido-gate-prompt-reset';
-const GATE_STATUS_ID = 'kaleido-gate-status';
 // 首页「注入实录」卡片 + 注入实录视图
 const HOME_INJECT_CARD_ID = 'kaleido-home-inject-card';
 const HOME_INJECT_STATUS_ID = 'kaleido-home-inject-status';
@@ -80,6 +75,9 @@ const PRESET_SAVE_ID = 'kaleido-preset-save';
 const PRESET_RESET_ID = 'kaleido-preset-reset';
 const PRESET_STATUS_ID = 'kaleido-preset-status';
 const PRESET_COUNT_ID = 'kaleido-preset-count';
+// 剧情预筛（预设模版设置区）
+const PRESET_GATE_TOGGLE_ID = 'kaleido-preset-gate-toggle';
+const PRESET_GATE_STATUS_ID = 'kaleido-preset-gate-status';
 
 // 剧情脉络（Storyline）· 可视化工作台
 const STORY_DIALOG_ID = 'kaleido-story-dialog';
