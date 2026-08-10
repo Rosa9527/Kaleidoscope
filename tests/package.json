@@ -1,0 +1,1 @@
+{"name":"kaleidoscope-tests","private":true,"version":"0.1.0","description":"万华镜扩展开发测试（不参与构建）","dependencies":{"jsdom":"^30.0.1"}}

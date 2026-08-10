@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>/* =========================================================
+   万华镜（Kaleidoscope）· 古风典雅 + 万花筒意象
+   宣纸底 + 墨色描边 + 朱砂印章 + 鎏金点缀；
+   六棱万花筒悬浮球、回纹饰带、菱形纹卡片徽章。
+   ========================================================= */
+
+.kaleido-sphere,
+.kaleido-panel,
+.kaleido-story-dialog {
+  --k-ink: #3b332a;
+  --k-ink-soft: rgba(59, 51, 42, 0.45);
+  --k-paper: #f7f1e3;
+  --k-paper-deep: #efe6d2;
+  --k-paper-light: #fbf7ec;
+  --k-cinnabar: #a63a2e;
+  --k-cinnabar-deep: #98332a;
+  --k-cinnabar-dark: #7c2a21;
+  --k-gold: #b8862f;
+  --k-gold-bright: #c9a227;
+  --k-azure: #4f6d7a;
+  --k-font: "KaiTi", "楷体", "STKaiti", "FangSong", "仿宋", "SimSun", "宋体", serif;
+}
+
+/* ---------- 六棱万花筒悬浮球 ---------- */
+.kaleido-sphere {
+  position: fixed;
+  z-index: 10000;
+  width: 44px;
+  height: 44px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  touch-action: none;
+  clip-path: polygon(50% 0%, 93.3% 25%, 93.3% 75%, 50% 100%, 6.7% 75%, 6.7% 25%);
+  background: linear-gradient(160deg, var(--k-gold-bright), #8a6d1f);
+  box-shadow: 0 5px 12px rgba(59, 51, 42, 0.3);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease;
+}
+
+/* 内框：宣纸底，露出鎏金描边 */
+.kaleido-sphere__frame {
+  position: absolute;
+  inset: 2.5px;
+  clip-path: polygon(50% 0%, 93.3% 25%, 93.3% 75%, 50% 100%, 6.7% 75%, 6.7% 25%);
+  background: radial-gradient(circle at 35% 28%, #fdf8ec, #f1e7cf);
+}
+
+/* 万花筒镜眼：六重对称花瓣，缓慢旋转 */
+.kaleido-sphere__eye {
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    from 0deg,
+    var(--k-cinnabar) 0deg 20deg,
+    var(--k-azure) 20deg 40deg,
+    var(--k-gold-bright) 40deg 60deg
+  );
+  box-shadow: inset 0 0 5px rgba(59, 51, 42, 0.35);
+  animation: kaleido-spin 16s linear infinite;
+}
+
+/* 镜眼蒙层：中央留亮、边缘收暗，像透过镜筒观察 */
+.kaleido-sphere__eye::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(253, 248, 236, 0) 0%,
+    rgba(253, 248, 236, 0) 34%,
+    rgba(247, 241, 227, 0.88) 70%,
+    rgba(59, 51, 42, 0.35) 100%
+  );
+}
+
+/* 轴心：朱砂圆点，鎏金环 */
+.kaleido-sphere__hub {
+  position: absolute;
+  z-index: 1;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--k-cinnabar-dark);
+  border: 1.5px solid var(--k-gold-bright);
+}
+
+.kaleido-sphere:hover {
+  filter: brightness(1.06);
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 7px 16px rgba(122, 42, 33, 0.32);
+}
+
+.kaleido-sphere:hover .kaleido-sphere__eye {
+  animation-duration: 4s;
+}
+
+.kaleido-sphere:active {
+  transform: scale(0.94);
+}
+
+.kaleido-sphere.is-dragging {
+  cursor: grabbing;
+  transition: none;
+  transform: scale(1.08);
+}
+
+.kaleido-sphere.is-appearing {
+  animation: kaleido-grow 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.kaleido-sphere.is-shrinking {
+  animation: kaleido-shrink 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes kaleido-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes kaleido-grow {
+  0% { transform: scale(0); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes kaleido-shrink {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0); opacity: 0; }
+}
+
+/* ---------- 面板：宣纸卷轴 ---------- */
+.kaleido-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: none;
+  pointer-events: none;
+}
+
+.kaleido-panel.is-open {
+  display: block;
+}
+
+.kaleido-panel__dialog {
+  position: fixed;
+  z-index: 1;
+  width: 372px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  pointer-events: auto;
+  font-family: var(--k-font);
+  font-size: 14px;
+  color: var(--k-ink);
+  background: var(--k-paper);
+  border: 1.5px solid rgba(59, 51, 42, 0.8);
+  border-radius: 8px;
+  box-shadow:
+    0 10px 28px rgba(59, 51, 42, 0.3),
+    0 0 0 1px rgba(184, 134, 47, 0.35);
+  overflow: hidden;
+}
+
+.kaleido-panel__dialog.is-dragging {
+  cursor: grabbing;
+}
+
+/* 标题栏：墨色横批 + 鎏金底边 */
+.kaleido-panel__header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px 8px;
+  background: linear-gradient(180deg, #4b4238, #3b332a);
+  border-bottom: 2px solid var(--k-gold);
+  cursor: grab;
+}
+
+.kaleido-panel__header:active {
+  cursor: grabbing;
+}
+
+.kaleido-panel__logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-size: 13px;
+  color: #fdf6e3;
+  background: linear-gradient(135deg, #b03a2e, #98332a);
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1.5px rgba(253, 246, 227, 0.35);
+  flex: none;
+}
+
+.kaleido-panel__logo .fa-solid {
+  animation: kaleido-logo-spin 12s linear infinite;
+}
+
+@keyframes kaleido-logo-spin {
+  to { transform: rotate(360deg); }
+}
+
+.kaleido-panel__title {
+  flex: 1;
+  color: #f7f1e3;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kaleido-panel__back,
+.kaleido-panel__close {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1;
+  color: #f7f1e3;
+  background: transparent;
+  border: 1.5px solid rgba(247, 241, 227, 0.5);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.kaleido-panel__back:hover,
+.kaleido-panel__close:hover {
+  background: var(--k-cinnabar);
+  border-color: var(--k-cinnabar);
+  transform: scale(1.08);
+}
+
+/* 内容区：宣纸底 */
+.kaleido-panel__body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: linear-gradient(180deg, #f9f4e8, #f4eddb);
+  padding: 14px 14px 16px;
+}
+
+.kaleido-panel__body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.kaleido-panel__body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.kaleido-panel__body::-webkit-scrollbar-thumb {
+  background: rgba(59, 51, 42, 0.3);
+  border-radius: 4px;
+}
+
+.kaleido-view {
+  display: none;
+}
+
+.kaleido-view.is-active {
+  display: block;
+}
+
+/* ---------- 首页：镜鉴英雄区 ---------- */
+.kaleido-home__hero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  background: linear-gradient(180deg, rgba(184, 134, 47, 0.1), rgba(184, 134, 47, 0.04));
+  border: 1px solid rgba(59, 51, 42, 0.15);
+  border-left: 3px solid var(--k-gold);
+  border-radius: 4px;
+}
+
+/* 首字放大：标语第一个「镜」字作字头 */
+.kaleido-home__slogan-first {
+  font-size: 2em;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--k-cinnabar-deep);
+  margin-right: 2px;
+}
+
+.kaleido-home__slogan {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--k-ink);
+}
+
+/* 首页卡片：菱形纹图标徽章 */
+.kaleido-home__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.kaleido-home__card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 11px 12px;
+  text-align: left;
+  font-family: var(--k-font);
+  color: var(--k-ink);
+  background: var(--k-paper-light);
+  border: 1.5px solid rgba(59, 51, 42, 0.22);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.kaleido-home__card:hover:not(:disabled) {
+  border-color: var(--k-cinnabar);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(59, 51, 42, 0.14);
+}
+
+.kaleido-home__card:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* 六棱徽章：图标放进六边形里 */
+.kaleido-home__card-icon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #fdf6e3;
+  background: linear-gradient(160deg, #b03a2e, #8f2d24);
+  clip-path: polygon(50% 0%, 93.3% 25%, 93.3% 75%, 50% 100%, 6.7% 75%, 6.7% 25%);
+}
+
+.kaleido-home__card:nth-child(2) .kaleido-home__card-icon,
+.kaleido-home__card:nth-child(3) .kaleido-home__card-icon {
+  background: linear-gradient(160deg, #5c7d8c, #45616d);
+}
+
+.kaleido-home__card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.kaleido-home__card-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.kaleido-home__card-status {
+  font-size: 12px;
+  color: rgba(59, 51, 42, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kaleido-home__card-status[data-state='ok'] {
+  color: #5f7f5a;
+}
+
+.kaleido-home__card-status[data-state='warn'] {
+  color: var(--k-gold);
+}
+
+.kaleido-home__card-status[data-state='error'] {
+  color: var(--k-cinnabar);
+}
+
+.kaleido-home__card--disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.kaleido-home__card--disabled .kaleido-home__card-icon {
+  filter: grayscale(0.5);
+}
+
+/* ---------- API 连接视图 ---------- */
+.kaleido-api__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.kaleido-api__title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  padding: 5px 10px;
+  background: rgba(166, 58, 46, 0.06);
+  border: 1px solid rgba(59, 51, 42, 0.18);
+  border-left: 3px solid var(--k-cinnabar);
+  border-radius: 3px;
+}
+
+.kaleido-api__status {
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  border: 1px solid rgba(59, 51, 42, 0.2);
+  background: rgba(59, 51, 42, 0.05);
+  color: rgba(59, 51, 42, 0.6);
+  max-width: 190px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kaleido-api__status[data-state='ok'] {
+  color: #4c6b47;
+  border-color: rgba(95, 127, 90, 0.5);
+  background: rgba(95, 127, 90, 0.1);
+}
+
+.kaleido-api__status[data-state='warn'] {
+  color: #8a6d1f;
+  border-color: rgba(184, 134, 47, 0.5);
+  background: rgba(184, 134, 47, 0.1);
+}
+
+.kaleido-api__status[data-state='error'] {
+  color: var(--k-cinnabar-deep);
+  border-color: rgba(166, 58, 46, 0.5);
+  background: rgba(166, 58, 46, 0.1);
+}
+
+.kaleido-api__status[data-state='busy'] {
+  color: var(--k-azure);
+  border-color: rgba(79, 109, 122, 0.5);
+  background: rgba(79, 109, 122, 0.1);
+}
+
+.kaleido-api__field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 12px;
+}
+
+.kaleido-api__label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: rgba(59, 51, 42, 0.75);
+}
+
+.kaleido-api__key-row {
+  display: flex;
+  gap: 6px;
+}
+
+.kaleido-api__key-row .kaleido-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.kaleido-api__actions {
+  margin-bottom: 12px;
+}
+
+.kaleido-api__concurrency-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 开关按钮：保持自身尺寸、文字不换行，避免被输入框挤压。
+   复合选择器保证优先级高于 .kaleido-btn（同优先级时后写的规则会覆盖先写的）。 */
+.kaleido-btn.kaleido-api__concurrency-toggle {
+  flex: none;
+  white-space: nowrap;
+  padding: 8px 16px;
+}
+
+/* 数字输入框：收敛成小号「印章格」。
+   必须用复合选择器压过 .kaleido-input 的 width: 100%，否则输入框会被撑成整行宽度。 */
+.kaleido-input.kaleido-api__concurrency-input {
+  width: 56px;
+  flex: none;
+  padding: 6px 4px;
+  text-align: center;
+}
+
+.kaleido-api__hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: rgba(59, 51, 42, 0.6);
+}
+
+.kaleido-api__hint:last-child {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(184, 134, 47, 0.5);
+}
+
+/* ---------- 通用控件 ---------- */
+.kaleido-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  font-family: var(--k-font);
+  font-size: 13px;
+  color: var(--k-ink);
+  background: var(--k-paper-light);
+  border: 1.5px solid rgba(59, 51, 42, 0.3);
+  border-radius: 4px;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.kaleido-input:focus {
+  border-color: var(--k-cinnabar);
+  background: #fffdf6;
+  box-shadow: 0 0 0 3px rgba(166, 58, 46, 0.12);
+}
+
+.kaleido-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+select.kaleido-input {
+  cursor: pointer;
+}
+
+.kaleido-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-family: var(--k-font);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #fdf6e3;
+  background: linear-gradient(180deg, #b03a2e, #98332a);
+  border: 1.5px solid #7c2a21;
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(59, 51, 42, 0.3);
+  transition: filter 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.kaleido-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(59, 51, 42, 0.32);
+}
+
+.kaleido-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.kaleido-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.kaleido-btn.is-active {
+  box-shadow: inset 0 0 0 2px rgba(253, 246, 227, 0.5);
+}
+
+.kaleido-icon-btn {
+  flex: none;
+  width: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: var(--k-ink);
+  background: var(--k-paper-light);
+  border: 1.5px solid rgba(59, 51, 42, 0.3);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.kaleido-icon-btn:hover {
+  border-color: var(--k-cinnabar);
+  transform: scale(1.06);
+}
+
+/* ---------- 剧情脉络工作台（大窗口 / 树状） ---------- */
+.kaleido-story-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(25, 19, 11, 0.42);
+  pointer-events: auto;
+}
+
+.kaleido-story-dialog.is-open {
+  display: flex;
+}
+
+.kaleido-story-dialog__inner {
+  width: min(920px, calc(100vw - 24px));
+  height: min(680px, calc(100vh - 24px));
+  display: flex;
+  flex-direction: column;
+  font-family: var(--k-font);
+  font-size: 14px;
+  color: var(--k-ink);
+  background: var(--k-paper);
+  border: 1.5px solid rgba(59, 51, 42, 0.85);
+  border-radius: 10px;
+  box-shadow:
+    0 16px 44px rgba(25, 19, 11, 0.45),
+    0 0 0 1px rgba(184, 134, 47, 0.4);
+  overflow: hidden;
+}
+
+.kaleido-story-dialog__header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, #4b4238, #3b332a);
+  border-bottom: 2px solid var(--k-gold);
+}
+
+.kaleido-story-dialog__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: #fdf6e3;
+}
+
+.kaleido-story-dialog__title .fa-solid {
+  color: var(--k-gold-bright);
+}
+
+.kaleido-story-dialog__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kaleido-story-dialog__toolbar .kaleido-icon-btn {
+  color: #fdf6e3;
+  background: rgba(253, 246, 227, 0.08);
+  border-color: rgba(253, 246, 227, 0.35);
+}
+
+.kaleido-story-dialog__body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  position: relative;
+  background: linear-gradient(180deg, #f9f4e8, #f4eddb);
+  padding: 12px;
+}
+
+/* 树区 */
+.kaleido-story__tree {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kaleido-story__tree-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.kaleido-story__tree-hint {
+  font-size: 12px;
+  color: rgba(59, 51, 42, 0.55);
+  letter-spacing: 1px;
+}
+
+.kaleido-story__tree-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 2px 2px 8px;
+}
+
+.kaleido-story__group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(184, 134, 47, 0.55);
+}
+
+.kaleido-story__group-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: rgba(59, 51, 42, 0.5);
+  padding: 0 4px;
+}
+
+/* 行 */
+.kaleido-story__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding-top: 3px;
+  padding-right: 8px;
+  padding-bottom: 3px;
+  background: var(--k-paper-light);
+  border: 1px solid rgba(59, 51, 42, 0.16);
+  border-radius: 5px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.kaleido-story__row:hover {
+  border-color: rgba(166, 58, 46, 0.45);
+  box-shadow: 0 2px 6px rgba(59, 51, 42, 0.12);
+}
+
+.kaleido-story__row--node {
+  border-left: 3px solid var(--k-gold);
+}
+
+.kaleido-story__row--node.is-expanded {
+  border-left-color: var(--k-cinnabar);
+}
+
+.kaleido-story__row--script {
+  border-left: 2px solid rgba(79, 109, 122, 0.45);
+  background: rgba(247, 241, 227, 0.72);
+}
+
+.kaleido-story__chevron {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: rgba(59, 51, 42, 0.55);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: transform 0.18s ease, color 0.18s ease;
+}
+
+.kaleido-story__chevron:hover {
+  color: var(--k-cinnabar);
+  background: rgba(166, 58, 46, 0.07);
+}
+
+.kaleido-story__row.is-expanded .kaleido-story__chevron span {
+  transform: rotate(90deg);
+  display: inline-block;
+}
+
+.kaleido-story__chevron.is-empty {
+  visibility: hidden;
+}
+
+.kaleido-story__row-icon {
+  flex: none;
+  width: 20px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--k-gold);
+}
+
+.kaleido-story__row-icon--script {
+  color: var(--k-azure);
+}
+
+.kaleido-story__row-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kaleido-story__row--script .kaleido-story__row-name {
+  font-weight: 500;
+}
+
+.kaleido-story__row-trigger {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 11px;
+  color: rgba(59, 51, 42, 0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kaleido-story__row-count {
+  flex: none;
+  font-size: 11px;
+  color: rgba(59, 51, 42, 0.45);
+  background: rgba(184, 134, 47, 0.12);
+  border: 1px solid rgba(184, 134, 47, 0.35);
+  border-radius: 8px;
+  padding: 0 7px;
+}
+
+.kaleido-story__row-badge {
+  flex: none;
+  font-size: 11px;
+  color: rgba(59, 51, 42, 0.5);
+  background: rgba(79, 109, 122, 0.1);
+  border: 1px solid rgba(79, 109, 122, 0.3);
+  border-radius: 8px;
+  padding: 0 7px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kaleido-story__row-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+}
+
+.kaleido-story__row:hover .kaleido-story__row-actions {
+  opacity: 1;
+}
+
+.kaleido-story__icon-btn {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: rgba(59, 51, 42, 0.72);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.kaleido-story__icon-btn:hover {
+  color: var(--k-cinnabar);
+  background: rgba(166, 58, 46, 0.08);
+  border-color: rgba(166, 58, 46, 0.35);
+}
+
+.kaleido-story__icon-btn--danger:hover {
+  color: #fff;
+  background: var(--k-cinnabar-deep);
+  border-color: var(--k-cinnabar-dark);
+}
+
+.kaleido-story__empty {
+  padding: 26px 16px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.9;
+  color: rgba(59, 51, 42, 0.5);
+  white-space: pre-line;
+}
+
+/* 编辑器（桌面：右侧浮层；移动端：全幅覆盖） */
+/* hidden 属性必须压过 display 规则，否则编辑器 / 导出按钮会关不掉、常显 */
+.kaleido-story-dialog__editor[hidden],
+.kaleido-btn[hidden] {
+  display: none !important;
+}
+.kaleido-story-dialog__editor {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  width: 350px;
+  max-width: calc(100% - 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: var(--k-paper);
+  border: 1.5px solid rgba(59, 51, 42, 0.55);
+  border-top: 3px solid var(--k-cinnabar);
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(59, 51, 42, 0.35);
+  overflow-y: auto;
+  z-index: 2;
+}
+
+.kaleido-story__editor-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kaleido-story__editor-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.kaleido-story__editor-spacer {
+  flex: 1;
+}
+
+.kaleido-story__textarea {
+  resize: vertical;
+  line-height: 1.7;
+  font-family: var(--k-font);
+}
+
+.kaleido-story__textarea--small {
+  min-height: 40px;
+}
+
+.kaleido-story__editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+/* 次要按钮：墨线描边、朱砂字 */
+.kaleido-btn--ghost {
+  color: var(--k-cinnabar);
+  background: transparent;
+  border-color: rgba(166, 58, 46, 0.45);
+  box-shadow: none;
+}
+
+.kaleido-btn--ghost:hover:not(:disabled) {
+  background: rgba(166, 58, 46, 0.06);
+  box-shadow: none;
+}
+
+/* 迷你按钮 */
+.kaleido-btn--mini {
+  padding: 4px 10px;
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+/* 小屏适配（手机端） */
+@media (max-width: 640px) {
+  .kaleido-story-dialog__inner {
+    width: 100vw;
+    height: 100dvh;
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
+    border: none;
+  }
+
+  .kaleido-story-dialog__body {
+    padding: 8px;
+  }
+
+  .kaleido-story__tree-hint {
+    display: none;
+  }
+
+  .kaleido-story-dialog__editor {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: auto;
+    max-width: none;
+    border-radius: 0;
+    border: none;
+  }
+
+  .kaleido-story__row-trigger {
+    display: none;
+  }
+
+  .kaleido-story__row-actions {
+    opacity: 1;
+  }
+}
+
+/* ---------- 页脚 ---------- *//* ---------- 页脚 ---------- */
+.kaleido-panel__footer {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 12px;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: rgba(59, 51, 42, 0.55);
+  background: var(--k-paper-deep);
+  border-top: 1px solid rgba(184, 134, 47, 0.45);
+}
+
+.kaleido-panel__slogan {
+  letter-spacing: 3px;
+  color: rgba(122, 42, 33, 0.65);
+}
+</style></head>
+<body>
+<div class="kaleido-panel is-open" aria-hidden="false">
+  <div class="kaleido-panel__dialog" role="dialog" style="left:0;top:0">
+    <div class="kaleido-panel__header kaleido-drag-handle">
+      <button type="button" class="kaleido-panel__back" style="visibility:hidden">←</button>
+      <span class="kaleido-panel__logo">镜</span>
+      <span class="kaleido-panel__title">万华镜</span>
+      <button type="button" class="kaleido-panel__close">✕</button>
+    </div>
+    <div class="kaleido-panel__body">
+      <section id="kaleido-home-view" class="kaleido-view is-active">
+        <div class="kaleido-home__hero">
+          <p class="kaleido-home__slogan"><span class="kaleido-home__slogan-first">镜</span>中万象，皆是文章</p>
+        </div>
+        <div class="kaleido-home__grid">
+          <button type="button" class="kaleido-home__card">
+            <span class="kaleido-home__card-icon"><span class="fa-solid fa-plug"></span></span>
+            <span class="kaleido-home__card-text">
+              <span class="kaleido-home__card-title">API 连接</span>
+              <span class="kaleido-home__card-status" data-state="ok">gpt-4o-mini</span>
+            </span>
+          </button>
+          <button type="button" class="kaleido-home__card">
+            <span class="kaleido-home__card-icon"><span class="fa-solid fa-sitemap"></span></span>
+            <span class="kaleido-home__card-text">
+              <span class="kaleido-home__card-title">剧情脉络</span>
+              <span class="kaleido-home__card-status" data-state="ok">0 节点 · 1 剧本</span>
+            </span>
+          </button>
+          <button type="button" class="kaleido-home__card">
+            <span class="kaleido-home__card-icon"><span class="fa-solid fa-book"></span></span>
+            <span class="kaleido-home__card-text">
+              <span class="kaleido-home__card-title">系统日志</span>
+              <span class="kaleido-home__card-status" data-state="idle">暂无记录</span>
+            </span>
+          </button>
+          <button type="button" class="kaleido-home__card kaleido-home__card--disabled" disabled>
+            <span class="kaleido-home__card-icon"><span class="fa-solid fa-wand-magic-sparkles"></span></span>
+            <span class="kaleido-home__card-text">
+              <span class="kaleido-home__card-title">注入实录</span>
+              <span class="kaleido-home__card-status" data-state="idle">敬请期待</span>
+            </span>
+          </button>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+</body></html>

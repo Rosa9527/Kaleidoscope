@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<title>万华镜预览</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="style.css">
+<style>
+  body { background: #2b2419; padding: 20px; }
+  .kaleido-panel { position: static !important; display: block !important; margin: 0 auto; }
+  .kaleido-panel__dialog { position: static !important; }
+  .kaleido-panel.is-open { display: block; }
+</style>
+</head><body>
+<script>
+  // 简易宿主 mock
+  const hostCtx = {
+    extensionSettings: {},
+    saveSettingsDebounced() {},
+    saveSettings() {},
+    eventSource: { on() {}, removeListener() {} },
+    event_types: {},
+  };
+  globalThis.Luker = { getContext: () => hostCtx };
+  globalThis.toastr = { success() {}, info() {}, warning() {}, error() {} };
+  globalThis.confirm = () => true;
+  globalThis.localStorage = { getItem: () => null, setItem() {} };
+  globalThis.URL.createObjectURL = () => 'blob:mock';
+  globalThis.URL.revokeObjectURL = () => {};
+</script>
+<script src="index.js"></script>
+<script>
+  // 打开面板并切到首页
+  setTimeout(() => {
+    const panel = document.getElementById('kaleido-panel');
+    if (panel) panel.classList.add('is-open');
+    document.getElementById('kaleido-panel')?.setAttribute('aria-hidden', 'false');
+  }, 100);
+</script>
+</body></html>
