@@ -1143,6 +1143,24 @@ select.kaleido-input {
     border: none;
   }
 
+  .kaleido-story-dialog__header {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  .kaleido-story-dialog__title,
+  .kaleido-story-dialog__toolbar .kaleido-btn {
+    white-space: nowrap;
+  }
+
+  .kaleido-story-dialog__toolbar {
+    margin-left: auto;
+  }
+
+  .kaleido-story__binding {
+    max-width: 100%;
+  }
+
   .kaleido-story-dialog__body {
     padding: 8px;
   }
