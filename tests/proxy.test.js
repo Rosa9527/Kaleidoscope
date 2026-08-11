@@ -71,6 +71,42 @@ runner.test('requestHostProxyChatCompletion：POST 到 /generate 端点', async 
   assert(result.response.ok === true, '应返回响应');
 });
 
+runner.test('isHostErrorEnvelopeContent：识别宿主 [API 错误] 信封', () => {
+  assert(ctx.isHostErrorEnvelopeContent('[API 错误]\n网络请求失败：Network request failed. (https://ollama.com/v1/chat/completions)') === true);
+});
+
+runner.test('isHostErrorEnvelopeContent：识别 [后端错误] 信封', () => {
+  assert(ctx.isHostErrorEnvelopeContent('[后端错误] 上游超时') === true);
+});
+
+runner.test('isHostErrorEnvelopeContent：识别裸 Network request failed', () => {
+  assert(ctx.isHostErrorEnvelopeContent('Network request failed. (https://ollama.com/v1/chat/completions)') === true);
+});
+
+runner.test('isHostErrorEnvelopeContent：正常模型回复不算信封', () => {
+  assert(ctx.isHostErrorEnvelopeContent('{"events":["vol1-002"]}') === false);
+  assert(ctx.isHostErrorEnvelopeContent('你好，这里是剧情回复') === false);
+});
+
+runner.test('requestChatCompletionOnce：代理返回错误信封时抛清晰错误而非当内容返回', async () => {
+  sandbox.fetch = async (url) => {
+    if (url === '/api/backends/chat-completions/generate') {
+      return jsonResponse({ choices: [{ message: { content: '[API 错误]\n网络请求失败：Network request failed. (https://ollama.com/v1/chat/completions)' } }] });
+    }
+    throw new Error('不应回退直连');
+  };
+  let thrown = null;
+  try {
+    await ctx.requestChatCompletionOnce('https://ollama.com/v1', { apiKey: 'sk-123' }, { model: 'm', messages: [], stream: false });
+  } catch (error) {
+    thrown = error;
+  }
+  assert(thrown, '应抛出错误');
+  assert(/上游 API 返回错误/.test(thrown.message), '错误应标明上游 API 错误，实际: ' + thrown.message);
+  assert(/网络请求失败/.test(thrown.message), '错误应包含宿主错误原文，实际: ' + thrown.message);
+  assert(thrown.retryable === true, '网络类错误应可重试');
+});
+
 runner.test('requestChatCompletionOnce：代理返回模型列表时回退直连', async () => {
   const calls = [];
   sandbox.fetch = async (url, init) => {

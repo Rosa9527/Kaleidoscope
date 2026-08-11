@@ -101,6 +101,38 @@ runner.test('waitAll 级联去重：轮次完成后同签名不再重跑（宿�
   assert(runs === 2, '新签名应开启新轮');
 });
 
+runner.test('waitAll 删楼重发：同 ID 不同内容应开启新轮（宿主复用被删消息 ID）', async () => {
+  const { ctx } = freshContext();
+  const barrier = ctx.getPreSendBarrier();
+  let runs = 0;
+  barrier.register('test-reused-id', () => { runs += 1; return Promise.resolve(); });
+  const c1 = chatWith(userMsg(8, '第一轮'));
+  await barrier.waitAll(c1, '8');
+  assert(runs === 1, '第一轮应执行一次');
+  // 删掉 8、9 两层楼后重发：新消息复用被删消息的 ID（8），但内容不同，
+  // 仅凭 ID 判重会把这次发送误判为旧轮直接放行（剧情预筛整轮被跳过）。
+  const c2 = chatWith(userMsg(8, '删楼后重发'));
+  await barrier.waitAll(c2, '8');
+  assert(runs === 2, '同 ID 不同内容应视为新发送，任务应再次执行');
+  await barrier.waitAll(c2, '8');
+  assert(runs === 2, '同 ID 同内容应复用本轮，不得重跑');
+});
+
+runner.test('clearSendBarrierRound：清空旧轮后同签名重新执行（messageDeleted 场景）', async () => {
+  const { ctx } = freshContext();
+  const barrier = ctx.getPreSendBarrier();
+  let runs = 0;
+  barrier.register('test-clear', () => { runs += 1; return Promise.resolve(); });
+  const c = chatWith(userMsg(9, '删后原样重发'));
+  await barrier.waitAll(c, '9');
+  assert(runs === 1, '首轮应执行一次');
+  // 删消息 → 清轮；即使重发内容与旧轮完全相同（内容判据兜不住），
+  // 清掉旧轮后也必须重新执行，而不是被误判为「同一发送已处理」。
+  ctx.clearSendBarrierRound();
+  await barrier.waitAll(c, '9');
+  assert(runs === 2, '清轮后同签名应重新执行');
+});
+
 runner.test('waitAll 失败隔离：单个任务 reject 不阻塞整轮', async () => {
   const { ctx } = freshContext();
   const barrier = ctx.getPreSendBarrier();

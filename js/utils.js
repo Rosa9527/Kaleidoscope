@@ -197,6 +197,17 @@ function responseContainsUsableText(responseText) {
   return typeof reasoning === 'string' && reasoning.trim().length > 0;
 }
 
+// TauriTavern 宿主代理在后端请求失败时，会把错误文本包装成 chat.completion
+// 形状的响应（content 以 [API 错误] / [后端错误] 开头，或直接是
+// "Network request failed. (...)"），而不是返回非 2xx 或 {error} 信封。
+// 这类内容不是模型回复，必须识别出来，否则下游（剧情预筛等）会把错误文本
+// 当 AI 内容解析，报出误导性的 JSON 解析错误。
+function isHostErrorEnvelopeContent(content) {
+  const text = String(content || '').trim();
+  return /^\[[^\]]*错误\]/.test(text)
+    || /^(?:网络请求失败|Network request failed)/i.test(text);
+}
+
 async function fetchText(url, options = {}) {
   const { timeoutMs, signal, ...fetchOptions } = options;
   const limitMs = Number(timeoutMs) > 0 ? Number(timeoutMs) : DEFAULT_API_TIMEOUT_MS;
@@ -474,6 +485,10 @@ async function requestChatCompletionOnce(apiBase, settings, body, signal) {
       ? '（疑似思考阶段耗尽输出预算：请调大 max_tokens 或改用非推理模型）'
       : '';
     throw createChatError(`AI 未返回文本内容（${transport}）${errorMessage}${finishReason ? `（${finishReason}）` : ''}${budgetHint}`, true);
+  }
+  if (isHostErrorEnvelopeContent(content)) {
+    const transient = /(?:网络|network|timeout|timed\s*out|failed|失败|超时)/i.test(content);
+    throw createChatError(`上游 API 返回错误（${transport}）: ${content.slice(0, 240)}`, transient);
   }
   return { content, transport };
 }
