@@ -2,8 +2,7 @@
 <html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Kaleidoscope Mobile Preview</title>
-<style>
-/* =========================================================
+<style>/* =========================================================
    万华镜（Kaleidoscope）· 古风典雅 + 万花筒意象
    宣纸底 + 墨色描边 + 朱砂印章 + 鎏金点缀；
    六棱万花筒悬浮球、回纹饰带、菱形纹卡片徽章。
@@ -1231,13 +1230,12 @@ select.kaleido-input {
 /* 小屏适配（手机端） */
 @media (max-width: 640px) {
   .kaleido-story-dialog__inner {
-    width: 100vw;
-    height: 100vh;
-    height: 100dvh;
-    max-width: none;
-    max-height: none;
-    border-radius: 0;
-    border: none;
+    width: 540px;
+    max-width: calc(100vw - 24px);
+    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px);
+    border-radius: 8px;
+    border: 1.5px solid rgba(59, 51, 42, 0.85);
   }
 
   .kaleido-story-dialog__header {
@@ -1260,6 +1258,10 @@ select.kaleido-input {
 
   .kaleido-story-dialog__body {
     padding: 8px;
+  }
+
+  .kaleido-story__tree-body {
+    min-height: 40vh;
   }
 
   .kaleido-story__tree-hint {
@@ -1947,7 +1949,6 @@ select.kaleido-input {
     overscroll-behavior: contain;
   }
 
-
   .kaleido-panel__body {
     padding-bottom: calc(16px + env(safe-area-inset-bottom));
     overscroll-behavior: contain;
@@ -1957,18 +1958,9 @@ select.kaleido-input {
     padding-bottom: calc(7px + env(safe-area-inset-bottom));
   }
 
-  /* ---------- 剧情脉络工作台：安全区 ---------- */
-  .kaleido-story-dialog__header {
-    padding-top: calc(10px + env(safe-area-inset-top));
-  }
-
+  /* ---------- 剧情脉络工作台：滚动隔离（窗口不再全屏，无需安全区） ---------- */
   .kaleido-story-dialog__body {
-    padding-bottom: calc(8px + env(safe-area-inset-bottom));
     overscroll-behavior: contain;
-  }
-
-  .kaleido-story-dialog__editor {
-    padding-bottom: calc(12px + env(safe-area-inset-bottom));
   }
 
   .kaleido-story__tree-body,
@@ -2219,7 +2211,6 @@ select.kaleido-input {
     color: var(--k-ink);
   }
 }
-
 </style>
 <style>
   body { margin: 0; background: #8c8271; font-family: sans-serif; }

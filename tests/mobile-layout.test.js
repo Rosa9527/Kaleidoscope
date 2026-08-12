@@ -35,22 +35,25 @@ assert(bundle.includes('dialog.style.left'), 'index.js 应始终写入内联 lef
 assert(shell.includes('dialog.getBoundingClientRect()'), 'js/ui-shell.js 应基于视觉位置计算拖拽偏移');
 assert(/\.kaleido-panel__header\s*\{[^}]*touch-action:\s*none/.test(style), '标题栏应设置 touch-action: none，避免触屏拖动被 pointercancel 打断');
 
-// 回归：面板标题栏不叠加安全区 inset（基础规则），剧情工作台标题栏保留（全屏工作台需要）。
+// 回归：面板标题栏不叠加安全区 inset（基础规则），剧情工作台窗口不再全屏，同样不叠加。
 const baseHeaderRule = style.match(/\.kaleido-panel__header\s*\{([^}]*)\}/);
 assert(baseHeaderRule, '缺少 .kaleido-panel__header 基础规则');
 assert(!baseHeaderRule[1].includes('env(safe-area-inset-top)'), '面板标题栏不应叠加安全区 inset');
 const lastMobileStart = style.lastIndexOf('@media (max-width: 640px)');
 assert(lastMobileStart !== -1, 'style.css 缺少 @media (max-width: 640px)');
 const lastMobileStyle = style.slice(lastMobileStart);
-const storyHeaderRule = lastMobileStyle.match(/\.kaleido-story-dialog__header\s*\{([^}]*)\}/);
-assert(storyHeaderRule && storyHeaderRule[1].includes('env(safe-area-inset-top)'), '剧情工作台标题栏应保留安全区 inset（全屏工作台仍需要）');
+const storyBodyRule = lastMobileStyle.match(/\.kaleido-story-dialog__body\s*\{([^}]*)\}/);
+assert(storyBodyRule && !storyBodyRule[1].includes('env(safe-area-inset-bottom)'), '剧情工作台 body 不应叠加安全区 inset（窗口不再全屏）');
 
-// 剧情脉络工作台仍为移动端全屏。
+// 剧情脉络工作台移动端与预设模版一致：540px 视窗（视口内自适应），不再全屏。
 const firstStoryMobileRule = style.match(
   /@media \(max-width: 640px\)[\s\S]*?\.kaleido-story-dialog__inner\s*\{([^}]*)\}/,
 );
 assert(firstStoryMobileRule, '缺少剧情脉络的移动端 .kaleido-story-dialog__inner 规则');
-assert(/\bwidth\s*:\s*100vw\b/.test(firstStoryMobileRule[1]), '剧情脉络移动端规则应包含 width:100vw');
-assert(/\bheight\s*:\s*100dvh\b/.test(firstStoryMobileRule[1]), '剧情脉络移动端规则应包含 height:100dvh');
+assert(/\bwidth\s*:\s*540px\b/.test(firstStoryMobileRule[1]), '剧情脉络移动端规则应包含 width:540px');
+assert(/max-width:\s*calc\(100vw - 24px\)/.test(firstStoryMobileRule[1]), '剧情脉络移动端规则应包含 max-width:calc(100vw - 24px)');
+assert(/max-height:\s*calc\(100dvh - 24px\)/.test(firstStoryMobileRule[1]), '剧情脉络移动端规则应包含 max-height:calc(100dvh - 24px)');
+assert(!/\bwidth\s*:\s*100vw\b/.test(firstStoryMobileRule[1]), '剧情脉络移动端规则不应再全屏 width:100vw');
+assert(!/\bheight\s*:\s*100dvh\b/.test(firstStoryMobileRule[1]), '剧情脉络移动端规则不应再全屏 height:100dvh');
 
 console.log('移动端面板定位静态检查通过');
