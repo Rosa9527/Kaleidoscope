@@ -176,7 +176,8 @@ function initDraggableSphere(sphere) {
 }
 
 // ---------- 面板 ----------
-// 移动端（≤640px）面板全屏铺满，不做浮窗定位 / 拖拽。
+// 移动端（≤640px）面板保留浮窗：默认位置交给 CSS 尺寸模式，
+// 用户拖动标题栏后改由内联 left/top 接管（与桌面端一致）。
 function isMobileViewport() {
   try {
     return Boolean(window.matchMedia && window.matchMedia('(max-width: 640px)').matches);
@@ -199,11 +200,14 @@ function clampPanelPosition(dialog, left, top) {
 function setPanelPosition(panel, left, top) {
   const dialog = panel?.querySelector('.kaleido-panel__dialog');
   if (!panel || !dialog) return;
-  // 移动端：位置交给 CSS 尺寸模式（普通面板保留浮窗，剧情脉络使用独立工作台），不写内联 left/top。
-  if (isMobileViewport()) return;
+  // 用户拖动 / 恢复定位后，解除移动端 CSS 居中或铺边约束，改由内联 left/top 接管。
   const next = clampPanelPosition(dialog, left, top);
   dialog.style.left = `${next.left}px`;
   dialog.style.top = `${next.top}px`;
+  dialog.style.right = 'auto';
+  dialog.style.bottom = 'auto';
+  dialog.style.transform = 'none';
+  dialog.classList.add('is-user-positioned');
   panel.dataset.left = String(next.left);
   panel.dataset.top = String(next.top);
   panel.dataset.positioned = 'true';
@@ -212,6 +216,8 @@ function setPanelPosition(panel, left, top) {
 function ensurePanelPosition(panel) {
   const dialog = panel?.querySelector('.kaleido-panel__dialog');
   if (!panel || !dialog) return;
+  // 移动端默认位置交给 CSS 尺寸模式；仅当用户已拖动定位后恢复内联位置。
+  if (isMobileViewport() && !dialog.classList.contains('is-user-positioned')) return;
   const storedLeft = Number(panel.dataset.left);
   const storedTop = Number(panel.dataset.top);
   if (Number.isFinite(storedLeft) && Number.isFinite(storedTop)) {
@@ -239,14 +245,16 @@ function initDraggablePanel(panel) {
   handles.forEach((handle) =>
     handle.addEventListener('pointerdown', (event) => {
       if (event.button !== 0) return;
-      if (isMobileViewport()) return;
       // 指针落在标题栏内的按钮上（返回/关闭）时，不启动拖拽、不捕获指针，
       // 否则 setPointerCapture 会把后续 click 重定向到标题栏，按钮点击失效。
       const target = event.target;
       if (target instanceof Element && typeof target.closest === 'function' && target.closest('button')) return;
+      // 用视觉位置（getBoundingClientRect）计算偏移：移动端居中布局带 transform，
+      // offsetLeft/offsetTop 是布局位置，会导致首帧跳动。
+      const rect = dialog.getBoundingClientRect();
       dragState = {
-        offsetX: event.clientX - dialog.offsetLeft,
-        offsetY: event.clientY - dialog.offsetTop,
+        offsetX: event.clientX - rect.left,
+        offsetY: event.clientY - rect.top,
       };
       dialog.classList.add('is-dragging');
       handle.setPointerCapture?.(event.pointerId);
@@ -259,6 +267,7 @@ function initDraggablePanel(panel) {
     setPanelPosition(panel, event.clientX - dragState.offsetX, event.clientY - dragState.offsetY);
   });
   window.addEventListener('pointerup', stopDragging);
+  window.addEventListener('pointercancel', stopDragging);
   window.addEventListener('resize', () => ensurePanelPosition(panel));
   panel.dataset.dragReady = 'true';
 }

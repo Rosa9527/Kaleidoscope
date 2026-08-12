@@ -41,6 +41,17 @@ assert(!/\bwidth\s*:\s*100vw\b/.test(panelRule[1]), '移动端面板规则不应
 assert(!/\bheight\s*:\s*100dvh\b/.test(panelRule[1]), '移动端面板规则不应包含 height:100dvh');
 assert(/\bborder-radius\s*:\s*10px\b/.test(panelRule[1]), '移动端面板规则应包含 border-radius:10px');
 
+// 移动端面板应可拖动定位（与 SoulLink 一致）：标题栏拖拽不再被
+// isMobileViewport() 拦截，拖动后由 is-user-positioned 解除 CSS 布局约束。
+assert(shell.includes('is-user-positioned'), 'js/ui-shell.js 缺少 is-user-positioned 用户定位状态');
+assert(shell.includes('dialog.getBoundingClientRect()'), 'js/ui-shell.js 应基于视觉位置计算拖拽偏移');
+assert(bundle.includes('is-user-positioned'), 'index.js 缺少 is-user-positioned 用户定位状态');
+assert(style.includes('.kaleido-panel__dialog.is-user-positioned'), 'style.css 缺少移动端 is-user-positioned 规则');
+assert(!style.includes('left: 14px !important'), '移动端面板规则不应再以 !important 固定 left');
+assert(!style.includes('left: 50% !important'), '移动端居中规则不应再以 !important 固定 left');
+assert(!style.includes('left: 10px !important'), '移动端大浮窗规则不应再以 !important 固定 left');
+assert(/\.kaleido-panel__header\s*\{[^}]*touch-action:\s*none/.test(style), '标题栏应设置 touch-action: none，避免触屏拖动被 pointercancel 打断');
+
 const firstStoryMobileRule = style.match(
   /@media \(max-width: 640px\)[\s\S]*?\.kaleido-story-dialog__inner\s*\{([^}]*)\}/,
 );
