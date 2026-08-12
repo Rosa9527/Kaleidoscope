@@ -199,7 +199,7 @@ function clampPanelPosition(dialog, left, top) {
 function setPanelPosition(panel, left, top) {
   const dialog = panel?.querySelector('.kaleido-panel__dialog');
   if (!panel || !dialog) return;
-  // 移动端全屏：位置交给 CSS（inset 0），不写内联 left/top，避免盖掉全屏布局。
+  // 移动端：位置交给 CSS 尺寸模式（普通面板保留浮窗，剧情脉络使用独立工作台），不写内联 left/top。
   if (isMobileViewport()) return;
   const next = clampPanelPosition(dialog, left, top);
   dialog.style.left = `${next.left}px`;
@@ -305,6 +305,9 @@ function showPanelView(viewId) {
     for (const mode of Object.values(PANEL_WIDE_MODES)) dialog.classList.remove(mode);
     const wideMode = PANEL_WIDE_MODES[viewId];
     if (wideMode) dialog.classList.add(wideMode);
+    for (const mode of Object.values(PANEL_MOBILE_MODES)) dialog.classList.remove(mode);
+    const mobileMode = PANEL_MOBILE_MODES[viewId];
+    if (mobileMode) dialog.classList.add(mobileMode);
   }
   const back = document.getElementById(PANEL_BACK_ID);
   if (back) back.style.visibility = viewId === HOME_VIEW_ID ? 'hidden' : 'visible';

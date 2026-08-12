@@ -332,6 +332,14 @@ const PANEL_WIDE_MODES = Object.freeze({
   [PRESET_VIEW_ID]: 'is-preset-mode',
   [INJECT_VIEW_ID]: 'is-inject-mode',
 });
+// 移动端面板尺寸模式：仅由手机端 CSS 使用，桌面端不改变尺寸。
+const PANEL_MOBILE_MODES = Object.freeze({
+  [HOME_VIEW_ID]: 'is-home-mode',
+  [API_VIEW_ID]: 'is-api-mode',
+  [LOG_VIEW_ID]: 'is-log-mode',
+  [PRESET_VIEW_ID]: 'is-preset-mode',
+  [INJECT_VIEW_ID]: 'is-inject-mode',
+});
 const ESC_KEY_HANDLER_KEY = '__kaleido_esc_key_handler__';
 const MENU_RECOVERY_OBSERVER_KEY = '__kaleido_menu_recovery_observer__';
 const HOST_EVENT_WATCHDOG_KEY = '__kaleido_host_event_watchdog__';
@@ -1294,7 +1302,7 @@ function clampPanelPosition(dialog, left, top) {
 function setPanelPosition(panel, left, top) {
   const dialog = panel?.querySelector('.kaleido-panel__dialog');
   if (!panel || !dialog) return;
-  // 移动端全屏：位置交给 CSS（inset 0），不写内联 left/top，避免盖掉全屏布局。
+  // 移动端：位置交给 CSS 尺寸模式（普通面板保留浮窗，剧情脉络使用独立工作台），不写内联 left/top。
   if (isMobileViewport()) return;
   const next = clampPanelPosition(dialog, left, top);
   dialog.style.left = `${next.left}px`;
@@ -1400,6 +1408,9 @@ function showPanelView(viewId) {
     for (const mode of Object.values(PANEL_WIDE_MODES)) dialog.classList.remove(mode);
     const wideMode = PANEL_WIDE_MODES[viewId];
     if (wideMode) dialog.classList.add(wideMode);
+    for (const mode of Object.values(PANEL_MOBILE_MODES)) dialog.classList.remove(mode);
+    const mobileMode = PANEL_MOBILE_MODES[viewId];
+    if (mobileMode) dialog.classList.add(mobileMode);
   }
   const back = document.getElementById(PANEL_BACK_ID);
   if (back) back.style.visibility = viewId === HOME_VIEW_ID ? 'hidden' : 'visible';

@@ -1936,20 +1936,53 @@ select.kaleido-input {
    - 触控目标放大、点按反馈优化、overscroll 隔离
    ========================================================= */
 @media (max-width: 640px) {
-  /* ---------- 面板：浮动卡片 → 全屏 ---------- */
+  /* ---------- 普通面板：按视图分级的大浮窗（不再统一全屏） ---------- */
   .kaleido-panel__dialog.kaleido-panel__dialog {
-    left: 0 !important;
-    top: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    width: 100vw;
+    left: 14px !important;
+    top: calc(14px + env(safe-area-inset-top)) !important;
+    right: 14px !important;
+    bottom: calc(14px + env(safe-area-inset-bottom)) !important;
+    width: auto;
     max-width: none;
-    height: 100vh;
-    height: 100dvh;
+    height: auto;
     max-height: none;
-    border-radius: 0;
-    border: none;
-    box-shadow: none;
+    border-radius: 10px;
+    border: 1.5px solid rgba(59, 51, 42, 0.8);
+    box-shadow:
+      0 10px 28px rgba(59, 51, 42, 0.3),
+      0 0 0 1px rgba(184, 134, 47, 0.35);
+  }
+
+  /* 首页与 API：居中的紧凑 / 中等浮窗，内容高度自适应。 */
+  .kaleido-panel__dialog.is-home-mode,
+  .kaleido-panel__dialog.is-api-mode {
+    left: 50% !important;
+    right: auto !important;
+    top: 50% !important;
+    bottom: auto !important;
+    transform: translate(-50%, -50%);
+    max-width: none;
+    max-height: calc(100dvh - 32px);
+  }
+
+  .kaleido-panel__dialog.is-home-mode {
+    width: min(360px, calc(100vw - 32px));
+  }
+
+  .kaleido-panel__dialog.is-api-mode {
+    width: min(420px, calc(100vw - 28px));
+    max-height: calc(100dvh - 28px);
+  }
+
+  /* 日志、预设、注入：给长内容更多空间，但仍保留可见浮窗边距。 */
+  .kaleido-panel__dialog.is-log-mode,
+  .kaleido-panel__dialog.is-preset-mode,
+  .kaleido-panel__dialog.is-inject-mode {
+    left: 10px !important;
+    top: calc(10px + env(safe-area-inset-top)) !important;
+    right: 10px !important;
+    bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+    transform: none;
   }
 
   .kaleido-panel,
@@ -2725,7 +2758,13 @@ select.kaleido-input {
     document.querySelectorAll('.kaleido-view').forEach(v => v.classList.toggle('is-active', v.id === id));
     document.querySelectorAll('.kaleido-view').forEach(v => v.setAttribute('aria-hidden', v.classList.contains('is-active') ? 'false' : 'true'));
     const dlg = document.querySelector('.kaleido-panel__dialog');
-    if (dlg) dlg.classList.toggle('is-log-mode', id === 'kaleido-log-view');
+    if (dlg) {
+      const modes = ['is-home-mode', 'is-api-mode', 'is-log-mode', 'is-preset-mode', 'is-inject-mode'];
+      const modeMap = { 'kaleido-home-view': 'is-home-mode', 'kaleido-api-view': 'is-api-mode', 'kaleido-log-view': 'is-log-mode', 'kaleido-preset-view': 'is-preset-mode', 'kaleido-inject-view': 'is-inject-mode' };
+      modes.forEach(m => dlg.classList.remove(m));
+      const mode = modeMap[id];
+      if (mode) dlg.classList.add(mode);
+    }
   };
   const map = { 'API 连接': 'kaleido-api-view', '剧情脉络': null, '系统日志': 'kaleido-log-view', '提示词模板': 'kaleido-preset-view', '注入实录': 'kaleido-inject-view' };
   document.addEventListener('click', (e) => {

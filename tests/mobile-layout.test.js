@@ -27,7 +27,7 @@ assert(bundle.includes('PANEL_MOBILE_MODES'), 'index.js 缺少 PANEL_MOBILE_MODE
 
 for (const mode of requiredModes) {
   assert(constants.includes(mode), `js/constants.js 缺少移动端模式 ${mode}`);
-  assert(shell.includes(mode), `js/ui-shell.js 缺少移动端模式 ${mode}`);
+  assert(shell.includes('PANEL_MOBILE_MODES'), 'js/ui-shell.js 未在视图切换时应用 PANEL_MOBILE_MODES');
   assert(bundle.includes(mode), `index.js 缺少移动端模式 ${mode}`);
   assert(style.includes(`.kaleido-panel__dialog.${mode}`), `style.css 缺少面板模式规则 ${mode}`);
 }

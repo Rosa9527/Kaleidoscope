@@ -331,6 +331,14 @@ const PANEL_WIDE_MODES = Object.freeze({
   [PRESET_VIEW_ID]: 'is-preset-mode',
   [INJECT_VIEW_ID]: 'is-inject-mode',
 });
+// 移动端面板尺寸模式：仅由手机端 CSS 使用，桌面端不改变尺寸。
+const PANEL_MOBILE_MODES = Object.freeze({
+  [HOME_VIEW_ID]: 'is-home-mode',
+  [API_VIEW_ID]: 'is-api-mode',
+  [LOG_VIEW_ID]: 'is-log-mode',
+  [PRESET_VIEW_ID]: 'is-preset-mode',
+  [INJECT_VIEW_ID]: 'is-inject-mode',
+});
 const ESC_KEY_HANDLER_KEY = '__kaleido_esc_key_handler__';
 const MENU_RECOVERY_OBSERVER_KEY = '__kaleido_menu_recovery_observer__';
 const HOST_EVENT_WATCHDOG_KEY = '__kaleido_host_event_watchdog__';
