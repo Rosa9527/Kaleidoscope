@@ -582,7 +582,6 @@
   border-top: 1px dashed rgba(184, 134, 47, 0.5);
 }
 
-
 /* ---------- 通用控件 ---------- */
 .kaleido-input {
   width: 100%;
@@ -864,6 +863,56 @@ select.kaleido-input {
   padding-left: calc(30px + var(--depth, 0) * 20px);
 }
 
+/* 节点启用滑块：点击关闭（整棵子树停用），再点激活 */
+.kaleido-story__switch {
+  flex: none;
+  position: relative;
+  width: 30px;
+  height: 16px;
+  padding: 0;
+  background: rgba(59, 51, 42, 0.3);
+  border: 1px solid rgba(59, 51, 42, 0.35);
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.kaleido-story__switch-thumb {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--k-paper-light);
+  box-shadow: 0 1px 2px rgba(59, 51, 42, 0.4);
+  transition: transform 0.18s ease;
+}
+
+.kaleido-story__switch:not(.is-off) {
+  background: var(--k-cinnabar);
+  border-color: var(--k-cinnabar-deep);
+}
+
+.kaleido-story__switch:not(.is-off) .kaleido-story__switch-thumb {
+  transform: translateX(14px);
+}
+
+.kaleido-story__switch:hover {
+  border-color: var(--k-cinnabar);
+  box-shadow: 0 0 0 2px rgba(166, 58, 46, 0.12);
+}
+
+/* 停用节点整行淡化，提示其子树不参与预筛 */
+.kaleido-story__row--node.is-disabled .kaleido-story__row-name,
+.kaleido-story__row--node.is-disabled .kaleido-story__row-count {
+  color: rgba(59, 51, 42, 0.4);
+}
+
+.kaleido-story__row--node.is-disabled .kaleido-story__row-icon {
+  color: rgba(59, 51, 42, 0.38);
+}
+
 .kaleido-story__chevron {
   flex: none;
   width: 22px;
@@ -1048,6 +1097,55 @@ select.kaleido-input {
   color: var(--k-gold);
 }
 
+/* 导入方式选择浮层：整包导入时询问合并 / 覆盖 */
+.kaleido-story__import-mode[hidden] {
+  display: none !important;
+}
+
+.kaleido-story__import-mode {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(25, 19, 11, 0.38);
+}
+
+.kaleido-story__import-mode-card {
+  width: min(380px, calc(100% - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: var(--k-paper);
+  border: 1.5px solid rgba(59, 51, 42, 0.55);
+  border-top: 3px solid var(--k-cinnabar);
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(59, 51, 42, 0.35);
+}
+
+.kaleido-story__import-mode-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.kaleido-story__import-mode-desc {
+  font-size: 12px;
+  line-height: 1.7;
+  color: rgba(59, 51, 42, 0.62);
+}
+
+.kaleido-story__import-mode-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.kaleido-story__import-mode-actions .kaleido-btn {
+  flex: 1;
+}
+
 /* 编辑器（桌面：右侧浮层；移动端：全幅覆盖） */
 /* hidden 属性必须压过 display 规则，否则编辑器 / 导出按钮会关不掉、常显 */
 .kaleido-story-dialog__editor[hidden],
@@ -1208,6 +1306,7 @@ select.kaleido-input {
   border: 1.5px dashed rgba(184, 134, 47, 0.55);
   border-radius: 4px;
 }
+
 /* 剧情预筛：启用开关区（自 API 连接页迁移） */
 .kaleido-preset__gate {
   display: flex;
@@ -1926,10 +2025,28 @@ select.kaleido-input {
 
   .kaleido-story__row {
     min-height: 42px;
+    /* 窄屏 + 深层缩进时动作按钮组放不下：允许行内换行，按钮组自动落到第二行 */
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  /* 名称保底宽度：即使按钮组换行后，节点/事件名称仍保持可读，不再被挤成 0 宽 */
+  .kaleido-story__row-name {
+    min-width: 60px;
   }
 
   .kaleido-story__row-actions {
     gap: 4px;
+  }
+
+  /* 树区在移动端改为块级堆叠：行内换行（动作按钮落到第二行）时行高按内容增长，
+     不再被固定高度的 flex 父容器压成单行（避免第二行溢出行框） */
+  .kaleido-story__tree-body {
+    display: block;
+  }
+
+  .kaleido-story__tree-body > .kaleido-story__row {
+    margin-bottom: 4px;
   }
 
   .kaleido-story__icon-btn {
@@ -1942,6 +2059,23 @@ select.kaleido-input {
     width: 30px;
     height: 30px;
     font-size: 13px;
+  }
+
+  .kaleido-story__switch {
+    width: 40px;
+    height: 22px;
+    border-radius: 11px;
+  }
+
+  .kaleido-story__switch-thumb {
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+  }
+
+  .kaleido-story__switch:not(.is-off) .kaleido-story__switch-thumb {
+    transform: translateX(18px);
   }
 
   .kaleido-story__row-badge {
@@ -2007,7 +2141,8 @@ select.kaleido-input {
   .kaleido-story-dialog .kaleido-btn,
   .kaleido-story-dialog .kaleido-icon-btn,
   .kaleido-story-dialog .kaleido-story__icon-btn,
-  .kaleido-story-dialog .kaleido-story__chevron {
+  .kaleido-story-dialog .kaleido-story__chevron,
+  .kaleido-story-dialog .kaleido-story__switch {
     touch-action: manipulation;
   }
 }
@@ -2309,8 +2444,8 @@ select.kaleido-input {
   </div><div id="kaleido-story-dialog" class="kaleido-story-dialog" aria-hidden="true">
     <div class="kaleido-story-dialog__inner" role="dialog" aria-label="剧情脉络工作台">
       <div class="kaleido-story-dialog__header">
-        <span class="kaleido-story-dialog__title"><span class="fa-solid fa-scroll"></span> 剧情脉络</span>
-        <span id="kaleido-story-binding" class="kaleido-story__binding" data-state="idle" title="群聊或未选角色：剧情数据保存在全局设置，不随角色卡导入导出">未绑定角色</span>
+        <span class="kaleido-story-dialog__title"><span class="fa-solid fa-scroll">📜</span> 剧情脉络</span>
+        <span id="kaleido-story-binding" class="kaleido-story__binding" data-state="ok" title="剧情数据保存在角色卡中">已绑定 · 辉夜大小姐</span>
         <div class="kaleido-story-dialog__toolbar">
           <button type="button" id="kaleido-story-import-btn" class="kaleido-btn kaleido-btn--mini">导入 剧情脉络</button>
           <button type="button" id="kaleido-story-export-btn" class="kaleido-btn kaleido-btn--mini kaleido-btn--ghost">导出 剧情脉络</button>
@@ -2323,79 +2458,194 @@ select.kaleido-input {
             <button type="button" id="kaleido-story-root-add" class="kaleido-btn kaleido-btn--mini kaleido-btn--primary" title="新建节点或事件">＋ 新建</button>
             <span class="kaleido-story__tree-hint">节点可层层嵌套 · 事件挂在节点下</span>
           </div>
-          <div id="kaleido-story-tree-body" class="kaleido-story__tree-body"><div class="kaleido-story__row kaleido-story__row--node is-expanded">
-    <button type="button" class="kaleido-story__chevron"><span>▶</span></button>
-    <span class="kaleido-story__row-icon"><span class="fa-solid fa-folder"></span></span>
-    <span class="kaleido-story__row-name">第一卷 · 初入江湖</span>
-    <span class="kaleido-story__row-trigger">故事开篇，主角踏入江湖。</span>
-    <span class="kaleido-story__row-count">2</span>
+          <div id="kaleido-story-tree-body" class="kaleido-story__tree-body">
+<div class="kaleido-story__row kaleido-story__row--node is-expanded" style="--depth: 0">
+    <button type="button" class="kaleido-story__chevron" data-action="toggle" title="展开 / 收起" aria-label="展开 / 收起"><span class="fa-solid fa-chevron-right">▶</span></button>
+    <span class="kaleido-story__row-icon"><span class="fa-solid fa-folder-open">📂</span></span>
+    <span class="kaleido-story__row-name" title="第一卷 · 初入江湖">第一卷 · 初入江湖</span>
+    <span class="kaleido-story__row-count">6 项</span>
+    <button type="button" class="kaleido-story__switch" data-action="toggle-enabled" role="switch" aria-checked="true" title="点击关闭 / 激活节点" aria-label="启用 / 关闭节点"><span class="kaleido-story__switch-thumb"></span></button>
     <span class="kaleido-story__row-actions">
-      <button type="button" class="kaleido-story__icon-btn" title="编辑">✎</button>
-      <button type="button" class="kaleido-story__icon-btn" title="导入事件">⇪</button>
-      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除">🗑</button>
-    </span></div><div class="kaleido-story__row kaleido-story__row--node is-expanded">
-    <button type="button" class="kaleido-story__chevron"><span>▶</span></button>
-    <span class="kaleido-story__row-icon"><span class="fa-solid fa-folder"></span></span>
-    <span class="kaleido-story__row-name">第一章 · 客栈风波</span>
-    <span class="kaleido-story__row-trigger">在客栈遭遇恶霸挑衅。</span>
-    <span class="kaleido-story__row-count">2</span>
+      <button type="button" class="kaleido-story__icon-btn" title="新建节点 / 事件" aria-label="新建节点 / 事件"><span class="fa-solid">＋</span></button>
+      <button type="button" class="kaleido-story__icon-btn" title="导入事件文件" aria-label="导入事件文件"><span class="fa-solid">⇪</span></button>
+      <button type="button" class="kaleido-story__icon-btn" title="编辑节点" aria-label="编辑节点"><span class="fa-solid">✎</span></button>
+      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除节点" aria-label="删除节点"><span class="fa-solid">🗑</span></button>
+    </span>
+  </div>
+<div class="kaleido-story__row kaleido-story__row--node is-expanded" style="--depth: 1">
+    <button type="button" class="kaleido-story__chevron" data-action="toggle" title="展开 / 收起" aria-label="展开 / 收起"><span class="fa-solid fa-chevron-right">▶</span></button>
+    <span class="kaleido-story__row-icon"><span class="fa-solid fa-folder-open">📂</span></span>
+    <span class="kaleido-story__row-name" title="第一章 · 客栈风波">第一章 · 客栈风波</span>
+    <span class="kaleido-story__row-count">4 项</span>
+    <button type="button" class="kaleido-story__switch" data-action="toggle-enabled" role="switch" aria-checked="true" title="点击关闭 / 激活节点" aria-label="启用 / 关闭节点"><span class="kaleido-story__switch-thumb"></span></button>
     <span class="kaleido-story__row-actions">
-      <button type="button" class="kaleido-story__icon-btn" title="编辑">✎</button>
-      <button type="button" class="kaleido-story__icon-btn" title="导入事件">⇪</button>
-      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除">🗑</button>
-    </span></div><div class="kaleido-story__row kaleido-story__row--script">
-      <button type="button" class="kaleido-story__chevron is-empty"></button>
-      <span class="kaleido-story__row-icon kaleido-story__row-icon--script"><span class="fa-solid fa-scroll"></span></span>
-      <span class="kaleido-story__row-name">客栈初遇</span>
-      <span class="kaleido-story__row-trigger">玩家进入客栈时</span>
-      <span class="kaleido-story__row-badge">s1</span>
-      <span class="kaleido-story__row-actions">
-        <button type="button" class="kaleido-story__icon-btn" title="编辑">✎</button>
-        <button type="button" class="kaleido-story__icon-btn" title="导出">⇩</button>
-        <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除">🗑</button>
-      </span></div><div class="kaleido-story__row kaleido-story__row--node is-expanded">
-    <button type="button" class="kaleido-story__chevron"><span>▶</span></button>
-    <span class="kaleido-story__row-icon"><span class="fa-solid fa-folder"></span></span>
-    <span class="kaleido-story__row-name">第二章 · 月下剑影</span>
-    <span class="kaleido-story__row-trigger">月夜与神秘剑客对峙。</span>
-    <span class="kaleido-story__row-count">2</span>
+      <button type="button" class="kaleido-story__icon-btn" title="新建节点 / 事件" aria-label="新建节点 / 事件"><span class="fa-solid">＋</span></button>
+      <button type="button" class="kaleido-story__icon-btn" title="导入事件文件" aria-label="导入事件文件"><span class="fa-solid">⇪</span></button>
+      <button type="button" class="kaleido-story__icon-btn" title="编辑节点" aria-label="编辑节点"><span class="fa-solid">✎</span></button>
+      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除节点" aria-label="删除节点"><span class="fa-solid">🗑</span></button>
+    </span>
+  </div>
+<div class="kaleido-story__row kaleido-story__row--node is-expanded" style="--depth: 2">
+    <button type="button" class="kaleido-story__chevron" data-action="toggle" title="展开 / 收起" aria-label="展开 / 收起"><span class="fa-solid fa-chevron-right">▶</span></button>
+    <span class="kaleido-story__row-icon"><span class="fa-solid fa-folder-open">📂</span></span>
+    <span class="kaleido-story__row-name" title="第一节 · 初遇恶霸">第一节 · 初遇恶霸</span>
+    <span class="kaleido-story__row-count">2 项</span>
+    <button type="button" class="kaleido-story__switch" data-action="toggle-enabled" role="switch" aria-checked="true" title="点击关闭 / 激活节点" aria-label="启用 / 关闭节点"><span class="kaleido-story__switch-thumb"></span></button>
     <span class="kaleido-story__row-actions">
-      <button type="button" class="kaleido-story__icon-btn" title="编辑">✎</button>
-      <button type="button" class="kaleido-story__icon-btn" title="导入事件">⇪</button>
-      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除">🗑</button>
-    </span></div><div class="kaleido-story__row kaleido-story__row--script">
-      <button type="button" class="kaleido-story__chevron is-empty"></button>
-      <span class="kaleido-story__row-icon kaleido-story__row-icon--script"><span class="fa-solid fa-scroll"></span></span>
-      <span class="kaleido-story__row-name">神秘剑客邀战</span>
-      <span class="kaleido-story__row-trigger">月夜触发</span>
-      <span class="kaleido-story__row-badge">s2</span>
-      <span class="kaleido-story__row-actions">
-        <button type="button" class="kaleido-story__icon-btn" title="编辑">✎</button>
-        <button type="button" class="kaleido-story__icon-btn" title="导出">⇩</button>
-        <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除">🗑</button>
-      </span></div><div class="kaleido-story__row kaleido-story__row--node is-expanded">
-    <button type="button" class="kaleido-story__chevron"><span>▶</span></button>
-    <span class="kaleido-story__row-icon"><span class="fa-solid fa-folder"></span></span>
-    <span class="kaleido-story__row-name">第二卷 · 武林大会</span>
-    <span class="kaleido-story__row-trigger">天下英豪齐聚。</span>
-    <span class="kaleido-story__row-count">2</span>
+      <button type="button" class="kaleido-story__icon-btn" title="新建节点 / 事件" aria-label="新建节点 / 事件"><span class="fa-solid">＋</span></button>
+      <button type="button" class="kaleido-story__icon-btn" title="导入事件文件" aria-label="导入事件文件"><span class="fa-solid">⇪</span></button>
+      <button type="button" class="kaleido-story__icon-btn" title="编辑节点" aria-label="编辑节点"><span class="fa-solid">✎</span></button>
+      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除节点" aria-label="删除节点"><span class="fa-solid">🗑</span></button>
+    </span>
+  </div>
+<div class="kaleido-story__row kaleido-story__row--node" style="--depth: 3">
+    <button type="button" class="kaleido-story__chevron" data-action="toggle" title="展开 / 收起" aria-label="展开 / 收起"><span class="fa-solid fa-chevron-right">▶</span></button>
+    <span class="kaleido-story__row-icon"><span class="fa-solid fa-folder">📁</span></span>
+    <span class="kaleido-story__row-name" title="事件一 · 挑衅">事件一 · 挑衅</span>
+    <span class="kaleido-story__row-count">1 项</span>
+    <button type="button" class="kaleido-story__switch" data-action="toggle-enabled" role="switch" aria-checked="true" title="点击关闭 / 激活节点" aria-label="启用 / 关闭节点"><span class="kaleido-story__switch-thumb"></span></button>
     <span class="kaleido-story__row-actions">
-      <button type="button" class="kaleido-story__icon-btn" title="编辑">✎</button>
-      <button type="button" class="kaleido-story__icon-btn" title="导入事件">⇪</button>
-      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除">🗑</button>
-    </span></div><div class="kaleido-story__row kaleido-story__row--script">
-      <button type="button" class="kaleido-story__chevron is-empty"></button>
-      <span class="kaleido-story__row-icon kaleido-story__row-icon--script"><span class="fa-solid fa-scroll"></span></span>
-      <span class="kaleido-story__row-name">掌门宣布大会</span>
-      <span class="kaleido-story__row-trigger">大会开幕</span>
-      <span class="kaleido-story__row-badge">s3</span>
-      <span class="kaleido-story__row-actions">
-        <button type="button" class="kaleido-story__icon-btn" title="编辑">✎</button>
-        <button type="button" class="kaleido-story__icon-btn" title="导出">⇩</button>
-        <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除">🗑</button>
-      </span></div></div>
+      <button type="button" class="kaleido-story__icon-btn" title="新建节点 / 事件" aria-label="新建节点 / 事件"><span class="fa-solid">＋</span></button>
+      <button type="button" class="kaleido-story__icon-btn" title="导入事件文件" aria-label="导入事件文件"><span class="fa-solid">⇪</span></button>
+      <button type="button" class="kaleido-story__icon-btn" title="编辑节点" aria-label="编辑节点"><span class="fa-solid">✎</span></button>
+      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除节点" aria-label="删除节点"><span class="fa-solid">🗑</span></button>
+    </span>
+  </div>
+<div class="kaleido-story__row kaleido-story__row--script" style="--depth: 3">
+    <span class="kaleido-story__row-icon kaleido-story__row-icon--script"><span class="fa-solid fa-scroll">📜</span></span>
+    <span class="kaleido-story__row-name" title="客栈初遇（雨夜特别版）">客栈初遇（雨夜特别版）</span>
+    <span class="kaleido-story__row-trigger" title="玩家进入客栈时且正在下雨">玩家进入客栈时且正在下雨</span>
+    <span class="kaleido-story__row-badge">第一卷</span>
+    <span class="kaleido-story__row-actions">
+      <button type="button" class="kaleido-story__icon-btn" title="编辑事件" aria-label="编辑事件"><span class="fa-solid">✎</span></button>
+      <button type="button" class="kaleido-story__icon-btn" title="导出事件" aria-label="导出事件"><span class="fa-solid">⇩</span></button>
+      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除事件" aria-label="删除事件"><span class="fa-solid">🗑</span></button>
+    </span>
+  </div>
+<div class="kaleido-story__row kaleido-story__row--script" style="--depth: 2">
+    <span class="kaleido-story__row-icon kaleido-story__row-icon--script"><span class="fa-solid fa-scroll">📜</span></span>
+    <span class="kaleido-story__row-name" title="客栈初遇">客栈初遇</span>
+    <span class="kaleido-story__row-trigger" title="玩家进入客栈时">玩家进入客栈时</span>
+    <span class="kaleido-story__row-badge">第一章</span>
+    <span class="kaleido-story__row-actions">
+      <button type="button" class="kaleido-story__icon-btn" title="编辑事件" aria-label="编辑事件"><span class="fa-solid">✎</span></button>
+      <button type="button" class="kaleido-story__icon-btn" title="导出事件" aria-label="导出事件"><span class="fa-solid">⇩</span></button>
+      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除事件" aria-label="删除事件"><span class="fa-solid">🗑</span></button>
+    </span>
+  </div>
+<div class="kaleido-story__row kaleido-story__row--node" style="--depth: 1">
+    <button type="button" class="kaleido-story__chevron" data-action="toggle" title="展开 / 收起" aria-label="展开 / 收起"><span class="fa-solid fa-chevron-right">▶</span></button>
+    <span class="kaleido-story__row-icon"><span class="fa-solid fa-folder">📁</span></span>
+    <span class="kaleido-story__row-name" title="第二章 · 月下剑影">第二章 · 月下剑影</span>
+    <span class="kaleido-story__row-count">1 项</span>
+    <button type="button" class="kaleido-story__switch" data-action="toggle-enabled" role="switch" aria-checked="true" title="点击关闭 / 激活节点" aria-label="启用 / 关闭节点"><span class="kaleido-story__switch-thumb"></span></button>
+    <span class="kaleido-story__row-actions">
+      <button type="button" class="kaleido-story__icon-btn" title="新建节点 / 事件" aria-label="新建节点 / 事件"><span class="fa-solid">＋</span></button>
+      <button type="button" class="kaleido-story__icon-btn" title="导入事件文件" aria-label="导入事件文件"><span class="fa-solid">⇪</span></button>
+      <button type="button" class="kaleido-story__icon-btn" title="编辑节点" aria-label="编辑节点"><span class="fa-solid">✎</span></button>
+      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除节点" aria-label="删除节点"><span class="fa-solid">🗑</span></button>
+    </span>
+  </div>
+<div class="kaleido-story__row kaleido-story__row--script" style="--depth: 2">
+    <span class="kaleido-story__row-icon kaleido-story__row-icon--script"><span class="fa-solid fa-scroll">📜</span></span>
+    <span class="kaleido-story__row-name" title="神秘剑客邀战">神秘剑客邀战</span>
+    <span class="kaleido-story__row-trigger" title="月夜触发">月夜触发</span>
+    <span class="kaleido-story__row-badge">第二章</span>
+    <span class="kaleido-story__row-actions">
+      <button type="button" class="kaleido-story__icon-btn" title="编辑事件" aria-label="编辑事件"><span class="fa-solid">✎</span></button>
+      <button type="button" class="kaleido-story__icon-btn" title="导出事件" aria-label="导出事件"><span class="fa-solid">⇩</span></button>
+      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除事件" aria-label="删除事件"><span class="fa-solid">🗑</span></button>
+    </span>
+  </div>
+<div class="kaleido-story__row kaleido-story__row--node" style="--depth: 0">
+    <button type="button" class="kaleido-story__chevron" data-action="toggle" title="展开 / 收起" aria-label="展开 / 收起"><span class="fa-solid fa-chevron-right">▶</span></button>
+    <span class="kaleido-story__row-icon"><span class="fa-solid fa-folder">📁</span></span>
+    <span class="kaleido-story__row-name" title="第二卷 · 武林大会">第二卷 · 武林大会</span>
+    <span class="kaleido-story__row-count">1 项</span>
+    <button type="button" class="kaleido-story__switch" data-action="toggle-enabled" role="switch" aria-checked="true" title="点击关闭 / 激活节点" aria-label="启用 / 关闭节点"><span class="kaleido-story__switch-thumb"></span></button>
+    <span class="kaleido-story__row-actions">
+      <button type="button" class="kaleido-story__icon-btn" title="新建节点 / 事件" aria-label="新建节点 / 事件"><span class="fa-solid">＋</span></button>
+      <button type="button" class="kaleido-story__icon-btn" title="导入事件文件" aria-label="导入事件文件"><span class="fa-solid">⇪</span></button>
+      <button type="button" class="kaleido-story__icon-btn" title="编辑节点" aria-label="编辑节点"><span class="fa-solid">✎</span></button>
+      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除节点" aria-label="删除节点"><span class="fa-solid">🗑</span></button>
+    </span>
+  </div>
+<div class="kaleido-story__row kaleido-story__row--script" style="--depth: 1">
+    <span class="kaleido-story__row-icon kaleido-story__row-icon--script"><span class="fa-solid fa-scroll">📜</span></span>
+    <span class="kaleido-story__row-name" title="掌门宣布大会">掌门宣布大会</span>
+    <span class="kaleido-story__row-trigger" title="大会开幕时">大会开幕时</span>
+    <span class="kaleido-story__row-badge">第二卷</span>
+    <span class="kaleido-story__row-actions">
+      <button type="button" class="kaleido-story__icon-btn" title="编辑事件" aria-label="编辑事件"><span class="fa-solid">✎</span></button>
+      <button type="button" class="kaleido-story__icon-btn" title="导出事件" aria-label="导出事件"><span class="fa-solid">⇩</span></button>
+      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除事件" aria-label="删除事件"><span class="fa-solid">🗑</span></button>
+    </span>
+  </div>
+<div class="kaleido-story__row kaleido-story__row--node is-disabled" style="--depth: 0">
+    <button type="button" class="kaleido-story__chevron is-empty" data-action="toggle" title="展开 / 收起" aria-label="展开 / 收起"><span class="fa-solid fa-chevron-right">▶</span></button>
+    <span class="kaleido-story__row-icon"><span class="fa-solid fa-folder">📁</span></span>
+    <span class="kaleido-story__row-name" title="第三卷 · 雪山之巅（未完结）">第三卷 · 雪山之巅（未完结）</span>
+    <span class="kaleido-story__row-count">0 项</span>
+    <button type="button" class="kaleido-story__switch is-off" data-action="toggle-enabled" role="switch" aria-checked="false" title="点击关闭 / 激活节点" aria-label="启用 / 关闭节点"><span class="kaleido-story__switch-thumb"></span></button>
+    <span class="kaleido-story__row-actions">
+      <button type="button" class="kaleido-story__icon-btn" title="新建节点 / 事件" aria-label="新建节点 / 事件"><span class="fa-solid">＋</span></button>
+      <button type="button" class="kaleido-story__icon-btn" title="导入事件文件" aria-label="导入事件文件"><span class="fa-solid">⇪</span></button>
+      <button type="button" class="kaleido-story__icon-btn" title="编辑节点" aria-label="编辑节点"><span class="fa-solid">✎</span></button>
+      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除节点" aria-label="删除节点"><span class="fa-solid">🗑</span></button>
+    </span>
+  </div>
+<div class="kaleido-story__row kaleido-story__row--node" style="--depth: 4">
+    <button type="button" class="kaleido-story__chevron" data-action="toggle" title="展开 / 收起" aria-label="展开 / 收起"><span class="fa-solid fa-chevron-right">▶</span></button>
+    <span class="kaleido-story__row-icon"><span class="fa-solid fa-folder">📁</span></span>
+    <span class="kaleido-story__row-name" title="深层嵌套节点（测试缩进收敛）">深层嵌套节点（测试缩进收敛）</span>
+    <span class="kaleido-story__row-count">1 项</span>
+    <button type="button" class="kaleido-story__switch" data-action="toggle-enabled" role="switch" aria-checked="true" title="点击关闭 / 激活节点" aria-label="启用 / 关闭节点"><span class="kaleido-story__switch-thumb"></span></button>
+    <span class="kaleido-story__row-actions">
+      <button type="button" class="kaleido-story__icon-btn" title="新建节点 / 事件" aria-label="新建节点 / 事件"><span class="fa-solid">＋</span></button>
+      <button type="button" class="kaleido-story__icon-btn" title="导入事件文件" aria-label="导入事件文件"><span class="fa-solid">⇪</span></button>
+      <button type="button" class="kaleido-story__icon-btn" title="编辑节点" aria-label="编辑节点"><span class="fa-solid">✎</span></button>
+      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除节点" aria-label="删除节点"><span class="fa-solid">🗑</span></button>
+    </span>
+  </div>
+<div class="kaleido-story__row kaleido-story__row--script" style="--depth: 5">
+    <span class="kaleido-story__row-icon kaleido-story__row-icon--script"><span class="fa-solid fa-scroll">📜</span></span>
+    <span class="kaleido-story__row-name" title="深层事件">深层事件</span>
+    <span class="kaleido-story__row-trigger" title="深层触发条件">深层触发条件</span>
+    <span class="kaleido-story__row-badge">深层</span>
+    <span class="kaleido-story__row-actions">
+      <button type="button" class="kaleido-story__icon-btn" title="编辑事件" aria-label="编辑事件"><span class="fa-solid">✎</span></button>
+      <button type="button" class="kaleido-story__icon-btn" title="导出事件" aria-label="导出事件"><span class="fa-solid">⇩</span></button>
+      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除事件" aria-label="删除事件"><span class="fa-solid">🗑</span></button>
+    </span>
+  </div>
+          <div class="kaleido-story__group">
+            <span class="kaleido-story__group-title">未分类事件（2）</span>
+<div class="kaleido-story__row kaleido-story__row--script" style="--depth: 0">
+    <span class="kaleido-story__row-icon kaleido-story__row-icon--script"><span class="fa-solid fa-scroll">📜</span></span>
+    <span class="kaleido-story__row-name" title="未分类事件一">未分类事件一</span>
+    <span class="kaleido-story__row-trigger" title="任意触发">任意触发</span>
+    <span class="kaleido-story__row-badge">未分类</span>
+    <span class="kaleido-story__row-actions">
+      <button type="button" class="kaleido-story__icon-btn" title="编辑事件" aria-label="编辑事件"><span class="fa-solid">✎</span></button>
+      <button type="button" class="kaleido-story__icon-btn" title="导出事件" aria-label="导出事件"><span class="fa-solid">⇩</span></button>
+      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除事件" aria-label="删除事件"><span class="fa-solid">🗑</span></button>
+    </span>
+  </div>
+<div class="kaleido-story__row kaleido-story__row--script" style="--depth: 0">
+    <span class="kaleido-story__row-icon kaleido-story__row-icon--script"><span class="fa-solid fa-scroll">📜</span></span>
+    <span class="kaleido-story__row-name" title="未分类事件二">未分类事件二</span>
+    <span class="kaleido-story__row-trigger" title="任意触发">任意触发</span>
+    <span class="kaleido-story__row-badge">未分类</span>
+    <span class="kaleido-story__row-actions">
+      <button type="button" class="kaleido-story__icon-btn" title="编辑事件" aria-label="编辑事件"><span class="fa-solid">✎</span></button>
+      <button type="button" class="kaleido-story__icon-btn" title="导出事件" aria-label="导出事件"><span class="fa-solid">⇩</span></button>
+      <button type="button" class="kaleido-story__icon-btn kaleido-story__icon-btn--danger" title="删除事件" aria-label="删除事件"><span class="fa-solid">🗑</span></button>
+    </span>
+  </div>
+          </div>
+          </div>
         </div>
-        <div id="kaleido-story-editor" class="kaleido-story-dialog__editor" hidden="">
+        <div id="kaleido-story-editor" class="kaleido-story-dialog__editor" hidden>
           <div class="kaleido-story__editor-head">
             <span id="kaleido-story-editor-title" class="kaleido-story__editor-title">新建节点</span>
             <span class="kaleido-story__editor-spacer"></span>
@@ -2404,31 +2654,29 @@ select.kaleido-input {
           <div id="kaleido-story-node-fields">
             <label class="kaleido-api__field" for="kaleido-story-node-name">
               <span class="kaleido-api__label">节点名称 *</span>
-              <input id="kaleido-story-node-name" class="kaleido-input" type="text" placeholder="填写节点名称" autocomplete="off" spellcheck="false">
+              <input id="kaleido-story-node-name" class="kaleido-input" type="text" placeholder="填写节点名称" autocomplete="off" spellcheck="false" />
             </label>
             <label class="kaleido-api__field" for="kaleido-story-node-parent">
               <span class="kaleido-api__label">上级节点</span>
-              <select id="kaleido-story-node-parent" class="kaleido-input">
-                <option value="">（顶层 · 根节点）</option>
-              </select>
+              <select id="kaleido-story-node-parent" class="kaleido-input"><option value="">（顶层 · 根节点）</option></select>
             </label>
             <label class="kaleido-api__field" for="kaleido-story-node-desc">
               <span class="kaleido-api__label">节点说明</span>
               <textarea id="kaleido-story-node-desc" class="kaleido-input kaleido-story__textarea kaleido-story__textarea--small" rows="3" placeholder="这个节点下的剧情大概讲什么（可选）"></textarea>
             </label>
           </div>
-          <div id="kaleido-story-script-fields" hidden="">
+          <div id="kaleido-story-script-fields" hidden>
             <label class="kaleido-api__field" for="kaleido-story-script-name">
               <span class="kaleido-api__label">事件名称 *</span>
-              <input id="kaleido-story-script-name" class="kaleido-input" type="text" placeholder="填写事件名称" autocomplete="off" spellcheck="false">
+              <input id="kaleido-story-script-name" class="kaleido-input" type="text" placeholder="填写事件名称" autocomplete="off" spellcheck="false" />
             </label>
             <label class="kaleido-api__field" for="kaleido-story-script-id">
               <span class="kaleido-api__label">事件 ID *</span>
-              <input id="kaleido-story-script-id" class="kaleido-input" type="text" placeholder="如：001（默认自动递增）" autocomplete="off" spellcheck="false">
+              <input id="kaleido-story-script-id" class="kaleido-input" type="text" placeholder="如：001（默认自动递增）" autocomplete="off" spellcheck="false" />
             </label>
             <label class="kaleido-api__field" for="kaleido-story-script-trigger">
               <span class="kaleido-api__label">触发条件</span>
-              <input id="kaleido-story-script-trigger" class="kaleido-input" type="text" placeholder="如：玩家第一次到达新手村" autocomplete="off" spellcheck="false">
+              <input id="kaleido-story-script-trigger" class="kaleido-input" type="text" placeholder="如：玩家第一次到达新手村" autocomplete="off" spellcheck="false" />
             </label>
             <label class="kaleido-api__field" for="kaleido-story-script-desc">
               <span class="kaleido-api__label">事件说明</span>
@@ -2436,9 +2684,7 @@ select.kaleido-input {
             </label>
             <label class="kaleido-api__field" for="kaleido-story-script-node-select">
               <span class="kaleido-api__label">所属节点</span>
-              <select id="kaleido-story-script-node-select" class="kaleido-input">
-                <option value="">未分类</option>
-              </select>
+              <select id="kaleido-story-script-node-select" class="kaleido-input"><option value="">未分类</option></select>
             </label>
             <label class="kaleido-api__field" for="kaleido-story-script-content">
               <span class="kaleido-api__label">事件内容 *</span>
@@ -2446,22 +2692,32 @@ select.kaleido-input {
             </label>
           </div>
           <div class="kaleido-story__editor-actions">
-            <button type="button" id="kaleido-story-editor-export" class="kaleido-btn kaleido-btn--mini kaleido-btn--ghost" hidden="">导出事件</button>
+            <button type="button" id="kaleido-story-editor-export" class="kaleido-btn kaleido-btn--mini kaleido-btn--ghost" hidden>导出事件</button>
             <span class="kaleido-story__editor-spacer"></span>
             <button type="button" id="kaleido-story-editor-save" class="kaleido-btn kaleido-btn--mini kaleido-btn--primary">保存</button>
           </div>
         </div>
       </div>
-      <div id="kaleido-story-add-menu" class="kaleido-story__add-menu" hidden="" role="menu" aria-label="新建">
+      <div id="kaleido-story-import-mode" class="kaleido-story__import-mode" hidden role="dialog" aria-label="选择导入方式">
+        <div class="kaleido-story__import-mode-card">
+          <div class="kaleido-story__import-mode-title">选择导入方式</div>
+          <div id="kaleido-story-import-mode-desc" class="kaleido-story__import-mode-desc">检测到整包导入文件。</div>
+          <div class="kaleido-story__import-mode-actions">
+            <button type="button" id="kaleido-story-import-mode-merge" class="kaleido-btn kaleido-btn--mini kaleido-btn--primary" title="同 id 条目更新，其余追加">🔀 合并导入</button>
+            <button type="button" id="kaleido-story-import-mode-replace" class="kaleido-btn kaleido-btn--mini kaleido-btn--ghost" title="清空当前剧情脉络后整体替换">📦 覆盖导入</button>
+          </div>
+        </div>
+      </div>
+      <div id="kaleido-story-add-menu" class="kaleido-story__add-menu" hidden role="menu" aria-label="新建">
         <button type="button" id="kaleido-story-add-menu-node" class="kaleido-story__add-menu-item" role="menuitem" data-kind="node">
-          <span class="fa-solid fa-folder"></span> 新建节点
+          <span class="fa-solid fa-folder">📁</span> 新建节点
         </button>
         <button type="button" id="kaleido-story-add-menu-script" class="kaleido-story__add-menu-item" role="menuitem" data-kind="script">
-          <span class="fa-solid fa-scroll"></span> 新建事件
+          <span class="fa-solid fa-scroll">📜</span> 新建事件
         </button>
       </div>
-      <input id="kaleido-story-import-input" type="file" accept=".yaml,.yml,text/yaml,application/x-yaml" hidden="">
-      <input id="kaleido-story-import-script-input" type="file" accept=".yaml,.yml,text/yaml,application/x-yaml" hidden="">
+      <input id="kaleido-story-import-input" type="file" accept=".yaml,.yml,text/yaml,application/x-yaml" hidden />
+      <input id="kaleido-story-import-script-input" type="file" accept=".yaml,.yml,text/yaml,application/x-yaml" hidden />
     </div>
   </div>
 <script>

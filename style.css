@@ -2020,10 +2020,28 @@ select.kaleido-input {
 
   .kaleido-story__row {
     min-height: 42px;
+    /* 窄屏 + 深层缩进时动作按钮组放不下：允许行内换行，按钮组自动落到第二行 */
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  /* 名称保底宽度：即使按钮组换行后，节点/事件名称仍保持可读，不再被挤成 0 宽 */
+  .kaleido-story__row-name {
+    min-width: 60px;
   }
 
   .kaleido-story__row-actions {
     gap: 4px;
+  }
+
+  /* 树区在移动端改为块级堆叠：行内换行（动作按钮落到第二行）时行高按内容增长，
+     不再被固定高度的 flex 父容器压成单行（避免第二行溢出行框） */
+  .kaleido-story__tree-body {
+    display: block;
+  }
+
+  .kaleido-story__tree-body > .kaleido-story__row {
+    margin-bottom: 4px;
   }
 
   .kaleido-story__icon-btn {
