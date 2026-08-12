@@ -186,6 +186,8 @@
   background: linear-gradient(180deg, #4b4238, #3b332a);
   border-bottom: 2px solid var(--k-gold);
   cursor: grab;
+  /* 触屏：禁止浏览器把标题栏手势接管为滚动/平移，否则拖动会收到 pointercancel */
+  touch-action: none;
 }
 
 .kaleido-panel__header:active {
@@ -1930,7 +1932,7 @@ select.kaleido-input {
 /* =========================================================
    移动端全面适配（≤640px：手机浏览器 / SillyTavern 手机端）
    覆盖点：
-   - 面板浮动卡片 → 全屏（盖过宽视图类与历史拖拽位置）
+   - 面板按视图分级浮窗（默认交给 CSS 尺寸模式，用户拖动后由内联位置接管）
    - 动态视口高度 dvh + 安全区（刘海 / 底部横条）
    - iOS 聚焦自动放大防抖（表单控件字号提到 16px）
    - 触控目标放大、点按反馈优化、overscroll 隔离
@@ -1938,10 +1940,10 @@ select.kaleido-input {
 @media (max-width: 640px) {
   /* ---------- 普通面板：按视图分级的大浮窗（不再统一全屏） ---------- */
   .kaleido-panel__dialog.kaleido-panel__dialog {
-    left: 14px !important;
-    top: calc(14px + env(safe-area-inset-top)) !important;
-    right: 14px !important;
-    bottom: calc(14px + env(safe-area-inset-bottom)) !important;
+    left: 14px;
+    top: calc(14px + env(safe-area-inset-top));
+    right: 14px;
+    bottom: calc(14px + env(safe-area-inset-bottom));
     width: auto;
     max-width: none;
     height: auto;
@@ -1956,10 +1958,10 @@ select.kaleido-input {
   /* 首页与 API：居中的紧凑 / 中等浮窗，内容高度自适应。 */
   .kaleido-panel__dialog.is-home-mode,
   .kaleido-panel__dialog.is-api-mode {
-    left: 50% !important;
-    right: auto !important;
-    top: 50% !important;
-    bottom: auto !important;
+    left: 50%;
+    right: auto;
+    top: 50%;
+    bottom: auto;
     transform: translate(-50%, -50%);
     max-width: none;
     max-height: calc(100dvh - 32px);
@@ -1978,11 +1980,23 @@ select.kaleido-input {
   .kaleido-panel__dialog.is-log-mode,
   .kaleido-panel__dialog.is-preset-mode,
   .kaleido-panel__dialog.is-inject-mode {
-    left: 10px !important;
-    top: calc(10px + env(safe-area-inset-top)) !important;
-    right: 10px !important;
-    bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+    left: 10px;
+    top: calc(10px + env(safe-area-inset-top));
+    right: 10px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
     transform: none;
+  }
+
+  /* 用户拖动定位后：解除 CSS 居中 / 铺边约束，改由内联 left/top 接管。 */
+  .kaleido-panel__dialog.is-user-positioned {
+    left: auto;
+    right: auto;
+    top: auto;
+    bottom: auto;
+    transform: none;
+    width: min(360px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px);
   }
 
   .kaleido-panel,
@@ -1990,8 +2004,10 @@ select.kaleido-input {
     overscroll-behavior: contain;
   }
 
+  /* 面板是浮窗：对话框 top 已按安全区偏移，标题栏不再叠加安全区，
+     否则刘海/状态栏 inset 会在「万华镜」标题上方形成大块空白（SoulLink 无此问题）。 */
   .kaleido-panel__header {
-    padding-top: calc(9px + env(safe-area-inset-top));
+    padding-top: 9px;
   }
 
   .kaleido-panel__body {

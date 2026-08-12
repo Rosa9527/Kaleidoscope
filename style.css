@@ -1999,8 +1999,10 @@ select.kaleido-input {
     overscroll-behavior: contain;
   }
 
+  /* 面板是浮窗：对话框 top 已按安全区偏移，标题栏不再叠加安全区，
+     否则刘海/状态栏 inset 会在「万华镜」标题上方形成大块空白（SoulLink 无此问题）。 */
   .kaleido-panel__header {
-    padding-top: calc(9px + env(safe-area-inset-top));
+    padding-top: 9px;
   }
 
   .kaleido-panel__body {

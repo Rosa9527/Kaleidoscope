@@ -52,6 +52,15 @@ assert(!style.includes('left: 50% !important'), '移动端居中规则不应再�
 assert(!style.includes('left: 10px !important'), '移动端大浮窗规则不应再以 !important 固定 left');
 assert(/\.kaleido-panel__header\s*\{[^}]*touch-action:\s*none/.test(style), '标题栏应设置 touch-action: none，避免触屏拖动被 pointercancel 打断');
 
+// 回归：面板标题栏不叠加安全区 inset。面板是浮窗，对话框 top 已按安全区偏移；
+// 再叠加会在「万华镜」标题上方形成大块空白（同目录 SoulLink 无此问题）。
+const panelHeaderRule = lastMobileStyle.match(/\.kaleido-panel__header\s*\{([^}]*)\}/);
+assert(panelHeaderRule, '最后一个移动端媒体查询缺少面板标题栏规则');
+assert(!panelHeaderRule[1].includes('env(safe-area-inset-top)'), '面板标题栏不应叠加安全区 inset');
+assert(/padding-top\s*:\s*9px/.test(panelHeaderRule[1]), '面板标题栏应保持基础 9px 顶距');
+const storyHeaderRule = lastMobileStyle.match(/\.kaleido-story-dialog__header\s*\{([^}]*)\}/);
+assert(storyHeaderRule && storyHeaderRule[1].includes('env(safe-area-inset-top)'), '剧情工作台标题栏应保留安全区 inset（全屏工作台仍需要）');
+
 const firstStoryMobileRule = style.match(
   /@media \(max-width: 640px\)[\s\S]*?\.kaleido-story-dialog__inner\s*\{([^}]*)\}/,
 );
