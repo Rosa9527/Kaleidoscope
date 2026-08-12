@@ -2,7 +2,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '0.7.4';
+const MODULE_VERSION = '0.7.5';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 
 // ---------- DOM ID / class ----------
