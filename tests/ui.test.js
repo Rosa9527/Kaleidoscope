@@ -518,32 +518,17 @@ runner.test('createPanel 创建预设模版视图与首页入口', () => {
   assert($('kaleido-preset-reset'), '预设视图应有恢复默认按钮');
 });
 
-runner.test('视图切换同步移动端尺寸模式且清除旧模式', () => {
+runner.test('面板打开时始终以内联 left/top 定位（与 SoulLink 一致）', () => {
   ui.createPanel();
   const dialog = $('kaleido-panel').querySelector('.kaleido-panel__dialog');
-  const modes = {
-    'kaleido-home-view': 'is-home-mode',
-    'kaleido-api-view': 'is-api-mode',
-    'kaleido-log-view': 'is-log-mode',
-    'kaleido-preset-view': 'is-preset-mode',
-    'kaleido-inject-view': 'is-inject-mode',
-  };
-
-  for (const [viewId, mode] of Object.entries(modes)) {
-    ui.showPanelView(viewId);
-    assert(dialog.classList.contains(mode), `${viewId} 应添加 ${mode}`);
-    for (const otherMode of Object.values(modes)) {
-      if (otherMode === mode) continue;
-      assert(!dialog.classList.contains(otherMode), `${viewId} 不应残留 ${otherMode}`);
-    }
-  }
-
-  ui.showPanelView('kaleido-home-view');
-  assert(dialog.classList.contains('is-home-mode'), '返回首页后应保留 is-home-mode');
-  for (const otherMode of Object.values(modes)) {
-    if (otherMode === 'is-home-mode') continue;
-    assert(!dialog.classList.contains(otherMode), `返回首页后不应残留 ${otherMode}`);
-  }
+  ui.openPanel();
+  assert(dialog.style.left !== '', '打开面板后应写入内联 left');
+  assert(dialog.style.top !== '', '打开面板后应写入内联 top');
+  assert(dialog.style.right === 'auto', '定位后 right 应为 auto');
+  assert(dialog.style.bottom === 'auto', '定位后 bottom 应为 auto');
+  assert(dialog.style.transform === 'none', '定位后 transform 应为 none');
+  assert(!dialog.classList.contains('is-home-mode'), '不应再添加移动端尺寸模式');
+  assert(!dialog.classList.contains('is-api-mode'), '不应再添加移动端尺寸模式');
 });
 
 runner.test('首页标语旁日志小图标打开系统日志视图', () => {

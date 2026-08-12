@@ -1,7 +1,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '0.7.7';
+const MODULE_VERSION = '0.7.8';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 
 // ---------- DOM ID / class ----------
@@ -327,14 +327,6 @@ const PANEL_VIEW_TITLES = Object.freeze({
 });
 // 宽视图模式：日志视图需要更宽的窗口展示时间/级别/来源/内容。
 const PANEL_WIDE_MODES = Object.freeze({
-  [LOG_VIEW_ID]: 'is-log-mode',
-  [PRESET_VIEW_ID]: 'is-preset-mode',
-  [INJECT_VIEW_ID]: 'is-inject-mode',
-});
-// 移动端面板尺寸模式：仅由手机端 CSS 使用，桌面端不改变尺寸。
-const PANEL_MOBILE_MODES = Object.freeze({
-  [HOME_VIEW_ID]: 'is-home-mode',
-  [API_VIEW_ID]: 'is-api-mode',
   [LOG_VIEW_ID]: 'is-log-mode',
   [PRESET_VIEW_ID]: 'is-preset-mode',
   [INJECT_VIEW_ID]: 'is-inject-mode',

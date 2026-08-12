@@ -1933,76 +1933,13 @@ select.kaleido-input {
    - 触控目标放大、点按反馈优化、overscroll 隔离
    ========================================================= */
 @media (max-width: 640px) {
-  /* ---------- 普通面板：按视图分级的大浮窗（不再统一全屏） ---------- */
-  .kaleido-panel__dialog.kaleido-panel__dialog {
-    left: 14px;
-    top: calc(14px + env(safe-area-inset-top));
-    right: 14px;
-    bottom: calc(14px + env(safe-area-inset-bottom));
-    width: auto;
-    max-width: none;
-    height: auto;
-    max-height: none;
-    border-radius: 10px;
-    border: 1.5px solid rgba(59, 51, 42, 0.8);
-    box-shadow:
-      0 10px 28px rgba(59, 51, 42, 0.3),
-      0 0 0 1px rgba(184, 134, 47, 0.35);
-  }
-
-  /* 首页与 API：居中的紧凑 / 中等浮窗，内容高度自适应。 */
-  .kaleido-panel__dialog.is-home-mode,
-  .kaleido-panel__dialog.is-api-mode {
-    left: 50%;
-    right: auto;
-    top: 50%;
-    bottom: auto;
-    transform: translate(-50%, -50%);
-    max-width: none;
-    max-height: calc(100dvh - 32px);
-  }
-
-  .kaleido-panel__dialog.is-home-mode {
-    width: min(360px, calc(100vw - 32px));
-  }
-
-  .kaleido-panel__dialog.is-api-mode {
-    width: min(420px, calc(100vw - 28px));
-    max-height: calc(100dvh - 28px);
-  }
-
-  /* 日志、预设、注入：给长内容更多空间，但仍保留可见浮窗边距。 */
-  .kaleido-panel__dialog.is-log-mode,
-  .kaleido-panel__dialog.is-preset-mode,
-  .kaleido-panel__dialog.is-inject-mode {
-    left: 10px;
-    top: calc(10px + env(safe-area-inset-top));
-    right: 10px;
-    bottom: calc(10px + env(safe-area-inset-bottom));
-    transform: none;
-  }
-
-  /* 用户拖动定位后：解除 CSS 居中 / 铺边约束，改由内联 left/top 接管。 */
-  .kaleido-panel__dialog.is-user-positioned {
-    left: auto;
-    right: auto;
-    top: auto;
-    bottom: auto;
-    transform: none;
-    width: min(360px, calc(100vw - 24px));
-    max-width: calc(100vw - 24px);
-    max-height: calc(100dvh - 24px);
-  }
-
+  /* ---------- 普通面板：与 SoulLink 一致，始终由内联 left/top 定位 ----------
+     面板不再按视图分级铺边/居中：打开时 ensurePanelPosition 写入内联
+     left/top（clamp 在视口内），标题栏始终可见可拖；这里只保留安全区
+     与滚动隔离。 */
   .kaleido-panel,
   .kaleido-story-dialog {
     overscroll-behavior: contain;
-  }
-
-  /* 面板是浮窗：对话框 top 已按安全区偏移，标题栏不再叠加安全区，
-     否则刘海/状态栏 inset 会在「万华镜」标题上方形成大块空白（SoulLink 无此问题）。 */
-  .kaleido-panel__header {
-    padding-top: 9px;
   }
 
   .kaleido-panel__body {
