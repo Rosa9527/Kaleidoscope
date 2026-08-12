@@ -1,8 +1,5 @@
 # 移动端面板分级尺寸 Implementation Plan
 
-> **v0.7.9 修订**：本计划中「剧情脉络保持移动端全屏」的决策已被推翻——
-> 剧情脉络工作台改为与面板一致的浮窗（尺寸同预设模版 540px），见「重要设计.md」。
-
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 让手机端只有「剧情脉络」真正全屏，首页、API 连接、系统日志、预设模版和注入实录按内容需求使用不同大小但保留边距的浮窗。

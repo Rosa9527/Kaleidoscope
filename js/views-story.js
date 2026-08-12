@@ -45,7 +45,6 @@ function openStoryWorkbench() {
   closeStoryEditor();
   dialog.classList.add('is-open');
   dialog.setAttribute('aria-hidden', 'false');
-  ensureStoryDialogPosition(dialog);
   renderStoryTree();
   refreshHomeStoryStatus();
   logApp('debug', '剧情脉络工作台已打开');
@@ -133,6 +132,7 @@ function renderStoryNodeRows(container, ctx, node, depth) {
 function buildStoryNodeRow(node, depth, expanded, childCount) {
   const row = document.createElement('div');
   row.className = 'kaleido-story__row kaleido-story__row--node';
+  row.dataset.id = node.id;
   row.style.setProperty('--depth', String(depth));
   const enabled = node.enabled !== false;
   row.innerHTML = `
@@ -158,6 +158,7 @@ function buildStoryNodeRow(node, depth, expanded, childCount) {
 function buildStoryScriptRow(script, depth) {
   const row = document.createElement('div');
   row.className = 'kaleido-story__row kaleido-story__row--script';
+  row.dataset.id = script.id;
   row.style.setProperty('--depth', String(depth));
   const ctx = getContextSafe();
   const node = script.nodeId ? getStoryNodeById(ctx, script.nodeId) : null;
@@ -643,7 +644,6 @@ function initStorySection() {
     </div>
   `;
   document.body.appendChild(dialog);
-  initDraggableStoryDialog(dialog);
 
   document.getElementById(STORY_ROOT_ADD_ID)?.addEventListener('click', (event) => {
     openStoryAddMenu(event.currentTarget, { root: true });
@@ -738,6 +738,25 @@ function initStorySection() {
       }
       default:
         break;
+    }
+  });
+
+  // 双击已建立的节点 / 事件行：默认进入编辑（按钮、输入控件上保持原行为）
+  treeBody?.addEventListener('dblclick', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+    if (target.closest('button, input, select, textarea, a')) return;
+    const row = target.closest('.kaleido-story__row');
+    if (!row) return;
+    const ctx = getContextSafe();
+    if (!ctx) return;
+    const id = String(row.dataset.id || '');
+    if (row.classList.contains('kaleido-story__row--node')) {
+      const node = getStoryNodeById(ctx, id);
+      if (node) openStoryNodeEditor(node);
+    } else if (row.classList.contains('kaleido-story__row--script')) {
+      const script = getStoryScriptById(ctx, id);
+      if (script) openStoryScriptEditor(script);
     }
   });
 

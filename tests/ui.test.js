@@ -52,6 +52,10 @@ function click(el) {
   el.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, cancelable: true }));
 }
 
+function dblclick(el) {
+  el.dispatchEvent(new dom.window.MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+}
+
 async function flush() {
   await new Promise((resolve) => setTimeout(resolve, 10));
 }
@@ -319,6 +323,26 @@ runner.test('编辑事件时导出按钮可见，节点编辑时隐藏', () => {
   click($('kaleido-story-editor-cancel'));
 });
 
+runner.test('双击节点/事件行默认进入编辑', () => {
+  // 双击节点行名称 → 编辑节点
+  dblclick(rowByName('第一卷').querySelector('.kaleido-story__row-name'));
+  assert(!$('kaleido-story-editor').hidden, '双击节点应打开编辑器');
+  assert($('kaleido-story-editor-title').textContent === '编辑节点', '节点标题应为编辑节点');
+  assert($('kaleido-story-node-name').value === '第一卷', '节点名称应回填');
+  click($('kaleido-story-editor-cancel'));
+
+  // 双击事件行名称 → 编辑事件
+  dblclick(rowByName('雨夜事件（修订）').querySelector('.kaleido-story__row-name'));
+  assert(!$('kaleido-story-editor').hidden, '双击事件应打开编辑器');
+  assert($('kaleido-story-editor-title').textContent === '编辑事件', '事件标题应为编辑事件');
+  assert($('kaleido-story-script-name').value === '雨夜事件（修订）', '事件名称应回填');
+  click($('kaleido-story-editor-cancel'));
+
+  // 双击按钮不进入编辑（保持按钮原行为）
+  dblclick(actionButton(rowByName('第一卷'), 'toggle'));
+  assert($('kaleido-story-editor').hidden, '双击按钮不应打开编辑器');
+});
+
 runner.test('编辑器上级节点下拉排除自身与后代（防环）', () => {
   click(actionButton(rowByName('第一卷'), 'edit'));
   const select = $('kaleido-story-node-parent');
@@ -529,16 +553,6 @@ runner.test('面板打开时始终以内联 left/top 定位（与 SoulLink 一�
   assert(dialog.style.transform === 'none', '定位后 transform 应为 none');
   assert(!dialog.classList.contains('is-home-mode'), '不应再添加移动端尺寸模式');
   assert(!dialog.classList.contains('is-api-mode'), '不应再添加移动端尺寸模式');
-});
-
-runner.test('剧情脉络工作台打开时以内联 left/top 定位（与面板一致）', () => {
-  ui.openStoryWorkbench();
-  const inner = $('kaleido-story-dialog').querySelector('.kaleido-story-dialog__inner');
-  assert(inner.style.left !== '', '打开工作台后应写入内联 left');
-  assert(inner.style.top !== '', '打开工作台后应写入内联 top');
-  assert(inner.style.right === 'auto', '定位后 right 应为 auto');
-  assert(inner.style.bottom === 'auto', '定位后 bottom 应为 auto');
-  assert(inner.style.transform === 'none', '定位后 transform 应为 none');
 });
 
 runner.test('首页标语旁日志小图标打开系统日志视图', () => {

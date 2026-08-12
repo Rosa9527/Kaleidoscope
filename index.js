@@ -2,7 +2,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '0.7.9';
+const MODULE_VERSION = '0.7.8';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 
 // ---------- DOM ID / class ----------
@@ -1354,89 +1354,6 @@ function initDraggablePanel(panel) {
   window.addEventListener('pointercancel', stopDragging);
   window.addEventListener('resize', () => ensurePanelPosition(panel));
   panel.dataset.dragReady = 'true';
-}
-
-// ---------- 剧情脉络工作台：与面板一致的浮窗定位（内联 left/top + 标题栏拖拽） ----------
-function clampStoryDialogPosition(dialog, left, top) {
-  const width = dialog?.offsetWidth || 540;
-  const height = dialog?.offsetHeight || 480;
-  const maxLeft = Math.max(0, window.innerWidth - width);
-  const maxTop = Math.max(0, window.innerHeight - height);
-  return {
-    left: Math.max(0, Math.min(left, maxLeft)),
-    top: Math.max(0, Math.min(top, maxTop)),
-  };
-}
-
-function setStoryDialogPosition(dialog, left, top) {
-  const inner = dialog?.querySelector('.kaleido-story-dialog__inner');
-  if (!dialog || !inner) return;
-  const next = clampStoryDialogPosition(inner, left, top);
-  inner.style.left = `${next.left}px`;
-  inner.style.top = `${next.top}px`;
-  inner.style.right = 'auto';
-  inner.style.bottom = 'auto';
-  inner.style.transform = 'none';
-  dialog.dataset.left = String(next.left);
-  dialog.dataset.top = String(next.top);
-  dialog.dataset.positioned = 'true';
-}
-
-function ensureStoryDialogPosition(dialog) {
-  const inner = dialog?.querySelector('.kaleido-story-dialog__inner');
-  if (!dialog || !inner) return;
-  const storedLeft = Number(dialog.dataset.left);
-  const storedTop = Number(dialog.dataset.top);
-  if (Number.isFinite(storedLeft) && Number.isFinite(storedTop)) {
-    setStoryDialogPosition(dialog, storedLeft, storedTop);
-    return;
-  }
-  const defaultLeft = Math.max(EDGE_GAP, window.innerWidth - inner.offsetWidth - EDGE_GAP);
-  const defaultTop = EDGE_GAP;
-  setStoryDialogPosition(dialog, defaultLeft, defaultTop);
-}
-
-function initDraggableStoryDialog(dialog) {
-  if (!dialog || dialog.dataset.dragReady === 'true') return;
-  const inner = dialog.querySelector('.kaleido-story-dialog__inner');
-  const handles = dialog.querySelectorAll('.kaleido-story-dialog__header');
-  if (!inner || handles.length === 0) return;
-
-  let dragState = null;
-
-  const stopDragging = () => {
-    dragState = null;
-    inner.classList.remove('is-dragging');
-  };
-
-  handles.forEach((handle) =>
-    handle.addEventListener('pointerdown', (event) => {
-      if (event.button !== 0) return;
-      // 指针落在标题栏内的按钮上（导入/导出/关闭）时，不启动拖拽、不捕获指针，
-      // 否则 setPointerCapture 会把后续 click 重定向到标题栏，按钮点击失效。
-      const target = event.target;
-      if (target instanceof Element && typeof target.closest === 'function' && target.closest('button')) return;
-      // 用视觉位置（getBoundingClientRect）计算偏移：移动端居中布局带 transform，
-      // offsetLeft/offsetTop 是布局位置，会导致首帧跳动。
-      const rect = inner.getBoundingClientRect();
-      dragState = {
-        offsetX: event.clientX - rect.left,
-        offsetY: event.clientY - rect.top,
-      };
-      inner.classList.add('is-dragging');
-      handle.setPointerCapture?.(event.pointerId);
-      event.preventDefault();
-    }),
-  );
-
-  window.addEventListener('pointermove', (event) => {
-    if (!dragState) return;
-    setStoryDialogPosition(dialog, event.clientX - dragState.offsetX, event.clientY - dragState.offsetY);
-  });
-  window.addEventListener('pointerup', stopDragging);
-  window.addEventListener('pointercancel', stopDragging);
-  window.addEventListener('resize', () => ensureStoryDialogPosition(dialog));
-  dialog.dataset.dragReady = 'true';
 }
 
 function openPanel() {
@@ -4665,7 +4582,6 @@ function openStoryWorkbench() {
   closeStoryEditor();
   dialog.classList.add('is-open');
   dialog.setAttribute('aria-hidden', 'false');
-  ensureStoryDialogPosition(dialog);
   renderStoryTree();
   refreshHomeStoryStatus();
   logApp('debug', '剧情脉络工作台已打开');
@@ -4753,6 +4669,7 @@ function renderStoryNodeRows(container, ctx, node, depth) {
 function buildStoryNodeRow(node, depth, expanded, childCount) {
   const row = document.createElement('div');
   row.className = 'kaleido-story__row kaleido-story__row--node';
+  row.dataset.id = node.id;
   row.style.setProperty('--depth', String(depth));
   const enabled = node.enabled !== false;
   row.innerHTML = `
@@ -4778,6 +4695,7 @@ function buildStoryNodeRow(node, depth, expanded, childCount) {
 function buildStoryScriptRow(script, depth) {
   const row = document.createElement('div');
   row.className = 'kaleido-story__row kaleido-story__row--script';
+  row.dataset.id = script.id;
   row.style.setProperty('--depth', String(depth));
   const ctx = getContextSafe();
   const node = script.nodeId ? getStoryNodeById(ctx, script.nodeId) : null;
@@ -5263,7 +5181,6 @@ function initStorySection() {
     </div>
   `;
   document.body.appendChild(dialog);
-  initDraggableStoryDialog(dialog);
 
   document.getElementById(STORY_ROOT_ADD_ID)?.addEventListener('click', (event) => {
     openStoryAddMenu(event.currentTarget, { root: true });
@@ -5358,6 +5275,25 @@ function initStorySection() {
       }
       default:
         break;
+    }
+  });
+
+  // 双击已建立的节点 / 事件行：默认进入编辑（按钮、输入控件上保持原行为）
+  treeBody?.addEventListener('dblclick', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+    if (target.closest('button, input, select, textarea, a')) return;
+    const row = target.closest('.kaleido-story__row');
+    if (!row) return;
+    const ctx = getContextSafe();
+    if (!ctx) return;
+    const id = String(row.dataset.id || '');
+    if (row.classList.contains('kaleido-story__row--node')) {
+      const node = getStoryNodeById(ctx, id);
+      if (node) openStoryNodeEditor(node);
+    } else if (row.classList.contains('kaleido-story__row--script')) {
+      const script = getStoryScriptById(ctx, id);
+      if (script) openStoryScriptEditor(script);
     }
   });
 

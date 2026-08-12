@@ -35,34 +35,22 @@ assert(bundle.includes('dialog.style.left'), 'index.js 应始终写入内联 lef
 assert(shell.includes('dialog.getBoundingClientRect()'), 'js/ui-shell.js 应基于视觉位置计算拖拽偏移');
 assert(/\.kaleido-panel__header\s*\{[^}]*touch-action:\s*none/.test(style), '标题栏应设置 touch-action: none，避免触屏拖动被 pointercancel 打断');
 
-// 回归：面板与剧情脉络标题栏都不叠加安全区 inset（浮窗标题栏不需要）。
+// 回归：面板标题栏不叠加安全区 inset（基础规则），剧情工作台标题栏保留（全屏工作台需要）。
 const baseHeaderRule = style.match(/\.kaleido-panel__header\s*\{([^}]*)\}/);
 assert(baseHeaderRule, '缺少 .kaleido-panel__header 基础规则');
 assert(!baseHeaderRule[1].includes('env(safe-area-inset-top)'), '面板标题栏不应叠加安全区 inset');
-const storyHeaderRule = style.match(/\.kaleido-story-dialog__header\s*\{([^}]*)\}/);
-assert(storyHeaderRule, '缺少 .kaleido-story-dialog__header 基础规则');
-assert(!storyHeaderRule[1].includes('env(safe-area-inset-top)'), '剧情脉络标题栏不应叠加安全区 inset（浮窗与面板一致）');
-assert(/touch-action:\s*none/.test(storyHeaderRule[1]), '剧情脉络标题栏应设置 touch-action: none（可拖动）');
-assert(/cursor:\s*grab/.test(storyHeaderRule[1]), '剧情脉络标题栏应显示 grab 光标');
+const lastMobileStart = style.lastIndexOf('@media (max-width: 640px)');
+assert(lastMobileStart !== -1, 'style.css 缺少 @media (max-width: 640px)');
+const lastMobileStyle = style.slice(lastMobileStart);
+const storyHeaderRule = lastMobileStyle.match(/\.kaleido-story-dialog__header\s*\{([^}]*)\}/);
+assert(storyHeaderRule && storyHeaderRule[1].includes('env(safe-area-inset-top)'), '剧情工作台标题栏应保留安全区 inset（全屏工作台仍需要）');
 
-// 剧情脉络工作台与面板一致：浮窗尺寸（与预设模版同宽），不再移动端全屏。
-const storyInnerRule = style.match(/\.kaleido-story-dialog__inner\s*\{([^}]*)\}/);
-assert(storyInnerRule, '缺少 .kaleido-story-dialog__inner 基础规则');
-assert(/\bwidth\s*:\s*540px\b/.test(storyInnerRule[1]), '剧情脉络浮窗应与预设模版同宽（540px）');
-assert(/max-width:\s*calc\(100vw - 24px\)/.test(storyInnerRule[1]), '剧情脉络浮窗应限制最大宽度');
-assert(/max-height:\s*calc\(100dvh - 24px\)/.test(storyInnerRule[1]), '剧情脉络浮窗应限制最大高度');
-assert(!/\bwidth\s*:\s*100vw\b/.test(storyInnerRule[1]), '剧情脉络浮窗不应再全屏宽');
-assert(!/\bheight\s*:\s*100dvh\b/.test(storyInnerRule[1]), '剧情脉络浮窗不应再全屏高');
-const storyMobileInnerRule = style.match(
+// 剧情脉络工作台仍为移动端全屏。
+const firstStoryMobileRule = style.match(
   /@media \(max-width: 640px\)[\s\S]*?\.kaleido-story-dialog__inner\s*\{([^}]*)\}/,
 );
-assert(!storyMobileInnerRule || !/\bwidth\s*:\s*100vw\b/.test(storyMobileInnerRule[1]), '剧情脉络移动端不应再全屏宽');
-assert(!storyMobileInnerRule || !/\bheight\s*:\s*100dvh\b/.test(storyMobileInnerRule[1]), '剧情脉络移动端不应再全屏高');
-
-// 剧情脉络工作台与面板一致：内联 left/top 定位 + 标题栏拖拽。
-assert(shell.includes('setStoryDialogPosition'), 'js/ui-shell.js 应包含剧情脉络定位函数');
-assert(shell.includes('ensureStoryDialogPosition'), 'js/ui-shell.js 应包含剧情脉络位置恢复函数');
-assert(shell.includes('initDraggableStoryDialog'), 'js/ui-shell.js 应包含剧情脉络拖拽初始化');
-assert(bundle.includes('initDraggableStoryDialog'), 'index.js 应包含剧情脉络拖拽初始化');
+assert(firstStoryMobileRule, '缺少剧情脉络的移动端 .kaleido-story-dialog__inner 规则');
+assert(/\bwidth\s*:\s*100vw\b/.test(firstStoryMobileRule[1]), '剧情脉络移动端规则应包含 width:100vw');
+assert(/\bheight\s*:\s*100dvh\b/.test(firstStoryMobileRule[1]), '剧情脉络移动端规则应包含 height:100dvh');
 
 console.log('移动端面板定位静态检查通过');

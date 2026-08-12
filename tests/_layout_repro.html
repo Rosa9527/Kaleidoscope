@@ -1,6 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
-/* =========================================================
+<html><head><meta charset="utf-8"><style>/* =========================================================
    万华镜（Kaleidoscope）· 古风典雅 + 万花筒意象
    宣纸底 + 墨色描边 + 朱砂印章 + 鎏金点缀；
    六棱万花筒悬浮球、回纹饰带、菱形纹卡片徽章。
@@ -151,7 +150,6 @@
   width: 372px;
   max-width: calc(100vw - 24px);
   max-height: calc(100vh - 24px);
-  max-height: calc(100dvh - 24px);
   margin: 0;
   display: flex;
   flex-direction: column;
@@ -183,8 +181,6 @@
   background: linear-gradient(180deg, #4b4238, #3b332a);
   border-bottom: 2px solid var(--k-gold);
   cursor: grab;
-  /* 触屏：禁止浏览器把标题栏手势接管为滚动/平移，否则拖动会收到 pointercancel */
-  touch-action: none;
 }
 
 .kaleido-panel__header:active {
@@ -285,7 +281,6 @@
 .kaleido-home__hero {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   padding: 10px 12px;
   margin-bottom: 14px;
@@ -310,60 +305,6 @@
   font-weight: 700;
   letter-spacing: 3px;
   color: var(--k-ink);
-}
-
-/* 首页标语旁：系统日志小图标 */
-.kaleido-home__log-btn {
-  position: relative;
-  flex: none;
-  width: 30px;
-  height: 30px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  font-size: 13px;
-  color: var(--k-ink);
-  background: var(--k-paper-light);
-  border: 1.5px solid rgba(59, 51, 42, 0.3);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.kaleido-home__log-btn:hover {
-  border-color: var(--k-cinnabar);
-  transform: translateY(-1px);
-  box-shadow: 0 3px 8px rgba(59, 51, 42, 0.16);
-}
-
-.kaleido-home__log-btn:active {
-  transform: scale(0.96);
-}
-
-.kaleido-home__log-badge {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  min-width: 16px;
-  height: 16px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 4px;
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1;
-  color: #fdf6e3;
-  background: var(--k-cinnabar);
-  border: 1.5px solid #fdf6e3;
-  border-radius: 999px;
-  box-shadow: 0 1px 3px rgba(59, 51, 42, 0.35);
-}
-
-.kaleido-home__log-badge[data-state='warn'] {
-  background: var(--k-gold);
-  color: #4b4238;
 }
 
 /* 首页卡片：菱形纹图标徽章 */
@@ -670,28 +611,25 @@ select.kaleido-input {
   transform: scale(1.06);
 }
 
-/* ---------- 剧情脉络工作台（浮窗 / 树状，与面板一致） ---------- */
+/* ---------- 剧情脉络工作台（大窗口 / 树状） ---------- */
 .kaleido-story-dialog {
   position: fixed;
   inset: 0;
   z-index: 10001;
   display: none;
+  align-items: center;
+  justify-content: center;
   background: rgba(25, 19, 11, 0.42);
   pointer-events: auto;
 }
 
 .kaleido-story-dialog.is-open {
-  display: block;
+  display: flex;
 }
 
 .kaleido-story-dialog__inner {
-  position: fixed;
-  z-index: 1;
-  width: 540px;
-  max-width: calc(100vw - 24px);
-  max-height: calc(100vh - 24px);
-  max-height: calc(100dvh - 24px);
-  margin: 0;
+  width: min(920px, calc(100vw - 24px));
+  height: min(680px, calc(100vh - 24px));
   display: flex;
   flex-direction: column;
   font-family: var(--k-font);
@@ -699,15 +637,11 @@ select.kaleido-input {
   color: var(--k-ink);
   background: var(--k-paper);
   border: 1.5px solid rgba(59, 51, 42, 0.85);
-  border-radius: 8px;
+  border-radius: 10px;
   box-shadow:
     0 16px 44px rgba(25, 19, 11, 0.45),
     0 0 0 1px rgba(184, 134, 47, 0.4);
   overflow: hidden;
-}
-
-.kaleido-story-dialog__inner.is-dragging {
-  cursor: grabbing;
 }
 
 .kaleido-story-dialog__header {
@@ -719,13 +653,6 @@ select.kaleido-input {
   padding: 10px 12px;
   background: linear-gradient(180deg, #4b4238, #3b332a);
   border-bottom: 2px solid var(--k-gold);
-  cursor: grab;
-  /* 触屏：禁止浏览器把标题栏手势接管为滚动/平移，否则拖动会收到 pointercancel */
-  touch-action: none;
-}
-
-.kaleido-story-dialog__header:active {
-  cursor: grabbing;
 }
 
 .kaleido-story-dialog__title {
@@ -740,34 +667,6 @@ select.kaleido-input {
 
 .kaleido-story-dialog__title .fa-solid {
   color: var(--k-gold-bright);
-}
-
-/* 角色卡绑定徽标：已绑定（ok）/ 待绑定（warn）/ 未绑定角色（idle） */
-.kaleido-story__binding {
-  flex: none;
-  max-width: 40%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  letter-spacing: 1px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid rgba(253, 246, 227, 0.35);
-  background: rgba(253, 246, 227, 0.08);
-  color: #fdf6e3;
-  cursor: default;
-}
-.kaleido-story__binding[data-state='ok'] {
-  border-color: rgba(201, 162, 39, 0.7);
-  color: #f3d98b;
-}
-.kaleido-story__binding[data-state='warn'] {
-  border-color: rgba(230, 180, 90, 0.6);
-  color: #f0c987;
-}
-.kaleido-story__binding[data-state='idle'] {
-  opacity: 0.75;
 }
 
 .kaleido-story-dialog__toolbar {
@@ -862,7 +761,6 @@ select.kaleido-input {
 
 .kaleido-story__row--node {
   border-left: 3px solid var(--k-gold);
-  padding-left: calc(10px + var(--depth, 0) * 20px);
 }
 
 .kaleido-story__row--node.is-expanded {
@@ -872,57 +770,6 @@ select.kaleido-input {
 .kaleido-story__row--script {
   border-left: 2px solid rgba(79, 109, 122, 0.45);
   background: rgba(247, 241, 227, 0.72);
-  padding-left: calc(30px + var(--depth, 0) * 20px);
-}
-
-/* 节点启用滑块：点击关闭（整棵子树停用），再点激活 */
-.kaleido-story__switch {
-  flex: none;
-  position: relative;
-  width: 30px;
-  height: 16px;
-  padding: 0;
-  background: rgba(59, 51, 42, 0.3);
-  border: 1px solid rgba(59, 51, 42, 0.35);
-  border-radius: 9px;
-  cursor: pointer;
-  transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
-}
-
-.kaleido-story__switch-thumb {
-  position: absolute;
-  top: 1px;
-  left: 1px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--k-paper-light);
-  box-shadow: 0 1px 2px rgba(59, 51, 42, 0.4);
-  transition: transform 0.18s ease;
-}
-
-.kaleido-story__switch:not(.is-off) {
-  background: var(--k-cinnabar);
-  border-color: var(--k-cinnabar-deep);
-}
-
-.kaleido-story__switch:not(.is-off) .kaleido-story__switch-thumb {
-  transform: translateX(14px);
-}
-
-.kaleido-story__switch:hover {
-  border-color: var(--k-cinnabar);
-  box-shadow: 0 0 0 2px rgba(166, 58, 46, 0.12);
-}
-
-/* 停用节点整行淡化，提示其子树不参与预筛 */
-.kaleido-story__row--node.is-disabled .kaleido-story__row-name,
-.kaleido-story__row--node.is-disabled .kaleido-story__row-count {
-  color: rgba(59, 51, 42, 0.4);
-}
-
-.kaleido-story__row--node.is-disabled .kaleido-story__row-icon {
-  color: rgba(59, 51, 42, 0.38);
 }
 
 .kaleido-story__chevron {
@@ -1066,103 +913,10 @@ select.kaleido-input {
   white-space: pre-line;
 }
 
-/* 「＋」新建菜单：节点 / 剧本二选一 */
-.kaleido-story__add-menu {
-  position: fixed;
-  z-index: 3;
-  min-width: 136px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 6px;
-  background: var(--k-paper-light);
-  border: 1.5px solid rgba(59, 51, 42, 0.4);
-  border-radius: 6px;
-  box-shadow: 0 8px 20px rgba(59, 51, 42, 0.28);
-}
-
-.kaleido-story__add-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 10px;
-  font-family: var(--k-font);
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--k-ink);
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  text-align: left;
-  white-space: nowrap;
-}
-
-.kaleido-story__add-menu-item:hover {
-  background: rgba(166, 58, 46, 0.08);
-  color: var(--k-cinnabar);
-}
-
-.kaleido-story__add-menu-item .fa-solid {
-  width: 16px;
-  text-align: center;
-  color: var(--k-gold);
-}
-
-/* 导入方式选择浮层：整包导入时询问合并 / 覆盖 */
-.kaleido-story__import-mode[hidden] {
-  display: none !important;
-}
-
-.kaleido-story__import-mode {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(25, 19, 11, 0.38);
-}
-
-.kaleido-story__import-mode-card {
-  width: min(380px, calc(100% - 32px));
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 16px;
-  background: var(--k-paper);
-  border: 1.5px solid rgba(59, 51, 42, 0.55);
-  border-top: 3px solid var(--k-cinnabar);
-  border-radius: 8px;
-  box-shadow: 0 12px 30px rgba(59, 51, 42, 0.35);
-}
-
-.kaleido-story__import-mode-title {
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 2px;
-}
-
-.kaleido-story__import-mode-desc {
-  font-size: 12px;
-  line-height: 1.7;
-  color: rgba(59, 51, 42, 0.62);
-}
-
-.kaleido-story__import-mode-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.kaleido-story__import-mode-actions .kaleido-btn {
-  flex: 1;
-}
-
 /* 编辑器（桌面：右侧浮层；移动端：全幅覆盖） */
 /* hidden 属性必须压过 display 规则，否则编辑器 / 导出按钮会关不掉、常显 */
 .kaleido-story-dialog__editor[hidden],
-.kaleido-btn[hidden],
-.kaleido-story__add-menu[hidden] {
+.kaleido-btn[hidden] {
   display: none !important;
 }
 .kaleido-story-dialog__editor {
@@ -1240,6 +994,15 @@ select.kaleido-input {
 
 /* 小屏适配（手机端） */
 @media (max-width: 640px) {
+  .kaleido-story-dialog__inner {
+    width: 100vw;
+    height: 100dvh;
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
+    border: none;
+  }
+
   .kaleido-story-dialog__header {
     flex-wrap: wrap;
     row-gap: 6px;
@@ -1287,178 +1050,6 @@ select.kaleido-input {
 }
 
 /* ---------- 页脚 ---------- *//* ---------- 页脚 ---------- */
-/* ---------- 预设模版视图 ---------- */
-.kaleido-panel__dialog.is-preset-mode {
-  width: 540px;
-}
-
-.kaleido-preset {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.kaleido-preset__note {
-  margin: 0;
-  padding: 8px 12px;
-  font-size: 12px;
-  line-height: 1.7;
-  color: var(--k-ink);
-  background: rgba(184, 134, 47, 0.12);
-  border: 1.5px dashed rgba(184, 134, 47, 0.55);
-  border-radius: 4px;
-}
-
-/* 剧情预筛：启用开关区（自 API 连接页迁移） */
-.kaleido-preset__gate {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  background: rgba(95, 157, 201, 0.08);
-  border: 1.5px solid rgba(95, 157, 201, 0.45);
-  border-radius: 4px;
-}
-
-.kaleido-preset__gate-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.kaleido-preset__gate-title {
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 1px;
-}
-
-.kaleido-preset__gate-hint {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.7;
-  color: rgba(59, 51, 42, 0.6);
-}
-
-.kaleido-preset__gate-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.kaleido-preset__gate-label {
-  font-size: 12.5px;
-  font-weight: 700;
-}
-
-.kaleido-preset__tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.kaleido-preset__tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 12px;
-  font-family: var(--k-font);
-  font-size: 12.5px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  color: var(--k-ink);
-  cursor: pointer;
-  background: var(--k-paper-light);
-  border: 1.5px solid rgba(59, 51, 42, 0.3);
-  border-radius: 4px;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
-}
-
-.kaleido-preset__tab:hover {
-  border-color: var(--k-cinnabar);
-  transform: translateY(-1px);
-}
-
-.kaleido-preset__tab.is-active {
-  color: #fdf6e3;
-  background: linear-gradient(180deg, #b03a2e, #98332a);
-  border-color: #7c2a21;
-}
-
-.kaleido-preset__tab.is-dirty::after {
-  content: '●';
-  font-size: 9px;
-  color: var(--k-cinnabar);
-}
-
-.kaleido-preset__tab.is-active.is-dirty::after {
-  color: #fdf6e3;
-}
-
-.kaleido-preset__editor {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.kaleido-preset__meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 11.5px;
-  opacity: 0.8;
-}
-
-.kaleido-preset__status {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 9px;
-  font-size: 11.5px;
-  border-radius: 999px;
-  border: 1.5px solid rgba(95, 157, 201, 0.7);
-  color: #3d6a8f;
-  background: rgba(255, 255, 255, 0.7);
-}
-
-.kaleido-preset__status[data-state='dirty'] {
-  color: #8a6d1f;
-  border-color: rgba(184, 134, 47, 0.95);
-  background: rgba(184, 134, 47, 0.2);
-}
-
-.kaleido-preset__status[data-state='custom'] {
-  color: #4f7a33;
-  border-color: rgba(123, 160, 91, 0.9);
-  background: rgba(123, 160, 91, 0.16);
-}
-
-.kaleido-preset__count {
-  font-size: 11px;
-  opacity: 0.7;
-}
-
-.kaleido-preset__text {
-  min-height: 300px;
-  max-height: 56vh;
-  resize: vertical;
-  font-family: ui-monospace, "Cascadia Code", Consolas, "Courier New", monospace;
-  font-size: 12.5px;
-  line-height: 1.75;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.kaleido-preset__actions {
-  display: flex;
-  gap: 8px;
-}
-
-.kaleido-preset__actions .kaleido-btn {
-  flex: 1;
-}
-
 .kaleido-panel__footer {
   flex: none;
   display: flex;
@@ -1476,745 +1067,6 @@ select.kaleido-input {
   letter-spacing: 3px;
   color: rgba(122, 42, 33, 0.65);
 }
-
-/* ---------- 系统日志视图 ---------- */
-.kaleido-panel__dialog.is-log-mode {
-  width: 540px;
-}
-
-.kaleido-log {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.kaleido-log__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.kaleido-log__chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  font-family: var(--k-font);
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--k-ink);
-  cursor: pointer;
-  background: var(--k-paper-light);
-  border: 1.5px solid rgba(59, 51, 42, 0.3);
-  border-radius: 4px;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
-}
-
-.kaleido-log__chip:hover {
-  border-color: var(--k-cinnabar);
-  transform: translateY(-1px);
-}
-
-.kaleido-log__chip.is-active {
-  color: #fdf6e3;
-  background: linear-gradient(180deg, #b03a2e, #98332a);
-  border-color: #7c2a21;
-}
-
-.kaleido-log__chip-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 17px;
-  padding: 0 4px;
-  font-size: 10px;
-  line-height: 1.5;
-  border-radius: 3px;
-  background: rgba(59, 51, 42, 0.12);
-}
-
-.kaleido-log__chip.is-active .kaleido-log__chip-count {
-  background: rgba(253, 246, 227, 0.25);
-}
-
-.kaleido-log__tools {
-  display: flex;
-  gap: 8px;
-}
-
-.kaleido-log__search {
-  flex: 1;
-}
-
-.kaleido-log__max,
-.kaleido-log__source {
-  flex: none;
-  width: auto;
-  padding: 7px 8px;
-  font-size: 12px;
-}
-
-.kaleido-log__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.kaleido-log__action {
-  flex: 1;
-  min-width: 72px;
-  padding: 6px 8px;
-  font-family: var(--k-font);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  color: var(--k-ink);
-  cursor: pointer;
-  background: var(--k-paper-light);
-  border: 1.5px solid rgba(59, 51, 42, 0.3);
-  border-radius: 4px;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
-}
-
-.kaleido-log__action:hover {
-  background: rgba(166, 58, 46, 0.08);
-  border-color: var(--k-cinnabar);
-  transform: translateY(-1px);
-}
-
-.kaleido-log__action.is-active {
-  color: #fdf6e3;
-  background: linear-gradient(180deg, #b03a2e, #98332a);
-  border-color: #7c2a21;
-}
-
-.kaleido-log__console {
-  position: relative;
-  background: #2b2419;
-  border: 1.5px solid rgba(59, 51, 42, 0.8);
-  border-radius: 6px;
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.35);
-}
-
-.kaleido-log__list {
-  height: 300px;
-  max-height: 52vh;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 8px 6px;
-  font-family: ui-monospace, "Cascadia Code", Consolas, "Courier New", monospace;
-  font-size: 11.5px;
-  line-height: 1.55;
-  scroll-behavior: auto;
-}
-
-.kaleido-log__list::-webkit-scrollbar {
-  width: 9px;
-}
-
-.kaleido-log__list::-webkit-scrollbar-thumb {
-  background: rgba(253, 246, 227, 0.22);
-  border-radius: 4px;
-}
-
-.kaleido-log__row {
-  display: flex;
-  gap: 6px;
-  align-items: baseline;
-  padding: 1px 5px;
-  border-radius: 3px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.kaleido-log__row:hover {
-  background: rgba(253, 246, 227, 0.07);
-}
-
-.kaleido-log__row.is-expanded {
-  white-space: normal;
-}
-
-.kaleido-log__time {
-  flex: none;
-  color: #a89a7e;
-}
-
-.kaleido-log__level {
-  flex: none;
-  width: 38px;
-  text-align: center;
-  padding: 0 2px;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  border-radius: 3px;
-}
-
-.kaleido-log__row--debug .kaleido-log__level {
-  color: #8ec7e8;
-  background: rgba(143, 199, 232, 0.14);
-}
-
-.kaleido-log__row--info .kaleido-log__level {
-  color: #a8d68f;
-  background: rgba(168, 214, 143, 0.13);
-}
-
-.kaleido-log__row--warn .kaleido-log__level {
-  color: #f0c15c;
-  background: rgba(240, 193, 92, 0.16);
-}
-
-.kaleido-log__row--error .kaleido-log__level {
-  color: #ff9aa0;
-  background: rgba(255, 120, 128, 0.18);
-}
-
-.kaleido-log__source {
-  flex: none;
-  max-width: 76px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: #c9a6e8;
-  opacity: 0.9;
-}
-
-.kaleido-log__text {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: #d9cdb6;
-}
-
-.kaleido-log__row--error .kaleido-log__text {
-  color: #ffd7d9;
-}
-
-.kaleido-log__row.is-expanded .kaleido-log__text {
-  white-space: pre-wrap;
-  word-break: break-all;
-  overflow: visible;
-}
-
-.kaleido-log__detail {
-  display: none;
-  flex-basis: 100%;
-  margin: 2px 0 4px;
-  padding: 6px 8px;
-  font-family: ui-monospace, "Cascadia Code", Consolas, "Courier New", monospace;
-  font-size: 11px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-all;
-  color: #c9d8b8;
-  background: rgba(253, 246, 227, 0.05);
-  border-left: 3px solid rgba(184, 134, 47, 0.6);
-  border-radius: 3px;
-}
-
-.kaleido-log__row.is-expanded .kaleido-log__detail {
-  display: block;
-}
-
-.kaleido-log__repeat {
-  flex: none;
-  align-self: center;
-  padding: 0 5px;
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1.6;
-  color: #f0c15c;
-  background: rgba(240, 193, 92, 0.16);
-  border: 1px solid rgba(240, 193, 92, 0.5);
-  border-radius: 3px;
-}
-
-.kaleido-log__note,
-.kaleido-log__empty {
-  padding: 10px 8px;
-  font-size: 11.5px;
-  text-align: center;
-  color: #a89a7e;
-}
-
-.kaleido-log__back {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  padding: 4px 10px;
-  font-family: var(--k-font);
-  font-size: 11.5px;
-  font-weight: 700;
-  color: #fdf6e3;
-  background: linear-gradient(180deg, #b03a2e, #98332a);
-  border: 1.5px solid #7c2a21;
-  border-radius: 4px;
-  cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-}
-
-.kaleido-log__back:hover {
-  filter: brightness(1.08);
-}
-
-.kaleido-log__status {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 11.5px;
-  color: rgba(59, 51, 42, 0.6);
-}
-
-.kaleido-log__paused {
-  padding: 2px 8px;
-  font-weight: 700;
-  color: #8a6d1f;
-  background: rgba(184, 134, 47, 0.14);
-  border: 1px solid rgba(184, 134, 47, 0.5);
-  border-radius: 3px;
-}
-/* ---------- 注入实录视图 ---------- */
-.kaleido-panel__dialog.is-inject-mode {
-  width: 540px;
-}
-
-.kaleido-inject {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.kaleido-inject__note {
-  margin: 0;
-  padding: 8px 12px;
-  font-size: 12px;
-  line-height: 1.7;
-  color: var(--k-ink-soft);
-  background: rgba(184, 134, 47, 0.08);
-  border-left: 3px solid rgba(184, 134, 47, 0.55);
-  border-radius: 3px;
-}
-
-.kaleido-panel__section-title {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  color: var(--k-cinnabar);
-}
-
-.kaleido-inject__summary {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 10px 12px;
-  background: var(--k-paper-light);
-  border: 1.5px solid rgba(59, 51, 42, 0.25);
-  border-radius: 6px;
-}
-
-.kaleido-inject__summary-outcome {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--k-ink);
-}
-
-.kaleido-inject__summary-outcome[data-state='ok'] {
-  color: #2f6b3a;
-}
-
-.kaleido-inject__summary-outcome[data-state='warn'] {
-  color: #8a6d1f;
-}
-
-.kaleido-inject__summary-stats,
-.kaleido-inject__summary-names {
-  font-size: 11.5px;
-  line-height: 1.6;
-  color: var(--k-ink-soft);
-}
-
-.kaleido-inject__empty {
-  padding: 14px 10px;
-  font-size: 12px;
-  line-height: 1.7;
-  text-align: center;
-  color: #a89a7e;
-}
-
-.kaleido-inject__gate-text,
-.kaleido-inject__inject-text {
-  margin: 0;
-  padding: 10px 12px;
-  font-family: ui-monospace, "Cascadia Code", Consolas, "Courier New", monospace;
-  font-size: 11.5px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-all;
-  color: #c9d8b8;
-  background: #2b2419;
-  border: 1.5px solid rgba(59, 51, 42, 0.8);
-  border-radius: 6px;
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.35);
-}
-
-.kaleido-inject__events {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.kaleido-inject__event {
-  padding: 8px 10px;
-  background: var(--k-paper-light);
-  border: 1.5px solid rgba(59, 51, 42, 0.25);
-  border-left: 3px solid var(--k-cinnabar);
-  border-radius: 6px;
-}
-
-.kaleido-inject__event-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-
-.kaleido-inject__event-name {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--k-ink);
-}
-
-.kaleido-inject__event-id {
-  padding: 1px 6px;
-  font-family: ui-monospace, "Cascadia Code", Consolas, "Courier New", monospace;
-  font-size: 10.5px;
-  color: var(--k-cinnabar);
-  background: rgba(166, 58, 46, 0.08);
-  border: 1px solid rgba(166, 58, 46, 0.35);
-  border-radius: 3px;
-}
-
-.kaleido-inject__event-line {
-  margin: 2px 0;
-  font-size: 11.5px;
-  line-height: 1.6;
-  color: var(--k-ink-soft);
-}
-
-.kaleido-inject__event-body {
-  margin-top: 6px;
-  padding: 6px 8px;
-  font-size: 12px;
-  line-height: 1.7;
-  color: var(--k-ink);
-  background: rgba(184, 134, 47, 0.07);
-  border-radius: 4px;
-}
-
-.kaleido-inject__inject-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.kaleido-inject__copy {
-  padding: 4px 10px;
-  font-size: 12px;
-  letter-spacing: 0;
-}
-
-
-
-/* =========================================================
-   移动端全面适配（≤640px：手机浏览器 / SillyTavern 手机端）
-   覆盖点：
-   - 面板按视图分级浮窗（默认交给 CSS 尺寸模式，用户拖动后由内联位置接管）
-   - 动态视口高度 dvh + 安全区（刘海 / 底部横条）
-   - iOS 聚焦自动放大防抖（表单控件字号提到 16px）
-   - 触控目标放大、点按反馈优化、overscroll 隔离
-   ========================================================= */
-@media (max-width: 640px) {
-  /* ---------- 普通面板：与 SoulLink 一致，始终由内联 left/top 定位 ----------
-     面板不再按视图分级铺边/居中：打开时 ensurePanelPosition 写入内联
-     left/top（clamp 在视口内），标题栏始终可见可拖；这里只保留安全区
-     与滚动隔离。 */
-  .kaleido-panel,
-  .kaleido-story-dialog {
-    overscroll-behavior: contain;
-  }
-
-  .kaleido-panel__body {
-    padding-bottom: calc(16px + env(safe-area-inset-bottom));
-    overscroll-behavior: contain;
-  }
-
-  .kaleido-panel__footer {
-    padding-bottom: calc(7px + env(safe-area-inset-bottom));
-  }
-
-  /* ---------- 剧情脉络工作台：安全区（浮窗与面板一致，标题栏不叠加顶部 inset） ---------- */
-  .kaleido-story-dialog__body {
-    padding-bottom: calc(8px + env(safe-area-inset-bottom));
-    overscroll-behavior: contain;
-  }
-
-  .kaleido-story-dialog__editor {
-    padding-bottom: calc(12px + env(safe-area-inset-bottom));
-  }
-
-  .kaleido-story__tree-body,
-  .kaleido-log__list {
-    overscroll-behavior: contain;
-  }
-
-  /* ---------- iOS 聚焦自动放大防抖：表单控件字号提到 16px ---------- */
-  .kaleido-panel .kaleido-input,
-  .kaleido-story-dialog .kaleido-input {
-    font-size: 16px;
-  }
-
-  /* ---------- 触控目标放大 ---------- */
-  .kaleido-panel__back,
-  .kaleido-panel__close {
-    width: 34px;
-    height: 34px;
-    font-size: 15px;
-  }
-
-  .kaleido-home__log-btn {
-    width: 36px;
-    height: 36px;
-    font-size: 15px;
-  }
-
-  .kaleido-home__card {
-    padding: 13px 12px;
-  }
-
-  .kaleido-btn {
-    min-height: 40px;
-  }
-
-  .kaleido-icon-btn {
-    width: 38px;
-    height: 38px;
-    font-size: 15px;
-  }
-
-  .kaleido-story__row {
-    min-height: 42px;
-    /* 窄屏 + 深层缩进时动作按钮组放不下：允许行内换行，按钮组自动落到第二行 */
-    flex-wrap: wrap;
-    row-gap: 4px;
-  }
-
-  /* 名称保底宽度：即使按钮组换行后，节点/事件名称仍保持可读，不再被挤成 0 宽 */
-  .kaleido-story__row-name {
-    min-width: 60px;
-  }
-
-  .kaleido-story__row-actions {
-    gap: 4px;
-  }
-
-  /* 树区在移动端改为块级堆叠：行内换行（动作按钮落到第二行）时行高按内容增长，
-     不再被固定高度的 flex 父容器压成单行（避免第二行溢出行框） */
-  .kaleido-story__tree-body {
-    display: block;
-  }
-
-  .kaleido-story__tree-body > .kaleido-story__row {
-    margin-bottom: 4px;
-  }
-
-  .kaleido-story__icon-btn {
-    width: 32px;
-    height: 32px;
-    font-size: 13px;
-  }
-
-  .kaleido-story__chevron {
-    width: 30px;
-    height: 30px;
-    font-size: 13px;
-  }
-
-  .kaleido-story__switch {
-    width: 40px;
-    height: 22px;
-    border-radius: 11px;
-  }
-
-  .kaleido-story__switch-thumb {
-    top: 2px;
-    left: 2px;
-    width: 16px;
-    height: 16px;
-  }
-
-  .kaleido-story__switch:not(.is-off) .kaleido-story__switch-thumb {
-    transform: translateX(18px);
-  }
-
-  .kaleido-story__row-badge {
-    max-width: 96px;
-  }
-
-  /* 树缩进收敛：深层嵌套不再把行名挤没（盖过历史内联样式） */
-  .kaleido-story__row--node {
-    padding-left: calc(8px + var(--depth, 0) * 14px) !important;
-  }
-
-  .kaleido-story__row--script {
-    padding-left: calc(22px + var(--depth, 0) * 14px) !important;
-  }
-
-  /* ---------- 窄屏布局：头部 / 工具行换行 ---------- */
-  .kaleido-api__head {
-    flex-wrap: wrap;
-  }
-
-  .kaleido-api__status {
-    max-width: 100%;
-  }
-
-  .kaleido-log__tools {
-    flex-wrap: wrap;
-  }
-
-  .kaleido-log__tools .kaleido-log__search {
-    flex-basis: 100%;
-    order: -1;
-  }
-
-  .kaleido-log__tools .kaleido-log__max,
-  .kaleido-log__tools .kaleido-log__source {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .kaleido-log__list {
-    height: 42vh;
-    min-height: 180px;
-  }
-
-  .kaleido-preset__text {
-    min-height: 40vh;
-  }
-
-  /* ---------- 点按反馈：去掉蓝底高亮、禁止双击缩放 ---------- */
-  .kaleido-sphere,
-  .kaleido-panel__dialog,
-  .kaleido-story-dialog {
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .kaleido-panel .kaleido-btn,
-  .kaleido-panel .kaleido-icon-btn,
-  .kaleido-panel .kaleido-home__card,
-  .kaleido-panel .kaleido-home__log-btn,
-  .kaleido-panel .kaleido-log__chip,
-  .kaleido-panel .kaleido-log__action,
-  .kaleido-panel .kaleido-preset__tab,
-  .kaleido-story-dialog .kaleido-btn,
-  .kaleido-story-dialog .kaleido-icon-btn,
-  .kaleido-story-dialog .kaleido-story__icon-btn,
-  .kaleido-story-dialog .kaleido-story__chevron,
-  .kaleido-story-dialog .kaleido-story__switch {
-    touch-action: manipulation;
-  }
-}
-
-/* ---------- 触屏设备（hover 不可用）：复位粘滞的 hover 视觉 ---------- */
-@media (hover: none) {
-  .kaleido-sphere:hover {
-    transform: none;
-    filter: none;
-    box-shadow: 0 5px 12px rgba(59, 51, 42, 0.3);
-  }
-
-  .kaleido-panel__back:hover,
-  .kaleido-panel__close:hover {
-    transform: none;
-    background: transparent;
-    border-color: rgba(247, 241, 227, 0.5);
-  }
-
-  .kaleido-home__log-btn:hover {
-    transform: none;
-    box-shadow: none;
-    border-color: rgba(59, 51, 42, 0.3);
-  }
-
-  .kaleido-home__card:hover:not(:disabled) {
-    transform: none;
-    box-shadow: none;
-    border-color: rgba(59, 51, 42, 0.22);
-  }
-
-  .kaleido-btn:hover:not(:disabled) {
-    transform: none;
-    filter: none;
-    box-shadow: 0 2px 4px rgba(59, 51, 42, 0.3);
-  }
-
-  .kaleido-log__back:hover {
-    filter: none;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-  }
-
-  .kaleido-btn--ghost:hover:not(:disabled) {
-    background: transparent;
-    box-shadow: none;
-  }
-
-  .kaleido-icon-btn:hover {
-    transform: none;
-    border-color: rgba(59, 51, 42, 0.3);
-  }
-
-  .kaleido-preset__tab:hover,
-  .kaleido-log__chip:hover {
-    transform: none;
-    border-color: rgba(59, 51, 42, 0.3);
-  }
-
-  .kaleido-log__action:hover {
-    transform: none;
-    background: var(--k-paper-light);
-    border-color: rgba(59, 51, 42, 0.3);
-  }
-
-  .kaleido-story__row:hover {
-    box-shadow: none;
-    border-color: rgba(59, 51, 42, 0.16);
-  }
-
-  .kaleido-story__row-actions {
-    opacity: 1;
-  }
-
-  .kaleido-story__chevron:hover {
-    color: rgba(59, 51, 42, 0.55);
-    background: transparent;
-  }
-
-  .kaleido-story__icon-btn:hover {
-    color: rgba(59, 51, 42, 0.72);
-    background: transparent;
-    border-color: transparent;
-  }
-
-  .kaleido-story__add-menu-item:hover {
-    background: transparent;
-    color: var(--k-ink);
-  }
-}
-
 </style></head>
 <body>
 <div class="kaleido-panel is-open" aria-hidden="false">
