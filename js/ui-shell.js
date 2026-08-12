@@ -261,6 +261,89 @@ function initDraggablePanel(panel) {
   panel.dataset.dragReady = 'true';
 }
 
+// ---------- 剧情脉络工作台：与面板一致的浮窗定位（内联 left/top + 标题栏拖拽） ----------
+function clampStoryDialogPosition(dialog, left, top) {
+  const width = dialog?.offsetWidth || 540;
+  const height = dialog?.offsetHeight || 480;
+  const maxLeft = Math.max(0, window.innerWidth - width);
+  const maxTop = Math.max(0, window.innerHeight - height);
+  return {
+    left: Math.max(0, Math.min(left, maxLeft)),
+    top: Math.max(0, Math.min(top, maxTop)),
+  };
+}
+
+function setStoryDialogPosition(dialog, left, top) {
+  const inner = dialog?.querySelector('.kaleido-story-dialog__inner');
+  if (!dialog || !inner) return;
+  const next = clampStoryDialogPosition(inner, left, top);
+  inner.style.left = `${next.left}px`;
+  inner.style.top = `${next.top}px`;
+  inner.style.right = 'auto';
+  inner.style.bottom = 'auto';
+  inner.style.transform = 'none';
+  dialog.dataset.left = String(next.left);
+  dialog.dataset.top = String(next.top);
+  dialog.dataset.positioned = 'true';
+}
+
+function ensureStoryDialogPosition(dialog) {
+  const inner = dialog?.querySelector('.kaleido-story-dialog__inner');
+  if (!dialog || !inner) return;
+  const storedLeft = Number(dialog.dataset.left);
+  const storedTop = Number(dialog.dataset.top);
+  if (Number.isFinite(storedLeft) && Number.isFinite(storedTop)) {
+    setStoryDialogPosition(dialog, storedLeft, storedTop);
+    return;
+  }
+  const defaultLeft = Math.max(EDGE_GAP, window.innerWidth - inner.offsetWidth - EDGE_GAP);
+  const defaultTop = EDGE_GAP;
+  setStoryDialogPosition(dialog, defaultLeft, defaultTop);
+}
+
+function initDraggableStoryDialog(dialog) {
+  if (!dialog || dialog.dataset.dragReady === 'true') return;
+  const inner = dialog.querySelector('.kaleido-story-dialog__inner');
+  const handles = dialog.querySelectorAll('.kaleido-story-dialog__header');
+  if (!inner || handles.length === 0) return;
+
+  let dragState = null;
+
+  const stopDragging = () => {
+    dragState = null;
+    inner.classList.remove('is-dragging');
+  };
+
+  handles.forEach((handle) =>
+    handle.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0) return;
+      // 指针落在标题栏内的按钮上（导入/导出/关闭）时，不启动拖拽、不捕获指针，
+      // 否则 setPointerCapture 会把后续 click 重定向到标题栏，按钮点击失效。
+      const target = event.target;
+      if (target instanceof Element && typeof target.closest === 'function' && target.closest('button')) return;
+      // 用视觉位置（getBoundingClientRect）计算偏移：移动端居中布局带 transform，
+      // offsetLeft/offsetTop 是布局位置，会导致首帧跳动。
+      const rect = inner.getBoundingClientRect();
+      dragState = {
+        offsetX: event.clientX - rect.left,
+        offsetY: event.clientY - rect.top,
+      };
+      inner.classList.add('is-dragging');
+      handle.setPointerCapture?.(event.pointerId);
+      event.preventDefault();
+    }),
+  );
+
+  window.addEventListener('pointermove', (event) => {
+    if (!dragState) return;
+    setStoryDialogPosition(dialog, event.clientX - dragState.offsetX, event.clientY - dragState.offsetY);
+  });
+  window.addEventListener('pointerup', stopDragging);
+  window.addEventListener('pointercancel', stopDragging);
+  window.addEventListener('resize', () => ensureStoryDialogPosition(dialog));
+  dialog.dataset.dragReady = 'true';
+}
+
 function openPanel() {
   const panel = getPanel();
   if (!panel) return;

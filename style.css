@@ -668,26 +668,28 @@ select.kaleido-input {
   transform: scale(1.06);
 }
 
-/* ---------- 剧情脉络工作台（大窗口 / 树状） ---------- */
+/* ---------- 剧情脉络工作台（浮窗 / 树状，与面板一致） ---------- */
 .kaleido-story-dialog {
   position: fixed;
   inset: 0;
   z-index: 10001;
   display: none;
-  align-items: center;
-  justify-content: center;
   background: rgba(25, 19, 11, 0.42);
   pointer-events: auto;
 }
 
 .kaleido-story-dialog.is-open {
-  display: flex;
+  display: block;
 }
 
 .kaleido-story-dialog__inner {
-  width: min(920px, calc(100vw - 24px));
-  height: min(680px, calc(100vh - 24px));
-  height: min(680px, calc(100dvh - 24px));
+  position: fixed;
+  z-index: 1;
+  width: 540px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+  max-height: calc(100dvh - 24px);
+  margin: 0;
   display: flex;
   flex-direction: column;
   font-family: var(--k-font);
@@ -695,11 +697,15 @@ select.kaleido-input {
   color: var(--k-ink);
   background: var(--k-paper);
   border: 1.5px solid rgba(59, 51, 42, 0.85);
-  border-radius: 10px;
+  border-radius: 8px;
   box-shadow:
     0 16px 44px rgba(25, 19, 11, 0.45),
     0 0 0 1px rgba(184, 134, 47, 0.4);
   overflow: hidden;
+}
+
+.kaleido-story-dialog__inner.is-dragging {
+  cursor: grabbing;
 }
 
 .kaleido-story-dialog__header {
@@ -711,6 +717,13 @@ select.kaleido-input {
   padding: 10px 12px;
   background: linear-gradient(180deg, #4b4238, #3b332a);
   border-bottom: 2px solid var(--k-gold);
+  cursor: grab;
+  /* 触屏：禁止浏览器把标题栏手势接管为滚动/平移，否则拖动会收到 pointercancel */
+  touch-action: none;
+}
+
+.kaleido-story-dialog__header:active {
+  cursor: grabbing;
 }
 
 .kaleido-story-dialog__title {
@@ -1225,16 +1238,6 @@ select.kaleido-input {
 
 /* 小屏适配（手机端） */
 @media (max-width: 640px) {
-  .kaleido-story-dialog__inner {
-    width: 100vw;
-    height: 100vh;
-    height: 100dvh;
-    max-width: none;
-    max-height: none;
-    border-radius: 0;
-    border: none;
-  }
-
   .kaleido-story-dialog__header {
     flex-wrap: wrap;
     row-gap: 6px;
@@ -1951,11 +1954,7 @@ select.kaleido-input {
     padding-bottom: calc(7px + env(safe-area-inset-bottom));
   }
 
-  /* ---------- 剧情脉络工作台：安全区 ---------- */
-  .kaleido-story-dialog__header {
-    padding-top: calc(10px + env(safe-area-inset-top));
-  }
-
+  /* ---------- 剧情脉络工作台：安全区（浮窗与面板一致，标题栏不叠加顶部 inset） ---------- */
   .kaleido-story-dialog__body {
     padding-bottom: calc(8px + env(safe-area-inset-bottom));
     overscroll-behavior: contain;

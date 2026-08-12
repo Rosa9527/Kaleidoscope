@@ -531,6 +531,16 @@ runner.test('面板打开时始终以内联 left/top 定位（与 SoulLink 一�
   assert(!dialog.classList.contains('is-api-mode'), '不应再添加移动端尺寸模式');
 });
 
+runner.test('剧情脉络工作台打开时以内联 left/top 定位（与面板一致）', () => {
+  ui.openStoryWorkbench();
+  const inner = $('kaleido-story-dialog').querySelector('.kaleido-story-dialog__inner');
+  assert(inner.style.left !== '', '打开工作台后应写入内联 left');
+  assert(inner.style.top !== '', '打开工作台后应写入内联 top');
+  assert(inner.style.right === 'auto', '定位后 right 应为 auto');
+  assert(inner.style.bottom === 'auto', '定位后 bottom 应为 auto');
+  assert(inner.style.transform === 'none', '定位后 transform 应为 none');
+});
+
 runner.test('首页标语旁日志小图标打开系统日志视图', () => {
   click($('kaleido-home-log-button'));
   assert($('kaleido-log-view').classList.contains('is-active'), '日志视图应激活');

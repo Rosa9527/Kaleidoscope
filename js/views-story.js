@@ -45,6 +45,7 @@ function openStoryWorkbench() {
   closeStoryEditor();
   dialog.classList.add('is-open');
   dialog.setAttribute('aria-hidden', 'false');
+  ensureStoryDialogPosition(dialog);
   renderStoryTree();
   refreshHomeStoryStatus();
   logApp('debug', '剧情脉络工作台已打开');
@@ -642,6 +643,7 @@ function initStorySection() {
     </div>
   `;
   document.body.appendChild(dialog);
+  initDraggableStoryDialog(dialog);
 
   document.getElementById(STORY_ROOT_ADD_ID)?.addEventListener('click', (event) => {
     openStoryAddMenu(event.currentTarget, { root: true });
