@@ -518,6 +518,34 @@ runner.test('createPanel 创建预设模版视图与首页入口', () => {
   assert($('kaleido-preset-reset'), '预设视图应有恢复默认按钮');
 });
 
+runner.test('视图切换同步移动端尺寸模式且清除旧模式', () => {
+  ui.createPanel();
+  const dialog = $('kaleido-panel').querySelector('.kaleido-panel__dialog');
+  const modes = {
+    'kaleido-home-view': 'is-home-mode',
+    'kaleido-api-view': 'is-api-mode',
+    'kaleido-log-view': 'is-log-mode',
+    'kaleido-preset-view': 'is-preset-mode',
+    'kaleido-inject-view': 'is-inject-mode',
+  };
+
+  for (const [viewId, mode] of Object.entries(modes)) {
+    ui.showPanelView(viewId);
+    assert(dialog.classList.contains(mode), `${viewId} 应添加 ${mode}`);
+    for (const otherMode of Object.values(modes)) {
+      if (otherMode === mode) continue;
+      assert(!dialog.classList.contains(otherMode), `${viewId} 不应残留 ${otherMode}`);
+    }
+  }
+
+  ui.showPanelView('kaleido-home-view');
+  assert(dialog.classList.contains('is-home-mode'), '返回首页后应保留 is-home-mode');
+  for (const otherMode of Object.values(modes)) {
+    if (otherMode === 'is-home-mode') continue;
+    assert(!dialog.classList.contains(otherMode), `返回首页后不应残留 ${otherMode}`);
+  }
+});
+
 runner.test('首页标语旁日志小图标打开系统日志视图', () => {
   click($('kaleido-home-log-button'));
   assert($('kaleido-log-view').classList.contains('is-active'), '日志视图应激活');
