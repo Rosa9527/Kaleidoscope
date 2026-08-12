@@ -1,7 +1,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '0.7.9';
+const MODULE_VERSION = '0.7.10';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 
 // ---------- DOM ID / class ----------
@@ -81,6 +81,7 @@ const PRESET_GATE_STATUS_ID = 'kaleido-preset-gate-status';
 
 // 剧情脉络（Storyline）· 可视化工作台
 const STORY_DIALOG_ID = 'kaleido-story-dialog';
+const STORY_VIEW_ID = 'kaleido-story-view';
 const STORY_DIALOG_KEY = '__kaleido_story_dialog_key__';
 const STORY_CLOSE_BTN_ID = 'kaleido-story-close-btn';
 const HOME_STORY_CARD_ID = 'kaleido-home-story-card';
@@ -324,12 +325,14 @@ const PANEL_VIEW_TITLES = Object.freeze({
   [LOG_VIEW_ID]: '系统日志',
   [PRESET_VIEW_ID]: '预设模版',
   [INJECT_VIEW_ID]: '注入实录',
+  [STORY_VIEW_ID]: '剧情脉络',
 });
 // 宽视图模式：日志视图需要更宽的窗口展示时间/级别/来源/内容。
 const PANEL_WIDE_MODES = Object.freeze({
   [LOG_VIEW_ID]: 'is-log-mode',
   [PRESET_VIEW_ID]: 'is-preset-mode',
   [INJECT_VIEW_ID]: 'is-inject-mode',
+  [STORY_VIEW_ID]: 'is-story-mode',
 });
 const ESC_KEY_HANDLER_KEY = '__kaleido_esc_key_handler__';
 const MENU_RECOVERY_OBSERVER_KEY = '__kaleido_menu_recovery_observer__';

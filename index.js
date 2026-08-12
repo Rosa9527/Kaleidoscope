@@ -2,7 +2,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '0.7.9';
+const MODULE_VERSION = '0.7.10';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 
 // ---------- DOM ID / class ----------
@@ -82,6 +82,7 @@ const PRESET_GATE_STATUS_ID = 'kaleido-preset-gate-status';
 
 // 剧情脉络（Storyline）· 可视化工作台
 const STORY_DIALOG_ID = 'kaleido-story-dialog';
+const STORY_VIEW_ID = 'kaleido-story-view';
 const STORY_DIALOG_KEY = '__kaleido_story_dialog_key__';
 const STORY_CLOSE_BTN_ID = 'kaleido-story-close-btn';
 const HOME_STORY_CARD_ID = 'kaleido-home-story-card';
@@ -325,12 +326,14 @@ const PANEL_VIEW_TITLES = Object.freeze({
   [LOG_VIEW_ID]: '系统日志',
   [PRESET_VIEW_ID]: '预设模版',
   [INJECT_VIEW_ID]: '注入实录',
+  [STORY_VIEW_ID]: '剧情脉络',
 });
 // 宽视图模式：日志视图需要更宽的窗口展示时间/级别/来源/内容。
 const PANEL_WIDE_MODES = Object.freeze({
   [LOG_VIEW_ID]: 'is-log-mode',
   [PRESET_VIEW_ID]: 'is-preset-mode',
   [INJECT_VIEW_ID]: 'is-inject-mode',
+  [STORY_VIEW_ID]: 'is-story-mode',
 });
 const ESC_KEY_HANDLER_KEY = '__kaleido_esc_key_handler__';
 const MENU_RECOVERY_OBSERVER_KEY = '__kaleido_menu_recovery_observer__';
@@ -1410,6 +1413,10 @@ function showPanelView(viewId) {
   if (viewId === INJECT_VIEW_ID) {
     renderInjectView();
   }
+  if (viewId === STORY_VIEW_ID) {
+    renderStoryTree();
+    refreshHomeStoryStatus();
+  }
   ensurePanelPosition(panel);
 }
 
@@ -1417,7 +1424,10 @@ function initPanelViews(panel) {
   if (!panel || panel.dataset.viewsReady === 'true') return;
   document.getElementById(PANEL_BACK_ID)?.addEventListener('click', () => showPanelView(HOME_VIEW_ID));
   document.getElementById(HOME_API_CARD_ID)?.addEventListener('click', () => showPanelView(API_VIEW_ID));
-  document.getElementById(HOME_STORY_CARD_ID)?.addEventListener('click', () => openStoryWorkbench());
+  document.getElementById(HOME_STORY_CARD_ID)?.addEventListener('click', () => {
+    if (isNarrowViewport()) showPanelView(STORY_VIEW_ID);
+    else openStoryWorkbench();
+  });
   document.getElementById(HOME_LOG_BUTTON_ID)?.addEventListener('click', () => showPanelView(LOG_VIEW_ID));
   document.getElementById(HOME_PRESET_CARD_ID)?.addEventListener('click', () => showPanelView(PRESET_VIEW_ID));
   document.getElementById(HOME_INJECT_CARD_ID)?.addEventListener('click', () => showPanelView(INJECT_VIEW_ID));
@@ -1641,7 +1651,7 @@ function createPanel() {
   initDraggablePanel(panel);
   initPanelViews(panel);
   initApiSection(panel);
-  initStorySection();
+  initStorySection(panel);
   initLogView(panel);
   initPresetSection(panel);
   panel.querySelector('.kaleido-panel__close')?.addEventListener('click', closePanel);
@@ -5076,24 +5086,15 @@ function handleStoryExportScript(script) {
 }
 
 // ---------- 初始化 ----------
-function initStorySection() {
-  if (getStoryWorkbench()) return;
-  const dialog = document.createElement('div');
-  dialog.id = STORY_DIALOG_ID;
-  dialog.className = 'kaleido-story-dialog';
-  dialog.setAttribute('aria-hidden', 'true');
-  dialog.innerHTML = `
-    <div class="kaleido-story-dialog__inner" role="dialog" aria-label="剧情脉络工作台">
-      <div class="kaleido-story-dialog__header">
-        <span class="kaleido-story-dialog__title"><span class="${STORY_ICON_CLASS}"></span> 剧情脉络</span>
-        <span id="${STORY_BINDING_ID}" class="kaleido-story__binding" data-state="idle" title="剧情数据与角色卡绑定状态">未绑定角色</span>
-        <div class="kaleido-story-dialog__toolbar">
-          <button type="button" id="${STORY_IMPORT_BTN_ID}" class="kaleido-btn kaleido-btn--mini">导入 剧情脉络</button>
-          <button type="button" id="${STORY_EXPORT_BTN_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--ghost">导出 剧情脉络</button>
-          <button type="button" id="${STORY_CLOSE_BTN_ID}" class="kaleido-icon-btn" title="关闭工作台" aria-label="关闭工作台">✕</button>
-        </div>
-      </div>
-      <div class="kaleido-story-dialog__body">
+// ---------- 手机端 / 电脑端分流 ----------
+function isNarrowViewport() {
+  return Boolean(window.matchMedia && window.matchMedia('(max-width: 640px)').matches);
+}
+
+// 工作台内容模板（树区 + 编辑器 + 导入方式 + 新建菜单 + 文件输入）：
+// 电脑端大窗口对话框与手机端面板视图共用，仅编辑器浮层类名不同。
+function buildStoryContentHTML(editorClass) {
+  return `
         <div id="${STORY_TREE_ID}" class="kaleido-story__tree">
           <div class="kaleido-story__tree-actions">
             <button type="button" id="${STORY_ROOT_ADD_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--primary" title="新建节点或事件">＋ 新建</button>
@@ -5101,7 +5102,7 @@ function initStorySection() {
           </div>
           <div id="${STORY_TREE_BODY_ID}" class="kaleido-story__tree-body"></div>
         </div>
-        <div id="${STORY_EDITOR_ID}" class="kaleido-story-dialog__editor" hidden>
+        <div id="${STORY_EDITOR_ID}" class="${editorClass}" hidden>
           <div class="kaleido-story__editor-head">
             <span id="${STORY_EDITOR_TITLE_ID}" class="kaleido-story__editor-title">新建节点</span>
             <span class="kaleido-story__editor-spacer"></span>
@@ -5157,40 +5158,36 @@ function initStorySection() {
             <button type="button" id="${STORY_EDITOR_SAVE_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--primary">保存</button>
           </div>
         </div>
-      </div>
-      <div id="${STORY_IMPORT_MODE_ID}" class="kaleido-story__import-mode" hidden role="dialog" aria-label="选择导入方式">
-        <div class="kaleido-story__import-mode-card">
-          <div class="kaleido-story__import-mode-title">选择导入方式</div>
-          <div id="${STORY_IMPORT_MODE_DESC_ID}" class="kaleido-story__import-mode-desc"></div>
-          <div class="kaleido-story__import-mode-actions">
-            <button type="button" id="${STORY_IMPORT_MODE_MERGE_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--primary" title="同 id 条目更新，其余追加">🔀 合并导入</button>
-            <button type="button" id="${STORY_IMPORT_MODE_REPLACE_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--ghost" title="清空当前剧情脉络后整体替换">📦 覆盖导入</button>
+        <div id="${STORY_IMPORT_MODE_ID}" class="kaleido-story__import-mode" hidden role="dialog" aria-label="选择导入方式">
+          <div class="kaleido-story__import-mode-card">
+            <div class="kaleido-story__import-mode-title">选择导入方式</div>
+            <div id="${STORY_IMPORT_MODE_DESC_ID}" class="kaleido-story__import-mode-desc"></div>
+            <div class="kaleido-story__import-mode-actions">
+              <button type="button" id="${STORY_IMPORT_MODE_MERGE_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--primary" title="同 id 条目更新，其余追加">🔀 合并导入</button>
+              <button type="button" id="${STORY_IMPORT_MODE_REPLACE_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--ghost" title="清空当前剧情脉络后整体替换">📦 覆盖导入</button>
+            </div>
           </div>
         </div>
-      </div>
-      <div id="${STORY_ADD_MENU_ID}" class="kaleido-story__add-menu" hidden role="menu" aria-label="新建">
-        <button type="button" id="${STORY_ADD_MENU_NODE_ID}" class="kaleido-story__add-menu-item" role="menuitem" data-kind="node">
-          <span class="${STORY_NODE_ICON_CLASS}"></span> 新建节点
-        </button>
-        <button type="button" id="${STORY_ADD_MENU_SCRIPT_ID}" class="kaleido-story__add-menu-item" role="menuitem" data-kind="script">
-          <span class="${STORY_SCRIPT_ICON_CLASS}"></span> 新建事件
-        </button>
-      </div>
-      <input id="${STORY_IMPORT_INPUT_ID}" type="file" accept=".yaml,.yml,text/yaml,application/x-yaml" hidden />
-      <input id="${STORY_IMPORT_SCRIPT_INPUT_ID}" type="file" accept=".yaml,.yml,text/yaml,application/x-yaml" hidden />
-    </div>
+        <div id="${STORY_ADD_MENU_ID}" class="kaleido-story__add-menu" hidden role="menu" aria-label="新建">
+          <button type="button" id="${STORY_ADD_MENU_NODE_ID}" class="kaleido-story__add-menu-item" role="menuitem" data-kind="node">
+            <span class="${STORY_NODE_ICON_CLASS}"></span> 新建节点
+          </button>
+          <button type="button" id="${STORY_ADD_MENU_SCRIPT_ID}" class="kaleido-story__add-menu-item" role="menuitem" data-kind="script">
+            <span class="${STORY_SCRIPT_ICON_CLASS}"></span> 新建事件
+          </button>
+        </div>
+        <input id="${STORY_IMPORT_INPUT_ID}" type="file" accept=".yaml,.yml,text/yaml,application/x-yaml" hidden />
+        <input id="${STORY_IMPORT_SCRIPT_INPUT_ID}" type="file" accept=".yaml,.yml,text/yaml,application/x-yaml" hidden />
   `;
-  document.body.appendChild(dialog);
+}
 
+// 内容事件绑定（对话框与面板视图共用）：新建菜单、导入导出、树操作、编辑器。
+function bindStoryContentEvents() {
   document.getElementById(STORY_ROOT_ADD_ID)?.addEventListener('click', (event) => {
     openStoryAddMenu(event.currentTarget, { root: true });
   });
   document.getElementById(STORY_ADD_MENU_NODE_ID)?.addEventListener('click', () => handleStoryAddMenuPick('node'));
   document.getElementById(STORY_ADD_MENU_SCRIPT_ID)?.addEventListener('click', () => handleStoryAddMenuPick('script'));
-  document.getElementById(STORY_CLOSE_BTN_ID)?.addEventListener('click', closeStoryWorkbench);
-  dialog.addEventListener('click', (event) => {
-    if (event.target === dialog) closeStoryWorkbench();
-  });
 
   document.getElementById(STORY_IMPORT_BTN_ID)?.addEventListener('click', () => {
     storyImportTargetNodeId = '';
@@ -5301,13 +5298,6 @@ function initStorySection() {
   document.getElementById(STORY_EDITOR_SAVE_ID)?.addEventListener('click', saveStoryEditor);
   document.getElementById(STORY_EDITOR_EXPORT_ID)?.addEventListener('click', handleStoryEditorExport);
 
-  if (!globalThis[STORY_DIALOG_KEY]) {
-    globalThis[STORY_DIALOG_KEY] = (event) => {
-      if (event.key !== 'Escape') return;
-      if (isStoryWorkbenchOpen()) closeStoryWorkbench();
-    };
-    document.addEventListener('keydown', globalThis[STORY_DIALOG_KEY]);
-  }
   if (!globalThis[STORY_ADD_MENU_KEY]) {
     globalThis[STORY_ADD_MENU_KEY] = (event) => {
       const menu = document.getElementById(STORY_ADD_MENU_ID);
@@ -5320,6 +5310,73 @@ function initStorySection() {
       closeStoryAddMenu();
     };
     document.addEventListener('click', globalThis[STORY_ADD_MENU_KEY]);
+  }
+}
+
+// ---------- 电脑端：独立大窗口工作台（全屏遮罩 + 920×680） ----------
+function initStoryWorkbench() {
+  if (getStoryWorkbench()) return;
+  const dialog = document.createElement('div');
+  dialog.id = STORY_DIALOG_ID;
+  dialog.className = 'kaleido-story-dialog';
+  dialog.setAttribute('aria-hidden', 'true');
+  dialog.innerHTML = `
+    <div class="kaleido-story-dialog__inner" role="dialog" aria-label="剧情脉络工作台">
+      <div class="kaleido-story-dialog__header">
+        <span class="kaleido-story-dialog__title"><span class="${STORY_ICON_CLASS}"></span> 剧情脉络</span>
+        <span id="${STORY_BINDING_ID}" class="kaleido-story__binding" data-state="idle" title="剧情数据与角色卡绑定状态">未绑定角色</span>
+        <div class="kaleido-story-dialog__toolbar">
+          <button type="button" id="${STORY_IMPORT_BTN_ID}" class="kaleido-btn kaleido-btn--mini">导入 剧情脉络</button>
+          <button type="button" id="${STORY_EXPORT_BTN_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--ghost">导出 剧情脉络</button>
+          <button type="button" id="${STORY_CLOSE_BTN_ID}" class="kaleido-icon-btn" title="关闭工作台" aria-label="关闭工作台">✕</button>
+        </div>
+      </div>
+      <div class="kaleido-story-dialog__body">
+${buildStoryContentHTML('kaleido-story-dialog__editor')}
+      </div>
+    </div>
+  `;
+  document.body.appendChild(dialog);
+  bindStoryContentEvents();
+  document.getElementById(STORY_CLOSE_BTN_ID)?.addEventListener('click', closeStoryWorkbench);
+  dialog.addEventListener('click', (event) => {
+    if (event.target === dialog) closeStoryWorkbench();
+  });
+  if (!globalThis[STORY_DIALOG_KEY]) {
+    globalThis[STORY_DIALOG_KEY] = (event) => {
+      if (event.key !== 'Escape') return;
+      if (isStoryWorkbenchOpen()) closeStoryWorkbench();
+    };
+    document.addEventListener('keydown', globalThis[STORY_DIALOG_KEY]);
+  }
+}
+
+// ---------- 手机端：面板内视图（与其它功能一致，共用面板标题栏与返回键） ----------
+function initStoryPanelView(panel) {
+  if (!panel || document.getElementById(STORY_VIEW_ID)) return;
+  const section = document.createElement('section');
+  section.id = STORY_VIEW_ID;
+  section.className = 'kaleido-view kaleido-story-view';
+  section.setAttribute('aria-hidden', 'true');
+  section.innerHTML = `
+    <div class="kaleido-story__toolbar">
+      <span id="${STORY_BINDING_ID}" class="kaleido-story__binding" data-state="idle" title="剧情数据与角色卡绑定状态">未绑定角色</span>
+      <div class="kaleido-story__toolbar-actions">
+        <button type="button" id="${STORY_IMPORT_BTN_ID}" class="kaleido-btn kaleido-btn--mini">导入 剧情脉络</button>
+        <button type="button" id="${STORY_EXPORT_BTN_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--ghost">导出 剧情脉络</button>
+      </div>
+    </div>
+${buildStoryContentHTML('kaleido-story__editor')}
+  `;
+  panel.querySelector('.kaleido-panel__body')?.appendChild(section);
+  bindStoryContentEvents();
+}
+
+function initStorySection(panel) {
+  if (isNarrowViewport()) {
+    initStoryPanelView(panel);
+  } else {
+    initStoryWorkbench();
   }
 }
 

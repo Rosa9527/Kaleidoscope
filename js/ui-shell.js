@@ -315,6 +315,10 @@ function showPanelView(viewId) {
   if (viewId === INJECT_VIEW_ID) {
     renderInjectView();
   }
+  if (viewId === STORY_VIEW_ID) {
+    renderStoryTree();
+    refreshHomeStoryStatus();
+  }
   ensurePanelPosition(panel);
 }
 
@@ -322,7 +326,10 @@ function initPanelViews(panel) {
   if (!panel || panel.dataset.viewsReady === 'true') return;
   document.getElementById(PANEL_BACK_ID)?.addEventListener('click', () => showPanelView(HOME_VIEW_ID));
   document.getElementById(HOME_API_CARD_ID)?.addEventListener('click', () => showPanelView(API_VIEW_ID));
-  document.getElementById(HOME_STORY_CARD_ID)?.addEventListener('click', () => openStoryWorkbench());
+  document.getElementById(HOME_STORY_CARD_ID)?.addEventListener('click', () => {
+    if (isNarrowViewport()) showPanelView(STORY_VIEW_ID);
+    else openStoryWorkbench();
+  });
   document.getElementById(HOME_LOG_BUTTON_ID)?.addEventListener('click', () => showPanelView(LOG_VIEW_ID));
   document.getElementById(HOME_PRESET_CARD_ID)?.addEventListener('click', () => showPanelView(PRESET_VIEW_ID));
   document.getElementById(HOME_INJECT_CARD_ID)?.addEventListener('click', () => showPanelView(INJECT_VIEW_ID));
@@ -546,7 +553,7 @@ function createPanel() {
   initDraggablePanel(panel);
   initPanelViews(panel);
   initApiSection(panel);
-  initStorySection();
+  initStorySection(panel);
   initLogView(panel);
   initPresetSection(panel);
   panel.querySelector('.kaleido-panel__close')?.addEventListener('click', closePanel);

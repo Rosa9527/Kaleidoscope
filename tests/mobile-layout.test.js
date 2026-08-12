@@ -55,5 +55,14 @@ assert(/max-width:\s*calc\(100vw - 24px\)/.test(firstStoryMobileRule[1]), '剧�
 assert(/max-height:\s*calc\(100dvh - 24px\)/.test(firstStoryMobileRule[1]), '剧情脉络移动端规则应包含 max-height:calc(100dvh - 24px)');
 assert(!/\bwidth\s*:\s*100vw\b/.test(firstStoryMobileRule[1]), '剧情脉络移动端规则不应再全屏 width:100vw');
 assert(!/\bheight\s*:\s*100dvh\b/.test(firstStoryMobileRule[1]), '剧情脉络移动端规则不应再全屏 height:100dvh');
+// 手机端剧情脉络与其它功能一致：面板内视图（由主页切换进入），不再使用独立对话框。
+assert(constants.includes("const STORY_VIEW_ID = 'kaleido-story-view';"), 'js/constants.js 应定义 STORY_VIEW_ID');
+assert(constants.includes("[STORY_VIEW_ID]: '剧情脉络'"), 'js/constants.js 应登记剧情脉络视图标题');
+assert(constants.includes("[STORY_VIEW_ID]: 'is-story-mode'"), 'js/constants.js 应登记剧情脉络宽视图模式');
+assert(shell.includes('isNarrowViewport()'), 'js/ui-shell.js 应按视口分流剧情脉络入口');
+assert(shell.includes('showPanelView(STORY_VIEW_ID)'), 'js/ui-shell.js 手机端应走面板视图');
+assert(/\.kaleido-story-view\s*\{[^}]*flex-direction:\s*column/.test(style), 'style.css 应有 .kaleido-story-view 布局');
+assert(/\.kaleido-panel__dialog\.is-story-mode\s*\{\s*width:\s*540px/.test(style), 'style.css 应有 is-story-mode 540px 宽视图');
+assert(/\.kaleido-story__editor\s*\{/.test(style), 'style.css 应有视图内编辑器样式');
 
 console.log('移动端面板定位静态检查通过');

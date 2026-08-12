@@ -668,6 +668,48 @@ select.kaleido-input {
   transform: scale(1.06);
 }
 
+/* ---------- 剧情脉络 · 手机端面板内视图（与其它功能一致） ---------- */
+.kaleido-story-view {
+  position: relative;
+  display: none;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.kaleido-story-view.is-active {
+  display: flex;
+}
+.kaleido-story__toolbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: linear-gradient(180deg, #4b4238, #3b332a);
+  border-bottom: 2px solid var(--k-gold);
+}
+.kaleido-story__toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.kaleido-story__editor {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: var(--k-paper);
+  border-top: 3px solid var(--k-cinnabar);
+  overflow-y: auto;
+  z-index: 2;
+}
+
 /* ---------- 剧情脉络工作台（大窗口 / 树状） ---------- */
 .kaleido-story-dialog {
   position: fixed;
@@ -1146,6 +1188,7 @@ select.kaleido-input {
 /* 编辑器（桌面：右侧浮层；移动端：全幅覆盖） */
 /* hidden 属性必须压过 display 规则，否则编辑器 / 导出按钮会关不掉、常显 */
 .kaleido-story-dialog__editor[hidden],
+.kaleido-story__editor[hidden],
 .kaleido-btn[hidden],
 .kaleido-story__add-menu[hidden] {
   display: none !important;
@@ -1256,6 +1299,11 @@ select.kaleido-input {
     padding: 8px;
   }
 
+  .kaleido-story__toolbar {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
   .kaleido-story__tree-body {
     min-height: 40vh;
   }
@@ -1287,6 +1335,10 @@ select.kaleido-input {
 /* ---------- 页脚 ---------- *//* ---------- 页脚 ---------- */
 /* ---------- 预设模版视图 ---------- */
 .kaleido-panel__dialog.is-preset-mode {
+  width: 540px;
+}
+
+.kaleido-panel__dialog.is-story-mode {
   width: 540px;
 }
 
