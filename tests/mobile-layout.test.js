@@ -71,4 +71,10 @@ assert(
   'style.css 手机端应隐藏变量系统导航项图标',
 );
 
+// 手机端游戏模式：档案封面保持单行（题签「游戏档案」+ 刷新 + 返回主页图标不换行）。
+assert(
+  /\.kaleido-game__cover\s*\{[^}]*flex-wrap:\s*nowrap/.test(lastMobileStyle),
+  'style.css 手机端 .kaleido-game__cover 应保持单行 flex-wrap: nowrap',
+);
+
 console.log('移动端面板定位静态检查通过');

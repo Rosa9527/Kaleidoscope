@@ -3637,17 +3637,28 @@ select.kaleido-input {
   }
 
   /* ---------- 游戏模式：移动端适配 ---------- */
+  /* 档案封面保持单行：题签「游戏档案」+ 刷新 + 返回主页图标不换行 */
   .kaleido-game__cover {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    gap: 8px;
     padding: 11px 12px;
   }
 
+  /* 题签不换行；最近更新时间放不下时省略号截断，而不是把按钮挤到下一行 */
+  .kaleido-game__cover-title {
+    white-space: nowrap;
+  }
+
   .kaleido-game__cover-updated {
-    max-width: 220px;
+    max-width: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .kaleido-game__refresh {
     margin-left: auto;
+    padding: 6px 10px;
   }
 
   .kaleido-game__entry-name,
