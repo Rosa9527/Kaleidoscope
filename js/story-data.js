@@ -617,7 +617,9 @@ function parseYamlList(state, minIndent) {
 function parseYamlSubset(text) {
   const state = {
     index: 0,
-    lines: String(text || '').replace(/\r\n?/g, '\n').split('\n'),
+    // 支持 ```yaml 代码块围栏（与 parseAgentJson 一致）：只剥离顶格围栏行，
+    // 缩进的围栏是块文本内容（如剧情里的 markdown），必须原样保留。
+    lines: String(text || '').replace(/\r\n?/g, '\n').split('\n').filter((line) => !/^```/.test(line)),
   };
   while (
     state.index < state.lines.length

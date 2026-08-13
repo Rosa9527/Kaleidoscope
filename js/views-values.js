@@ -145,7 +145,8 @@ function setValuesLayer(layer) {
   renderValuesTree();
 }
 
-// 层相关 UI 联动：自动维护 / 重置按钮只属于游戏值层；默认值层只提示手动修改。
+// 层相关 UI 联动：自动维护 / 重置按钮只属于游戏值层；新建按钮只属于默认值层
+// （游戏值层是 AI 维护的数据，只允许修改，不允许新建 / 删除条目）；默认值层只提示手动修改。
 function syncValuesLayerUI() {
   const isGame = valuesActiveLayer === 'game';
   const maintainNow = document.getElementById(VALUES_MAINTAIN_NOW_ID);
@@ -153,10 +154,12 @@ function syncValuesLayerUI() {
   const status = document.getElementById(VALUES_MAINTAIN_STATUS_ID);
   const hint = document.getElementById(VALUES_DEFAULT_HINT_ID);
   const injectBar = document.getElementById(VALUES_INJECT_BAR_ID);
+  const addRoot = document.getElementById(VALUES_ADD_ROOT_ID);
   if (maintainNow) maintainNow.hidden = !isGame;
   if (resetBtn) resetBtn.hidden = !isGame;
   if (status) status.hidden = !isGame;
   if (hint) hint.hidden = isGame;
+  if (addRoot) addRoot.hidden = isGame;
   // 注入提示词条只属于「默认数值」层（勾选配置随角色卡保存）。
   if (injectBar) injectBar.hidden = isGame;
 }
@@ -268,6 +271,8 @@ function buildValuesRow(path, name, node, depth) {
       : `已注册变量 · 变化规则：${registered.rule || '（未填写规则）'}`)
     : '';
   const isNode = valuesIsContainer(node);
+  // 游戏值层是 AI 维护的数据：只允许修改，不渲染新建菜单与删除按钮。
+  const isGameLayer = valuesActiveLayer === 'game';
   // 注入勾选框：只在「默认数值」层显示（配置随角色卡保存）。
   const injectConfig = valuesActiveLayer === 'default' ? getValuesInjectConfig(ctx) : null;
   const pathKey = path.join('/');
@@ -294,9 +299,9 @@ function buildValuesRow(path, name, node, depth) {
       <span class="kaleido-values__row-name" title="节点：可继续嵌套节点或挂变量">${escapeHtml(name)}</span>
       <span class="kaleido-values__row-count">${count} 项</span>
       <span class="kaleido-values__row-actions">
-        <button type="button" class="kaleido-values__icon-btn" data-action="add-menu" title="新建子节点 / 变量" aria-label="新建子节点 / 变量"><span class="${VALUES_ADD_CHILD_ICON_CLASS}"></span></button>
+        ${isGameLayer ? '' : `<button type="button" class="kaleido-values__icon-btn" data-action="add-menu" title="新建子节点 / 变量" aria-label="新建子节点 / 变量"><span class="${VALUES_ADD_CHILD_ICON_CLASS}"></span></button>`}
         <button type="button" class="kaleido-values__icon-btn" data-action="edit" title="编辑节点" aria-label="编辑节点"><span class="${VALUES_EDIT_ICON_CLASS}"></span></button>
-        <button type="button" class="kaleido-values__icon-btn kaleido-values__icon-btn--danger" data-action="delete" title="删除节点" aria-label="删除节点"><span class="${VALUES_DELETE_ICON_CLASS}"></span></button>
+        ${isGameLayer ? '' : `<button type="button" class="kaleido-values__icon-btn kaleido-values__icon-btn--danger" data-action="delete" title="删除节点" aria-label="删除节点"><span class="${VALUES_DELETE_ICON_CLASS}"></span></button>`}
       </span>
     `;
     const injectCheck = row.querySelector('button[data-inject-toggle]');
@@ -320,7 +325,7 @@ function buildValuesRow(path, name, node, depth) {
     <span class="kaleido-values__row-value" title="${escapeHtml(formatValuesLeafText(node))}">${escapeHtml(formatValuesLeafText(node))}</span>
     <span class="kaleido-values__row-actions">
       ${editButton}
-      <button type="button" class="kaleido-values__icon-btn kaleido-values__icon-btn--danger" data-action="delete" title="删除变量" aria-label="删除变量"><span class="${VALUES_DELETE_ICON_CLASS}"></span></button>
+      ${isGameLayer ? '' : `<button type="button" class="kaleido-values__icon-btn kaleido-values__icon-btn--danger" data-action="delete" title="删除变量" aria-label="删除变量"><span class="${VALUES_DELETE_ICON_CLASS}"></span></button>`}
     </span>
   `;
   const injectCheck = row.querySelector('button[data-inject-toggle]');
@@ -381,9 +386,14 @@ function renderValuesTree() {
   body.innerHTML = '';
   const hasEntries = Object.keys(valuesActiveTree).length > 0;
   if (!hasEntries) {
-    const emptyText = valuesActiveLayer === 'game' && !isValuesGameInitialized(ctx)
-      ? '游戏值尚未初始化：默认值会在首次修改或 AI 维护后写入聊天文件。\n现在显示的是当前角色卡的默认值。'
-      : '还没有节点。点击上方「＋ 新建」新建节点或变量；\n节点可层层嵌套，变量挂在节点下。';
+    let emptyText;
+    if (valuesActiveLayer === 'game' && !isValuesGameInitialized(ctx)) {
+      emptyText = '游戏值尚未初始化：默认值会在首次修改或 AI 维护后写入聊天文件。\n现在显示的是当前角色卡的默认值。';
+    } else if (valuesActiveLayer === 'game') {
+      emptyText = '游戏值还没有条目：请在「默认数值」层新建，\n或等 AI 维护按注册规则自动建立。';
+    } else {
+      emptyText = '还没有节点。点击上方「＋ 新建」新建节点或变量；\n节点可层层嵌套，变量挂在节点下。';
+    }
     body.appendChild(buildValuesEmpty(emptyText));
     return;
   }

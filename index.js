@@ -2,7 +2,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.0.4';
+const MODULE_VERSION = '1.0.5';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 
 // ---------- DOM ID / class ----------
@@ -523,7 +523,7 @@ const DEFAULT_VALUES_MAINTAIN_PROMPT = [
   '【输入】',
   '本轮输入包含三份材料：',
   '- <Key_Rules>：全部已注册变量及其变化规则。规则是变量变化的唯一依据，规则之外的变量不要随意改动。',
-  '- <Current_Values>：当前游戏变量（YAML 格式）。这是唯一可改动的数据，结构、条目名与层级必须原样保留。',
+  '- <Current_Values>：当前游戏变量（YAML 格式，仅含父变量；子变量为派生变量由系统自动计算，不要输出子变量）。这是唯一可改动的数据，结构、条目名与层级必须原样保留。',
   '- <Recent_Messages>：最新两条消息（用户消息 + AI 回复），是本轮维护的依据。',
   '',
   '【维护原则】',
@@ -532,12 +532,22 @@ const DEFAULT_VALUES_MAINTAIN_PROMPT = [
   '3. 消息中没有明确体现的变化不要改；拿不准时保持不变，宁可漏更也不可乱更。',
   '4. 保持结构与命名：顶层条目（人名、资源名）与层级不要删除、改名或合并，除非剧情明确要求；只更新叶子值。',
   '5. 变量必须是 YAML 标量（数字 / 字符串 / 布尔）：数字保留变量形态，字符串按剧情原样书写。',
+  '6. 子变量是派生变量：<Current_Values> 中不会出现子变量，输出中也一律不要出现子变量，子变量由系统按父变量自动计算。',
   '',
   '【输出】',
-  '你的回复必须且只能是一个 YAML 映射（可用 ```yaml 代码块包裹），内容为更新后的变量树：',
+  '你的回复必须且只能是一个 YAML 映射（可用 ```yaml 代码块包裹），内容是本次需要更新的变量：只列出有变化的键，不是完整变量树。',
   '- 只列出确实需要更新的变量；未提及的变量保持原值不动。',
   '- 需要删除某个变量时，把它的值写成 null。',
   '- 不要输出解释、备注或任何前后缀文字。',
+  '',
+  '【示例】',
+  '剧情中「艾莉」的金币从 100 变为 110、好感从 30 变为 40，其余变量不变，则回复：',
+  '```yaml',
+  '艾莉:',
+  '  金币: 110',
+  '  好感: 40',
+  '```',
+  '示例仅为格式演示：实际键名与数值以 <Key_Rules> 中的规则和本轮剧情为准。',
 ].join('\n');
 
 // ---------- 预设模版 ----------
@@ -4376,7 +4386,9 @@ function parseYamlList(state, minIndent) {
 function parseYamlSubset(text) {
   const state = {
     index: 0,
-    lines: String(text || '').replace(/\r\n?/g, '\n').split('\n'),
+    // 支持 ```yaml 代码块围栏（与 parseAgentJson 一致）：只剥离顶格围栏行，
+    // 缩进的围栏是块文本内容（如剧情里的 markdown），必须原样保留。
+    lines: String(text || '').replace(/\r\n?/g, '\n').split('\n').filter((line) => !/^```/.test(line)),
   };
   while (
     state.index < state.lines.length
@@ -6310,6 +6322,30 @@ function deriveValuesChildAt(tree, path, childKey) {
   return false;
 }
 
+// 剔除树中所有已注册子变量叶子（返回新树，不修改入参）：仅按叶子名匹配，
+// 容器与父变量原样保留。用于 AI 维护：发给 AI 的值表只含父变量，子变量是
+// 派生变量由系统计算，不发送也不允许 AI 改动。
+function stripValuesChildLeaves(tree, keys) {
+  const childNames = new Set();
+  for (const key of Array.isArray(keys) ? keys : []) {
+    if (isValuesChildKey(key)) childNames.add(String(key.name || '').trim());
+  }
+  const result = cloneValue(tree);
+  if (childNames.size === 0) return result;
+  const walk = (node) => {
+    if (!valuesIsContainer(node)) return;
+    for (const name of Object.keys(node)) {
+      if (valuesIsContainer(node[name])) {
+        walk(node[name]);
+      } else if (childNames.has(name)) {
+        delete node[name];
+      }
+    }
+  };
+  walk(result);
+  return result;
+}
+
 // 遍历整棵树，把所有已注册子变量叶子按父变量派生（就地修改，返回同一棵树）。
 // 多轮收敛：允许导入数据里出现「子变量的父变量也是子变量」的链式场景。
 function deriveValuesChildren(tree, keys) {
@@ -6967,9 +7003,10 @@ function serializeValuesGameTree(ctx) {
 // - 中断检查：生成被用户中止时跳过，不对半截回复发起维护；
 // - 失败即跳过本轮：调用失败不降级、不重试轰炸，本轮视为已处理。
 // 请求体：system 维护提示词 → <Key_Rules>（键注册表 + 变化规则）→
-// <Current_Values>（当前游戏值 YAML）→ <Recent_Messages>（最新 2 条消息）。
-// 解析：AI 返回 YAML/JSON 补丁 → 与当前树合并（仅已注册键可新增）→
-// 有变化才写聊天文件。
+// <Current_Values>（当前游戏值 YAML，仅父变量；子变量是派生变量不发送）→
+// <Recent_Messages>（最新 2 条消息）。
+// 解析：AI 返回 YAML/JSON 补丁 → 剔除子变量（不允许 AI 改动）→ 与当前树合并
+// （仅已注册键可新增）→ 按最新父变量重算子变量 → 有变化才写聊天文件。
 
 const valuesMaintainState = {
   running: false,
@@ -7030,7 +7067,9 @@ function buildValuesMaintainMessages(ctx, prompt) {
       '）'
     : '';
   const current = getValuesGameTree(ctx);
-  const currentText = serializeValuesTree(current, '') || '{}';
+  // 子变量是派生变量：发给 AI 的值表只含父变量，子变量不发送（也不允许 AI 改动）。
+  const parentCurrent = stripValuesChildLeaves(current, keys);
+  const currentText = serializeValuesTree(parentCurrent, '') || '{}';
   const recentMessages = getStoryGateRecentMessages(VALUES_MAINTAIN_RECENT_COUNT, ctx);
   return [
     { role: 'system', content: prompt },
@@ -7044,7 +7083,7 @@ function buildValuesMaintainMessages(ctx, prompt) {
     {
       role: 'user',
       content: [
-        '以下被 <Current_Values>...</Current_Values> 包裹的是当前游戏变量（YAML 格式），这是唯一可改动的数据，结构、条目名与层级必须原样保留。',
+        '以下被 <Current_Values>...</Current_Values> 包裹的是当前游戏变量（YAML 格式，仅含父变量；子变量为派生变量由系统计算，不在此列出），这是唯一可改动的数据，结构、条目名与层级必须原样保留。',
         '<Current_Values>\n' + currentText + '\n</Current_Values>',
       ].join('\n'),
     },
@@ -7079,6 +7118,16 @@ async function runValuesMaintain(ctx, settings, options = {}) {
     record.durationMs = Date.now() - startedAt;
     Object.assign(record, overrides);
     globalThis[VALUES_LAST_ROUND_KEY] = record;
+    // 结束 toast：空轮（跳过）静默；失败 → error，有变化 → success，无变化 → info。
+    if (!record.skipped) {
+      if (record.error) {
+        globalThis.toastr?.error?.(`变量更新失败：${record.error}`, `[${MODULE_DISPLAY_NAME}]`);
+      } else if (record.changed.length > 0) {
+        globalThis.toastr?.success?.(`变量更新成功：已更新 ${record.changed.length} 项`, `[${MODULE_DISPLAY_NAME}]`);
+      } else {
+        globalThis.toastr?.info?.('变量更新完成：本轮无变化', `[${MODULE_DISPLAY_NAME}]`);
+      }
+    }
     try {
       refreshHomeValuesStatus();
     } catch {}
@@ -7097,6 +7146,7 @@ async function runValuesMaintain(ctx, settings, options = {}) {
     const prompt = getValuesMaintainPrompt(ctx);
     const messages = buildValuesMaintainMessages(ctx, prompt);
     logApp('info', '变量维护：AI 开始', `${record.mode} · ${keys.length} 个变量 · ${VALUES_MAINTAIN_RECENT_COUNT} 条消息`);
+    globalThis.toastr?.info?.(`变量更新开始（${record.mode === 'manual' ? '手动' : '自动'}）…`, `[${MODULE_DISPLAY_NAME}]`);
     const content = await chatCompletion(settings, messages, {
       signal: controller.signal,
       maxTokens: VALUES_MAINTAIN_MAX_TOKENS,
@@ -7109,9 +7159,12 @@ async function runValuesMaintain(ctx, settings, options = {}) {
       finish({ error: 'AI 返回无法解析' });
       return record;
     }
-    const merged = mergeValuesPatch(current, patch, getValuesRegistryNames(ctx));
-    // 子变量派生：AI 可能改了父变量，合并后按最新父变量重算子变量（AI 对
-    // 子变量的任何改动都会被派生结果覆盖，保证子变量始终与父变量一致）。
+    // 子变量是派生变量：AI 输出里即使带了子变量也一律剔除（不允许增删改），
+    // 子变量最终值一律由合并后的父变量派生，保证与父变量一致。
+    const parentPatch = stripValuesChildLeaves(patch, keys);
+    const merged = mergeValuesPatch(current, parentPatch, getValuesRegistryNames(ctx));
+    // 子变量派生：AI 可能改了父变量，合并后按最新父变量重算子变量（子变量没有
+    // 发给 AI、补丁里的子变量也被剔除，这里只负责把父变量变化落到子变量上）。
     deriveValuesChildren(merged.tree, keys);
     // 子变量路径不计入变化：其值由父变量决定，父变量变化时已体现在父变量路径上。
     const childKeyNames = new Set(getValuesChildKeys(ctx).map((key) => String(key.name || '').trim()));
@@ -7795,7 +7848,8 @@ function setValuesLayer(layer) {
   renderValuesTree();
 }
 
-// 层相关 UI 联动：自动维护 / 重置按钮只属于游戏值层；默认值层只提示手动修改。
+// 层相关 UI 联动：自动维护 / 重置按钮只属于游戏值层；新建按钮只属于默认值层
+// （游戏值层是 AI 维护的数据，只允许修改，不允许新建 / 删除条目）；默认值层只提示手动修改。
 function syncValuesLayerUI() {
   const isGame = valuesActiveLayer === 'game';
   const maintainNow = document.getElementById(VALUES_MAINTAIN_NOW_ID);
@@ -7803,10 +7857,12 @@ function syncValuesLayerUI() {
   const status = document.getElementById(VALUES_MAINTAIN_STATUS_ID);
   const hint = document.getElementById(VALUES_DEFAULT_HINT_ID);
   const injectBar = document.getElementById(VALUES_INJECT_BAR_ID);
+  const addRoot = document.getElementById(VALUES_ADD_ROOT_ID);
   if (maintainNow) maintainNow.hidden = !isGame;
   if (resetBtn) resetBtn.hidden = !isGame;
   if (status) status.hidden = !isGame;
   if (hint) hint.hidden = isGame;
+  if (addRoot) addRoot.hidden = isGame;
   // 注入提示词条只属于「默认数值」层（勾选配置随角色卡保存）。
   if (injectBar) injectBar.hidden = isGame;
 }
@@ -7918,6 +7974,8 @@ function buildValuesRow(path, name, node, depth) {
       : `已注册变量 · 变化规则：${registered.rule || '（未填写规则）'}`)
     : '';
   const isNode = valuesIsContainer(node);
+  // 游戏值层是 AI 维护的数据：只允许修改，不渲染新建菜单与删除按钮。
+  const isGameLayer = valuesActiveLayer === 'game';
   // 注入勾选框：只在「默认数值」层显示（配置随角色卡保存）。
   const injectConfig = valuesActiveLayer === 'default' ? getValuesInjectConfig(ctx) : null;
   const pathKey = path.join('/');
@@ -7944,9 +8002,9 @@ function buildValuesRow(path, name, node, depth) {
       <span class="kaleido-values__row-name" title="节点：可继续嵌套节点或挂变量">${escapeHtml(name)}</span>
       <span class="kaleido-values__row-count">${count} 项</span>
       <span class="kaleido-values__row-actions">
-        <button type="button" class="kaleido-values__icon-btn" data-action="add-menu" title="新建子节点 / 变量" aria-label="新建子节点 / 变量"><span class="${VALUES_ADD_CHILD_ICON_CLASS}"></span></button>
+        ${isGameLayer ? '' : `<button type="button" class="kaleido-values__icon-btn" data-action="add-menu" title="新建子节点 / 变量" aria-label="新建子节点 / 变量"><span class="${VALUES_ADD_CHILD_ICON_CLASS}"></span></button>`}
         <button type="button" class="kaleido-values__icon-btn" data-action="edit" title="编辑节点" aria-label="编辑节点"><span class="${VALUES_EDIT_ICON_CLASS}"></span></button>
-        <button type="button" class="kaleido-values__icon-btn kaleido-values__icon-btn--danger" data-action="delete" title="删除节点" aria-label="删除节点"><span class="${VALUES_DELETE_ICON_CLASS}"></span></button>
+        ${isGameLayer ? '' : `<button type="button" class="kaleido-values__icon-btn kaleido-values__icon-btn--danger" data-action="delete" title="删除节点" aria-label="删除节点"><span class="${VALUES_DELETE_ICON_CLASS}"></span></button>`}
       </span>
     `;
     const injectCheck = row.querySelector('button[data-inject-toggle]');
@@ -7970,7 +8028,7 @@ function buildValuesRow(path, name, node, depth) {
     <span class="kaleido-values__row-value" title="${escapeHtml(formatValuesLeafText(node))}">${escapeHtml(formatValuesLeafText(node))}</span>
     <span class="kaleido-values__row-actions">
       ${editButton}
-      <button type="button" class="kaleido-values__icon-btn kaleido-values__icon-btn--danger" data-action="delete" title="删除变量" aria-label="删除变量"><span class="${VALUES_DELETE_ICON_CLASS}"></span></button>
+      ${isGameLayer ? '' : `<button type="button" class="kaleido-values__icon-btn kaleido-values__icon-btn--danger" data-action="delete" title="删除变量" aria-label="删除变量"><span class="${VALUES_DELETE_ICON_CLASS}"></span></button>`}
     </span>
   `;
   const injectCheck = row.querySelector('button[data-inject-toggle]');
@@ -8031,9 +8089,14 @@ function renderValuesTree() {
   body.innerHTML = '';
   const hasEntries = Object.keys(valuesActiveTree).length > 0;
   if (!hasEntries) {
-    const emptyText = valuesActiveLayer === 'game' && !isValuesGameInitialized(ctx)
-      ? '游戏值尚未初始化：默认值会在首次修改或 AI 维护后写入聊天文件。\n现在显示的是当前角色卡的默认值。'
-      : '还没有节点。点击上方「＋ 新建」新建节点或变量；\n节点可层层嵌套，变量挂在节点下。';
+    let emptyText;
+    if (valuesActiveLayer === 'game' && !isValuesGameInitialized(ctx)) {
+      emptyText = '游戏值尚未初始化：默认值会在首次修改或 AI 维护后写入聊天文件。\n现在显示的是当前角色卡的默认值。';
+    } else if (valuesActiveLayer === 'game') {
+      emptyText = '游戏值还没有条目：请在「默认数值」层新建，\n或等 AI 维护按注册规则自动建立。';
+    } else {
+      emptyText = '还没有节点。点击上方「＋ 新建」新建节点或变量；\n节点可层层嵌套，变量挂在节点下。';
+    }
     body.appendChild(buildValuesEmpty(emptyText));
     return;
   }

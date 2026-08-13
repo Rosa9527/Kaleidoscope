@@ -7,9 +7,10 @@
 // - 中断检查：生成被用户中止时跳过，不对半截回复发起维护；
 // - 失败即跳过本轮：调用失败不降级、不重试轰炸，本轮视为已处理。
 // 请求体：system 维护提示词 → <Key_Rules>（键注册表 + 变化规则）→
-// <Current_Values>（当前游戏值 YAML）→ <Recent_Messages>（最新 2 条消息）。
-// 解析：AI 返回 YAML/JSON 补丁 → 与当前树合并（仅已注册键可新增）→
-// 有变化才写聊天文件。
+// <Current_Values>（当前游戏值 YAML，仅父变量；子变量是派生变量不发送）→
+// <Recent_Messages>（最新 2 条消息）。
+// 解析：AI 返回 YAML/JSON 补丁 → 剔除子变量（不允许 AI 改动）→ 与当前树合并
+// （仅已注册键可新增）→ 按最新父变量重算子变量 → 有变化才写聊天文件。
 
 const valuesMaintainState = {
   running: false,
@@ -70,7 +71,9 @@ function buildValuesMaintainMessages(ctx, prompt) {
       '）'
     : '';
   const current = getValuesGameTree(ctx);
-  const currentText = serializeValuesTree(current, '') || '{}';
+  // 子变量是派生变量：发给 AI 的值表只含父变量，子变量不发送（也不允许 AI 改动）。
+  const parentCurrent = stripValuesChildLeaves(current, keys);
+  const currentText = serializeValuesTree(parentCurrent, '') || '{}';
   const recentMessages = getStoryGateRecentMessages(VALUES_MAINTAIN_RECENT_COUNT, ctx);
   return [
     { role: 'system', content: prompt },
@@ -84,7 +87,7 @@ function buildValuesMaintainMessages(ctx, prompt) {
     {
       role: 'user',
       content: [
-        '以下被 <Current_Values>...</Current_Values> 包裹的是当前游戏变量（YAML 格式），这是唯一可改动的数据，结构、条目名与层级必须原样保留。',
+        '以下被 <Current_Values>...</Current_Values> 包裹的是当前游戏变量（YAML 格式，仅含父变量；子变量为派生变量由系统计算，不在此列出），这是唯一可改动的数据，结构、条目名与层级必须原样保留。',
         '<Current_Values>\n' + currentText + '\n</Current_Values>',
       ].join('\n'),
     },
@@ -119,6 +122,16 @@ async function runValuesMaintain(ctx, settings, options = {}) {
     record.durationMs = Date.now() - startedAt;
     Object.assign(record, overrides);
     globalThis[VALUES_LAST_ROUND_KEY] = record;
+    // 结束 toast：空轮（跳过）静默；失败 → error，有变化 → success，无变化 → info。
+    if (!record.skipped) {
+      if (record.error) {
+        globalThis.toastr?.error?.(`变量更新失败：${record.error}`, `[${MODULE_DISPLAY_NAME}]`);
+      } else if (record.changed.length > 0) {
+        globalThis.toastr?.success?.(`变量更新成功：已更新 ${record.changed.length} 项`, `[${MODULE_DISPLAY_NAME}]`);
+      } else {
+        globalThis.toastr?.info?.('变量更新完成：本轮无变化', `[${MODULE_DISPLAY_NAME}]`);
+      }
+    }
     try {
       refreshHomeValuesStatus();
     } catch {}
@@ -137,6 +150,7 @@ async function runValuesMaintain(ctx, settings, options = {}) {
     const prompt = getValuesMaintainPrompt(ctx);
     const messages = buildValuesMaintainMessages(ctx, prompt);
     logApp('info', '变量维护：AI 开始', `${record.mode} · ${keys.length} 个变量 · ${VALUES_MAINTAIN_RECENT_COUNT} 条消息`);
+    globalThis.toastr?.info?.(`变量更新开始（${record.mode === 'manual' ? '手动' : '自动'}）…`, `[${MODULE_DISPLAY_NAME}]`);
     const content = await chatCompletion(settings, messages, {
       signal: controller.signal,
       maxTokens: VALUES_MAINTAIN_MAX_TOKENS,
@@ -149,9 +163,12 @@ async function runValuesMaintain(ctx, settings, options = {}) {
       finish({ error: 'AI 返回无法解析' });
       return record;
     }
-    const merged = mergeValuesPatch(current, patch, getValuesRegistryNames(ctx));
-    // 子变量派生：AI 可能改了父变量，合并后按最新父变量重算子变量（AI 对
-    // 子变量的任何改动都会被派生结果覆盖，保证子变量始终与父变量一致）。
+    // 子变量是派生变量：AI 输出里即使带了子变量也一律剔除（不允许增删改），
+    // 子变量最终值一律由合并后的父变量派生，保证与父变量一致。
+    const parentPatch = stripValuesChildLeaves(patch, keys);
+    const merged = mergeValuesPatch(current, parentPatch, getValuesRegistryNames(ctx));
+    // 子变量派生：AI 可能改了父变量，合并后按最新父变量重算子变量（子变量没有
+    // 发给 AI、补丁里的子变量也被剔除，这里只负责把父变量变化落到子变量上）。
     deriveValuesChildren(merged.tree, keys);
     // 子变量路径不计入变化：其值由父变量决定，父变量变化时已体现在父变量路径上。
     const childKeyNames = new Set(getValuesChildKeys(ctx).map((key) => String(key.name || '').trim()));

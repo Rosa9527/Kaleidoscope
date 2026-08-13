@@ -160,6 +160,15 @@ runner.test('解析 AI 返回：JSON 与 YAML 两种形态', () => {
   assert(ctx.parseValuesPatch('完全不是数据') === null, '乱码应返回 null');
 });
 
+runner.test('解析 AI 返回：YAML 支持 ```yaml 代码块围栏', () => {
+  const fenced = ctx.parseValuesPatch('```yaml\n金钱: 700\n张三:\n  好感: 40\n```');
+  assert(fenced && fenced['金钱'] === 700, '围栏 YAML 应可解析');
+  assert(fenced['张三']['好感'] === 40, '围栏 YAML 嵌套应可解析');
+  // 缩进的围栏是块文本内容，不能被误删。
+  const block = ctx.parseYamlSubset('说明: |-\n  ```js\n  console.log(1)\n  ```');
+  assert(block && block['说明'].includes('```js'), '块文本内的围栏应保留');
+});
+
 // ---------- YAML 整包导入导出 ----------
 runner.test('整包 YAML 往返：键 + 默认值', () => {
   const character = makeCharacter('测试角色', 'avatar-1');
@@ -397,6 +406,131 @@ runner.test('维护消息：子变量不列入键规则并注明派生关系', (
   assert(rulesBlock.includes('好感度: 友好互动 +5'), '应包含父变量规则');
   assert(!rulesBlock.includes('态度:'), '子变量不应列入键规则');
   assert(rulesBlock.includes('态度 ← 好感度'), '应注明子变量派生关系');
+});
+
+runner.test('维护消息：Current_Values 只含父变量，子变量叶子不发送', () => {
+  const c = makeChatCtx();
+  ctx.upsertValuesKey(c, '好感度', '友好互动 +5');
+  ctx.upsertValuesKey(c, '金钱', '按剧情收支变化');
+  ctx.upsertValuesKey(c, '态度', '', { type: 'child', parent: '好感度', rules: [{ min: 0, max: 100, value: '友好' }] });
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['张三', '好感度'], 40);
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['张三', '态度'], '未知');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['金钱'], 1000);
+  const messages = ctx.buildValuesMaintainMessages(c, '系统提示词');
+  const valuesBlock = messages[2].content;
+  assert(valuesBlock.includes('好感度: 40'), '应包含父变量当前值');
+  assert(valuesBlock.includes('金钱: 1000'), '应包含其他父变量当前值');
+  assert(!valuesBlock.includes('态度'), 'Current_Values 不应包含子变量');
+  assert(valuesBlock.includes('仅含父变量'), '应注明只含父变量');
+});
+
+runner.test('stripValuesChildLeaves：仅剔除子变量叶子，容器与父变量保留且不修改入参', () => {
+  const c = fresh();
+  ctx.upsertValuesKey(c, '好感度', '规则');
+  ctx.upsertValuesKey(c, '态度', '', { type: 'child', parent: '好感度', rules: [{ min: 0, max: 100, value: '友好' }] });
+  const tree = {
+    张三: { 好感度: 40, 态度: '友好' },
+    态度: { 备注: '同名容器不应被剔除' },
+  };
+  const stripped = ctx.stripValuesChildLeaves(tree, ctx.getValuesKeys(c));
+  assert(stripped['张三']['好感度'] === 40, '父变量应保留');
+  assert(stripped['张三']['态度'] === undefined, '子变量叶子应剔除');
+  assert(stripped['态度']['备注'] === '同名容器不应被剔除', '同名容器不应剔除');
+  assert(tree['张三']['态度'] === '友好', '原树不应被修改');
+});
+
+runner.test('AI 维护：补丁里的子变量增删改一律被剔除，子变量由父变量派生', async () => {
+  const c = makeChatCtx();
+  c.chat = [
+    { is_user: true, name: '玩家', mes: '送你礼物' },
+    { is_user: false, name: '角色', mes: '谢谢！' },
+  ];
+  ctx.upsertValuesKey(c, '好感度', '友好互动 +5');
+  ctx.upsertValuesKey(c, '金钱', '按剧情收支变化');
+  ctx.upsertValuesKey(c, '态度', '', { type: 'child', parent: '好感度', rules: [
+    { min: 0, max: 30, value: '冷淡' },
+    { min: 31, max: 100, value: '颇具好感' },
+  ] });
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['好感度'], 20);
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['态度'], '冷淡');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['金钱'], 1000);
+  // AI 试图改子变量、新增不存在的子变量并删除已有子变量
+  ctx.chatCompletion = async () => '{"好感度": 40, "态度": "AI乱改", "金钱": 500}';
+  const settings = ctx.getSettings(c);
+  settings.apiUrl = 'https://example.com/v1';
+  settings.model = 'test-model';
+  const record = await ctx.runValuesMaintain(c, settings, { force: true });
+  assert(record.ok === true, '维护应成功');
+  const state = ctx.getValuesChatState(c);
+  assert(state.values['好感度'] === 40, '父变量应更新为 40');
+  assert(state.values['金钱'] === 500, '父变量金钱应更新');
+  assert(state.values['态度'] === '颇具好感', '子变量应按父变量派生（AI 改动被剔除）');
+  assert(record.changed.indexOf('态度') < 0, '子变量不应计入变化');
+});
+
+runner.test('AI 维护：父变量不可派生时，AI 改子变量也不得残留', async () => {
+  const c = makeChatCtx();
+  c.chat = [
+    { is_user: true, name: '玩家', mes: '你好' },
+    { is_user: false, name: '角色', mes: '你好呀' },
+  ];
+  ctx.upsertValuesKey(c, '好感度', '友好互动 +5');
+  ctx.upsertValuesKey(c, '态度', '', { type: 'child', parent: '好感度', rules: [{ min: 0, max: 100, value: '友好' }] });
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['态度'], '旧值');
+  // 父变量缺失（无法派生），AI 直接改子变量 → 改动必须被剔除、不得残留
+  ctx.chatCompletion = async () => '{"态度": "AI改的"}';
+  const settings = ctx.getSettings(c);
+  settings.apiUrl = 'https://example.com/v1';
+  settings.model = 'test-model';
+  const record = await ctx.runValuesMaintain(c, settings, { force: true });
+  assert(record.ok === true, '维护应成功');
+  assert(record.changed.length === 0, '子变量改动不应计入变化');
+  assert(ctx.getValuesGameTree(c)['态度'] === '旧值', '父变量缺失时 AI 改子变量不得残留');
+});
+
+// ---------- 维护 toast ----------
+runner.test('AI 维护 toast：开始 / 成功有变化 / 无变化 / 失败 / 空轮静默', async () => {
+  const calls = [];
+  sandbox.toastr = {
+    info: (message) => calls.push(['info', message]),
+    success: (message) => calls.push(['success', message]),
+    error: (message) => calls.push(['error', message]),
+    warning: (message) => calls.push(['warning', message]),
+  };
+  const runOne = async (chatCompletion) => {
+    const c = makeChatCtx();
+    c.chat = [
+      { is_user: true, name: '玩家', mes: '送你礼物' },
+      { is_user: false, name: '角色', mes: '谢谢！' },
+    ];
+    ctx.upsertValuesKey(c, '好感度', '友好互动 +5');
+    ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['好感度'], 20);
+    ctx.chatCompletion = chatCompletion;
+    const settings = ctx.getSettings(c);
+    settings.apiUrl = 'https://example.com/v1';
+    settings.model = 'test-model';
+    calls.length = 0;
+    return ctx.runValuesMaintain(c, settings, { force: true });
+  };
+  // 成功：有变化
+  await runOne(async () => '{"好感度": 40}');
+  assert(calls.some(([kind, msg]) => kind === 'info' && msg.includes('变量更新开始（手动）')), '应有开始 toast');
+  assert(calls.some(([kind, msg]) => kind === 'success' && msg.includes('变量更新成功：已更新 1 项')), '应有成功 toast');
+  // 成功：无变化
+  await runOne(async () => '{}');
+  assert(calls.some(([kind, msg]) => kind === 'info' && msg.includes('变量更新完成：本轮无变化')), '应有无变化 toast');
+  assert(!calls.some(([kind]) => kind === 'success'), '无变化时不应有成功 toast');
+  // 失败：AI 返回无法解析
+  await runOne(async () => '不是 YAML');
+  assert(calls.some(([kind, msg]) => kind === 'error' && msg.includes('变量更新失败')), '应有失败 toast');
+  // 空轮（无变量无现有值）：静默，不应有任何 toast
+  const empty = makeChatCtx();
+  const settings = ctx.getSettings(empty);
+  settings.apiUrl = 'https://example.com/v1';
+  settings.model = 'test-model';
+  calls.length = 0;
+  await ctx.runValuesMaintain(empty, settings, { force: true });
+  assert(calls.length === 0, '空轮不应有 toast');
 });
 
 runner.test('整包 YAML 往返：子变量类型 / 父变量 / 区间规则', () => {

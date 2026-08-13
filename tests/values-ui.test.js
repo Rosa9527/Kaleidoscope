@@ -363,36 +363,39 @@ runner.test('双击行：变量进入变量编辑，节点进入节点编辑', (
 });
 
 // ---------- 游戏值层 ----------
-runner.test('游戏值层：注册金钱后新建键写入 chatMetadata', () => {
+runner.test('游戏值层：只可修改，修改写入 chatMetadata', () => {
   // 先注册「金钱」
   click($('kaleido-values-tab-keys'));
   click($('kaleido-values-add-key'));
   setValue('kaleido-values-key-editor-name', '金钱');
   setValue('kaleido-values-key-editor-rule', '获得 +N，消费 -N');
   click($('kaleido-values-key-editor-save'));
-  // 切到游戏值层新建键
+  // 新建只能在默认值层完成
   click($('kaleido-values-tab-tree'));
-  click($('kaleido-values-layer-game'));
-  assert($('kaleido-values-layer-game').classList.contains('is-active'), '游戏值层应激活');
+  click($('kaleido-values-layer-default'));
   pickAddMenu('key');
   const select = $('kaleido-values-editor-key-select');
   select.value = '金钱';
   setValue('kaleido-values-editor-value', '1000');
   click($('kaleido-values-editor-save'));
+  // 切到游戏值层：无新建按钮、无删除按钮，只能修改
+  click($('kaleido-values-layer-game'));
+  assert($('kaleido-values-add-root').hidden, '游戏值层应隐藏新建按钮');
+  const moneyRow = rowByName('金钱');
+  assert(!moneyRow.querySelector('button[data-action="delete"]'), '游戏值层不应有删除按钮');
+  click(actionButton(moneyRow, 'edit'));
+  setValue('kaleido-values-editor-value', '500');
+  click($('kaleido-values-editor-save'));
   const state = hostCtx.chatMetadata.kaleidoscope_values;
-  assert(state && state.values['金钱'] === 1000, '游戏值应写入 chatMetadata');
+  assert(state && state.values['金钱'] === 500, '游戏值应写入 chatMetadata');
   assert(ui.isValuesGameInitialized(hostCtx) === true, '游戏值应标记为已初始化');
 });
 
 // ---------- 删除 ----------
-runner.test('删除条目：确认后从当前层移除', async () => {
+runner.test('删除条目：确认后从默认值层移除；游戏值层无删除按钮', async () => {
   click($('kaleido-values-layer-game'));
   const moneyRow = rowByName('金钱');
-  click(actionButton(moneyRow, 'delete'));
-  assert(confirmMessage().includes('确定删除变量「金钱」'), '删除变量应先弹确认');
-  clickConfirmOk();
-  await flush();
-  assert(hostCtx.chatMetadata.kaleidoscope_values.values['金钱'] === undefined, '游戏值层应删除金钱');
+  assert(!moneyRow.querySelector('button[data-action="delete"]'), '游戏值层不应有删除按钮');
   click($('kaleido-values-layer-default'));
   const zhangRow = rowByName('张三');
   click(actionButton(zhangRow, 'delete'));
@@ -400,6 +403,41 @@ runner.test('删除条目：确认后从当前层移除', async () => {
   clickConfirmOk();
   await flush();
   assert(ui.getValuesDefaults(hostCtx)['张三'] === undefined, '默认值层应删除张三');
+  const moneyDefaultRow = rowByName('金钱');
+  click(actionButton(moneyDefaultRow, 'delete'));
+  assert(confirmMessage().includes('确定删除变量「金钱」'), '删除变量应先弹确认');
+  clickConfirmOk();
+  await flush();
+  assert(ui.getValuesDefaults(hostCtx)['金钱'] === undefined, '默认值层应删除金钱');
+});
+
+// ---------- 游戏值层：节点行只保留编辑 ----------
+runner.test('游戏值层：节点行无新建菜单与删除按钮，只保留编辑', () => {
+  // 直接播种游戏值与默认值（含节点），不依赖前面测试的顺序
+  hostCtx.chatMetadata.kaleidoscope_values = {
+    version: 1,
+    values: { '张三': { '好感': 30 } },
+    updatedAt: new Date().toISOString(),
+    lastSignature: '',
+  };
+  const defaults = ui.getValuesDefaults(hostCtx);
+  defaults['张三'] = { '好感': 20 };
+  ui.saveValuesData(hostCtx);
+  click($('kaleido-values-layer-game'));
+  assert($('kaleido-values-add-root').hidden, '游戏值层应隐藏新建按钮');
+  const nodeRow = rowByName('张三');
+  assert(!nodeRow.querySelector('button[data-action="add-menu"]'), '游戏值层节点行不应有新建菜单');
+  assert(!nodeRow.querySelector('button[data-action="delete"]'), '游戏值层节点行不应有删除按钮');
+  assert(nodeRow.querySelector('button[data-action="edit"]'), '游戏值层节点行应保留编辑');
+  const leafRow = rowByName('好感');
+  assert(!leafRow.querySelector('button[data-action="delete"]'), '游戏值层变量行不应有删除按钮');
+  assert(leafRow.querySelector('button[data-action="edit"]'), '游戏值层变量行应保留编辑');
+  // 对照：默认值层同样数据应有三件套（新建菜单 / 编辑 / 删除）
+  click($('kaleido-values-layer-default'));
+  assert(!$('kaleido-values-add-root').hidden, '默认值层应显示新建按钮');
+  const nodeRowDefault = rowByName('张三');
+  assert(nodeRowDefault.querySelector('button[data-action="add-menu"]'), '默认值层节点行应有新建菜单');
+  assert(nodeRowDefault.querySelector('button[data-action="delete"]'), '默认值层节点行应有删除按钮');
 });
 
 // ---------- 空树新建节点 ----------
@@ -415,18 +453,20 @@ runner.test('新建节点：空树时立即显示节点（不显示空状态）'
   assert(!$('kaleido-values-tree-body').querySelector('.kaleido-values__empty'), '不应显示空状态');
 });
 
-// ---------- 层联动：维护 / 重置只属于游戏值层 ----------
-runner.test('层联动：默认值层隐藏维护与重置，游戏值层显示', () => {
+// ---------- 层联动：维护 / 重置只属于游戏值层，新建只属于默认值层 ----------
+runner.test('层联动：默认值层隐藏维护与重置，游戏值层隐藏新建', () => {
   click($('kaleido-values-layer-default'));
   assert($('kaleido-values-maintain-now').hidden, '默认值层应隐藏立即维护');
   assert($('kaleido-values-reset-game').hidden, '默认值层应隐藏重置按钮');
   assert($('kaleido-values-maintain-status').hidden, '默认值层应隐藏维护状态');
   assert(!$('kaleido-values-default-hint').hidden, '默认值层应显示手动修改提示');
+  assert(!$('kaleido-values-add-root').hidden, '默认值层应显示新建按钮');
   click($('kaleido-values-layer-game'));
   assert(!$('kaleido-values-maintain-now').hidden, '游戏值层应显示立即维护');
   assert(!$('kaleido-values-reset-game').hidden, '游戏值层应显示重置按钮');
   assert(!$('kaleido-values-maintain-status').hidden, '游戏值层应显示维护状态');
   assert($('kaleido-values-default-hint').hidden, '游戏值层应隐藏手动修改提示');
+  assert($('kaleido-values-add-root').hidden, '游戏值层应隐藏新建按钮');
 });
 
 // ---------- 游戏值重置为默认值 ----------

@@ -384,6 +384,30 @@ function deriveValuesChildAt(tree, path, childKey) {
   return false;
 }
 
+// 剔除树中所有已注册子变量叶子（返回新树，不修改入参）：仅按叶子名匹配，
+// 容器与父变量原样保留。用于 AI 维护：发给 AI 的值表只含父变量，子变量是
+// 派生变量由系统计算，不发送也不允许 AI 改动。
+function stripValuesChildLeaves(tree, keys) {
+  const childNames = new Set();
+  for (const key of Array.isArray(keys) ? keys : []) {
+    if (isValuesChildKey(key)) childNames.add(String(key.name || '').trim());
+  }
+  const result = cloneValue(tree);
+  if (childNames.size === 0) return result;
+  const walk = (node) => {
+    if (!valuesIsContainer(node)) return;
+    for (const name of Object.keys(node)) {
+      if (valuesIsContainer(node[name])) {
+        walk(node[name]);
+      } else if (childNames.has(name)) {
+        delete node[name];
+      }
+    }
+  };
+  walk(result);
+  return result;
+}
+
 // 遍历整棵树，把所有已注册子变量叶子按父变量派生（就地修改，返回同一棵树）。
 // 多轮收敛：允许导入数据里出现「子变量的父变量也是子变量」的链式场景。
 function deriveValuesChildren(tree, keys) {
