@@ -93,6 +93,69 @@ function toggleStoryGate() {
   globalThis.toastr?.info?.('剧情预筛已' + (settings.storyGateEnabled ? '开启' : '关闭'), '[' + MODULE_DISPLAY_NAME + ']');
 }
 
+// ---------- 变量自动维护设置（自变量工作台联动） ----------
+function renderPresetValuesControl() {
+  const toggle = document.getElementById(PRESET_VALUES_TOGGLE_ID);
+  const status = document.getElementById(PRESET_VALUES_STATUS_ID);
+  if (!toggle && !status) return;
+  const ctx = getContextSafe();
+  const settings = ctx ? getSettings(ctx) : null;
+  if (!settings) return;
+  const enabled = settings.valuesAutoUpdateEnabled !== false;
+  if (toggle) {
+    toggle.textContent = enabled ? '✨ 变量自动维护：开' : '✨ 变量自动维护：关';
+    toggle.classList.toggle('is-active', enabled);
+    toggle.title = enabled ? '点击关闭：每轮生成结束后不再自动维护变量' : '点击开启：每轮生成结束后自动调用 AI 维护变量';
+  }
+  if (status) {
+    status.textContent = enabled ? '已启用' : '未启用';
+    status.dataset.state = enabled ? 'ok' : 'idle';
+  }
+}
+
+function toggleValuesAutoUpdate() {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const settings = getSettings(ctx);
+  settings.valuesAutoUpdateEnabled = !(settings.valuesAutoUpdateEnabled !== false);
+  saveSettings(ctx);
+  renderPresetValuesControl();
+  refreshHomeValuesStatus();
+  logApp('info', settings.valuesAutoUpdateEnabled ? '变量自动维护已开启' : '变量自动维护已关闭');
+  globalThis.toastr?.info?.('变量自动维护已' + (settings.valuesAutoUpdateEnabled ? '开启' : '关闭'), '[' + MODULE_DISPLAY_NAME + ']');
+}
+
+// ---------- 剧情触发设置（与变量工作台联动） ----------
+function renderPresetTriggerControl() {
+  const toggle = document.getElementById(PRESET_TRIGGER_TOGGLE_ID);
+  const status = document.getElementById(PRESET_TRIGGER_STATUS_ID);
+  if (!toggle && !status) return;
+  const ctx = getContextSafe();
+  const settings = ctx ? getSettings(ctx) : null;
+  if (!settings) return;
+  const enabled = settings.valuesTriggerEnabled !== false;
+  if (toggle) {
+    toggle.textContent = enabled ? '⚡ 剧情触发：开' : '⚡ 剧情触发：关';
+    toggle.classList.toggle('is-active', enabled);
+    toggle.title = enabled ? '点击关闭：发送前不再按变量条件触发剧情事件' : '点击开启：发送前按变量条件确定性触发剧情事件';
+  }
+  if (status) {
+    status.textContent = enabled ? '已启用' : '未启用';
+    status.dataset.state = enabled ? 'ok' : 'idle';
+  }
+}
+
+function toggleValuesTrigger() {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const settings = getSettings(ctx);
+  settings.valuesTriggerEnabled = !(settings.valuesTriggerEnabled !== false);
+  saveSettings(ctx);
+  renderPresetTriggerControl();
+  refreshHomeValuesStatus();
+  logApp('info', settings.valuesTriggerEnabled ? '剧情触发已开启' : '剧情触发已关闭');
+  globalThis.toastr?.info?.('剧情触发已' + (settings.valuesTriggerEnabled ? '开启' : '关闭'), '[' + MODULE_DISPLAY_NAME + ']');
+}
 // 首页「预设模版」卡片状态：已自定义的提示词份数。
 function refreshHomePresetStatus() {
   const status = document.getElementById(HOME_PRESET_STATUS_ID);
@@ -175,9 +238,13 @@ function initPresetSection(panel) {
   document.getElementById(PRESET_SAVE_ID)?.addEventListener('click', () => savePreset(presetActiveKey));
   document.getElementById(PRESET_RESET_ID)?.addEventListener('click', () => resetPreset(presetActiveKey));
   document.getElementById(PRESET_GATE_TOGGLE_ID)?.addEventListener('click', toggleStoryGate);
+  document.getElementById(PRESET_VALUES_TOGGLE_ID)?.addEventListener('click', toggleValuesAutoUpdate);
+  document.getElementById(PRESET_TRIGGER_TOGGLE_ID)?.addEventListener('click', toggleValuesTrigger);
 
   renderPresetEditor();
   renderPresetGateControl();
+  renderPresetValuesControl();
+  renderPresetTriggerControl();
   refreshHomePresetStatus();
   panel.dataset.presetReady = 'true';
   logApp('info', '预设模版已就绪');

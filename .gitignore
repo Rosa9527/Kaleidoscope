@@ -2,3 +2,18 @@ node_modules/
 .git/
 tests/_tmp_mobile/
 tests/_shot_*.png
+
+# 本地调试产物
+layout-test.html
+layout-test.png
+tests/_tmp_chrome*/
+tests/_cdp_probe*.js
+tests/_cdp_repro.js
+tests/_game_probe.js
+tests/_game_shot.png
+tests/_preview_values_redesign.html
+tests/_repro_*.html
+tests/_repro_shot.png
+tests/_repro_values.html
+tests/_tmp_layer_preview.html
+tests/_tmp_layer_shot.png

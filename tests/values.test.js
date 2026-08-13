@@ -1,0 +1,493 @@
+// 万华镜变量系统测试：键注册表 / 双层存储 / YAML 导入导出 / AI 补丁合并 / 维护消息。
+'use strict';
+const { readSources, loadInContext, createRunner, makeContext, makeCharacter } = require('./harness');
+
+let timerSeq = 0;
+let pendingTimers = [];
+const sandbox = {
+  console,
+  AbortController: globalThis.AbortController,
+  setTimeout: (fn, ms) => {
+    timerSeq += 1;
+    pendingTimers.push({ id: timerSeq, fn, ms });
+    return timerSeq;
+  },
+  clearTimeout: (id) => {
+    pendingTimers = pendingTimers.filter((timer) => timer.id !== id);
+  },
+};
+const ctx = loadInContext(sandbox, readSources());
+const runner = createRunner();
+const assert = (condition, message) => {
+  if (!condition) throw new Error(message || '断言失败');
+};
+
+async function flushTimers() {
+  const timers = pendingTimers.splice(0);
+  for (const timer of timers) timer.fn();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function fresh() {
+  return makeContext();
+}
+
+function makeChatCtx() {
+  const c = makeContext();
+  c.chatMetadata = {};
+  c.saveChat = () => {};
+  return c;
+}
+
+// ---------- 键注册表 ----------
+runner.test('注册键：名称去重、规则更新', () => {
+  const c = fresh();
+  ctx.upsertValuesKey(c, '好感', '友好互动 +5，冲突 -10，上限 100');
+  ctx.upsertValuesKey(c, '金钱', '按剧情收支变化');
+  assert(ctx.getValuesKeys(c).length === 2, '应有 2 个键');
+  ctx.upsertValuesKey(c, '好感', '新规则');
+  assert(ctx.getValuesKeys(c).length === 2, '同名键不应重复');
+  assert(ctx.getValuesKeyByName(c, '好感').rule === '新规则', '规则应更新');
+  assert(ctx.deleteValuesKey(c, '金钱') === true, '删除应成功');
+  assert(ctx.getValuesKeys(c).length === 1, '删除后应剩 1 个键');
+});
+
+// ---------- 默认值：角色卡绑定 ----------
+runner.test('默认值写入角色卡（writeExtensionField）', async () => {
+  const writes = [];
+  const character = makeCharacter('测试角色', 'avatar-1');
+  const c = makeContext({ characters: [character], characterId: 0, writeExtensionField: (index, key, value) => {
+    writes.push({ index, key, value });
+    return Promise.resolve();
+  } });
+  ctx.upsertValuesKey(c, '好感', '规则');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['张三', '好感'], 30);
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['金钱'], 1000);
+  ctx.saveValuesData(c);
+  await flushTimers();
+  assert(writes.length === 1, '应写入角色卡一次');
+  assert(writes[0].key === 'kaleidoscope_values', '扩展字段 key 应为 kaleidoscope_values');
+  assert(writes[0].value.defaults['金钱'] === 1000, '默认值应包含金钱');
+  assert(writes[0].value.defaults['张三']['好感'] === 30, '默认值应包含张三→好感');
+  assert(writes[0].value.keys.length === 1, '键注册表应随卡保存');
+});
+
+runner.test('无角色时默认值回退全局设置', () => {
+  const c = fresh();
+  ctx.upsertValuesKey(c, '好感', '规则');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['金钱'], 500);
+  ctx.saveValuesData(c);
+  const settings = c.extensionSettings.Kaleidoscope;
+  assert(settings.valuesData && settings.valuesData.keys.length === 1, '全局设置应保存键');
+  assert(settings.valuesData.defaults['金钱'] === 500, '全局设置应保存默认值');
+});
+
+// ---------- 游戏值：聊天文件绑定 ----------
+runner.test('游戏值写入 chatMetadata 并触发 saveChat', async () => {
+  let saved = 0;
+  const c = makeChatCtx();
+  c.saveChat = () => { saved += 1; };
+  const tree = { 张三: { 好感: 32 }, 金钱: 950 };
+  ctx.saveValuesChatState(c, tree, { lastSignature: 'sig-1' });
+  await flushTimers();
+  assert(saved === 1, '应调用 saveChat');
+  const state = c.chatMetadata.kaleidoscope_values;
+  assert(state && state.values['金钱'] === 950, 'chatMetadata 应保存游戏值');
+  assert(state.lastSignature === 'sig-1', '应保存签名');
+  assert(ctx.getValuesChatState(c).values['张三']['好感'] === 32, '读取应一致');
+});
+
+runner.test('游戏值未初始化时回退默认值', () => {
+  const c = makeChatCtx();
+  ctx.upsertValuesKey(c, '好感', '规则');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['张三', '好感'], 30);
+  const game = ctx.getValuesGameTree(c);
+  assert(game['张三']['好感'] === 30, '游戏值应回退默认值');
+  assert(ctx.isValuesGameInitialized(c) === false, '未初始化标记应为 false');
+});
+
+// ---------- AI 补丁合并 ----------
+runner.test('补丁合并：更新 / 删除 / 新增注册键 / 忽略未注册键', () => {
+  const current = { 张三: { 好感: 30, 体力: 80 }, 金钱: 1000 };
+  const registered = new Set(['好感', '金钱', '体力']);
+  const patch = {
+    张三: { 好感: 35, 体力: null },
+    金钱: 900,
+    新角色: { 好感: 10 },
+    好感: 99,
+  };
+  const merged = ctx.mergeValuesPatch(current, patch, registered);
+  assert(merged.tree['张三']['好感'] === 35, '嵌套值应更新');
+  assert(merged.tree['张三']['体力'] === undefined, 'null 应删除键');
+  assert(merged.tree['金钱'] === 900, '顶层值应更新');
+  assert(merged.tree['新角色'] === undefined, '未注册的新键应被忽略');
+  assert(merged.tree['好感'] === 99, '已注册的新顶层键应允许新增');
+  assert(merged.changed.includes('张三.好感'), 'changed 应包含更新路径');
+  assert(merged.changed.includes('张三.体力'), 'changed 应包含删除路径');
+  assert(merged.ignored.includes('新角色'), 'ignored 应包含被忽略路径');
+});
+
+runner.test('补丁合并：无变化时 changed 为空', () => {
+  const current = { 金钱: 1000 };
+  const merged = ctx.mergeValuesPatch(current, { 金钱: 1000 }, new Set(['金钱']));
+  assert(merged.changed.length === 0, '相同值不应算变化');
+  assert(merged.tree['金钱'] === 1000, '树应保持不变');
+});
+
+runner.test('补丁合并：节点不能变值、键不能变节点', () => {
+  const current = { 张三: { 好感: 30 }, 金钱: 1000 };
+  const registered = new Set(['好感', '金钱']);
+  const patch = {
+    张三: 99,          // 节点变值 → 忽略
+    金钱: { 子键: 5 }, // 键变节点 → 忽略
+  };
+  const merged = ctx.mergeValuesPatch(current, patch, registered);
+  assert(merged.tree['张三'] && typeof merged.tree['张三'] === 'object', '节点应保持容器');
+  assert(merged.tree['张三']['好感'] === 30, '节点内容应保持不变');
+  assert(merged.tree['金钱'] === 1000, '键应保持标量');
+  assert(merged.changed.length === 0, '不应有任何变化');
+  assert(merged.ignored.includes('张三'), '节点变值应记入 ignored');
+  assert(merged.ignored.includes('金钱'), '键变节点应记入 ignored');
+});
+
+// ---------- AI 返回解析 ----------
+runner.test('解析 AI 返回：JSON 与 YAML 两种形态', () => {
+  const json = ctx.parseValuesPatch('```json\n{"金钱": 800}\n```');
+  assert(json && json['金钱'] === 800, 'JSON 代码块应可解析');
+  const yaml = ctx.parseValuesPatch('金钱: 700\n张三:\n  好感: 40');
+  assert(yaml && yaml['金钱'] === 700, 'YAML 应可解析');
+  assert(yaml['张三']['好感'] === 40, 'YAML 嵌套应可解析');
+  assert(ctx.parseValuesPatch('完全不是数据') === null, '乱码应返回 null');
+});
+
+// ---------- YAML 整包导入导出 ----------
+runner.test('整包 YAML 往返：键 + 默认值', () => {
+  const character = makeCharacter('测试角色', 'avatar-1');
+  const c = makeContext({ characters: [character], characterId: 0, writeExtensionField: () => Promise.resolve() });
+  ctx.upsertValuesKey(c, '好感', '友好互动 +5，冲突 -10，上限 100');
+  ctx.upsertValuesKey(c, '金钱', '按剧情收支变化');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['张三', '好感'], 30);
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['金钱'], 1000);
+  const yaml = ctx.serializeValuesBundle(c);
+  assert(yaml.includes('format: kaleidoscope-values'), '应包含格式标记');
+  assert(yaml.includes('张三:'), '应包含嵌套条目');
+  const parsed = ctx.parseValuesBundle(yaml);
+  assert(parsed.keys.length === 2, '应解析出 2 个键');
+  assert(parsed.defaults['金钱'] === 1000, '应解析出金钱默认值');
+  assert(parsed.defaults['张三']['好感'] === 30, '应解析出嵌套默认值');
+});
+
+runner.test('整包解析：错误格式抛错', () => {
+  let threw = false;
+  try {
+    ctx.parseValuesBundle('format: other-thing\nkeys: []');
+  } catch (error) {
+    threw = true;
+  }
+  assert(threw, '错误 format 应抛错');
+});
+
+// ---------- 维护消息 ----------
+runner.test('维护消息：键规则 + 当前值 + 最新 2 条消息', () => {
+  const c = makeChatCtx();
+  c.chat = [
+    { is_user: true, name: '玩家', mes: '你好' },
+    { is_user: false, name: '角色', mes: '你好呀' },
+    { is_user: true, name: '玩家', mes: '送你礼物' },
+    { is_user: false, name: '角色', mes: '谢谢！' },
+  ];
+  ctx.upsertValuesKey(c, '好感', '友好互动 +5');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['好感'], 30);
+  const messages = ctx.buildValuesMaintainMessages(c, '系统提示词');
+  assert(messages.length === 4, '应有 4 条消息');
+  assert(messages[0].role === 'system' && messages[0].content === '系统提示词', '首条应为系统提示词');
+  assert(messages[1].content.includes('好感: 友好互动 +5'), '应包含键规则');
+  assert(messages[2].content.includes('好感: 30'), '应包含当前值');
+  const recent = JSON.parse(messages[3].content.match(/<Recent_Messages>\n([\s\S]*?)\n<\/Recent_Messages>/)[1]);
+  assert(recent.length === 2, '应只取最新 2 条消息');
+  assert(recent[0].content === '送你礼物' && recent[1].content === '谢谢！', '应取最后两条');
+});
+
+// ---------- 树工具 ----------
+runner.test('变量树工具：路径读写删除与计数', () => {
+  const tree = {};
+  ctx.valuesSetAtPath(tree, ['张三', '好感'], 30);
+  ctx.valuesSetAtPath(tree, ['金钱'], 1000);
+  assert(ctx.valuesGetAtPath(tree, ['张三', '好感']) === 30, '路径读取应正确');
+  assert(ctx.valuesCountEntries(tree) === 2, '应统计 2 个叶子');
+  ctx.valuesDeleteAtPath(tree, ['张三', '好感']);
+  assert(ctx.valuesGetAtPath(tree, ['张三', '好感']) === undefined, '删除后应不存在');
+  assert(ctx.valuesCountEntries(tree) === 1, '删除后应剩 1 个叶子');
+});
+
+// ---------- 注入提示词配置 ----------
+runner.test('注入配置：默认关闭且无勾选，可开关', () => {
+  const c = fresh();
+  const config = ctx.getValuesInjectConfig(c);
+  assert(config.enabled === false, '默认应关闭');
+  assert(Array.isArray(config.paths) && config.paths.length === 0, '默认应无勾选');
+  ctx.setValuesInjectEnabled(c, true);
+  assert(ctx.getValuesInjectConfig(c).enabled === true, '开启后应生效');
+  ctx.setValuesInjectEnabled(c, false);
+  assert(ctx.getValuesInjectConfig(c).enabled === false, '关闭后应生效');
+});
+
+runner.test('注入配置：打开下级自动提升祖先，关闭上级级联关闭后代', () => {
+  const c = fresh();
+  ctx.setValuesInjectPath(c, ['张三', '好感'], true);
+  ctx.setValuesInjectPath(c, ['金钱'], true);
+  let config = ctx.getValuesInjectConfig(c);
+  assert(config.paths.includes('张三/好感') && config.paths.includes('金钱'), '应勾选两个变量');
+  assert(config.paths.includes('张三'), '打开下级应自动提升上级');
+  // 打开节点「张三」→ 不自动打开后代（后代保持各自状态）
+  ctx.setValuesInjectPath(c, ['张三'], true);
+  config = ctx.getValuesInjectConfig(c);
+  assert(config.paths.includes('张三'), '节点应打开');
+  assert(config.paths.includes('张三/好感'), '已打开的后代应保留');
+  // 关闭节点 → 节点与后代全部关闭
+  ctx.setValuesInjectPath(c, ['张三'], false);
+  config = ctx.getValuesInjectConfig(c);
+  assert(!config.paths.includes('张三'), '节点应关闭');
+  assert(!config.paths.includes('张三/好感'), '后代应级联关闭');
+  assert(config.paths.includes('金钱'), '其他路径应保留');
+});
+
+runner.test('注入配置：祖先勾选覆盖后代（isValuesInjectPathSelected）', () => {
+  const c = fresh();
+  ctx.setValuesInjectPath(c, ['张三'], true);
+  assert(ctx.isValuesInjectPathSelected(c, ['张三']) === true, '节点自身应选中');
+  assert(ctx.isValuesInjectPathSelected(c, ['张三', '好感']) === true, '后代应被覆盖选中');
+  assert(ctx.isValuesInjectPathSelected(c, ['金钱']) === false, '无关路径不应选中');
+});
+
+runner.test('注入配置：随角色卡保存', async () => {
+  const writes = [];
+  const character = makeCharacter('测试角色', 'avatar-1');
+  const c = makeContext({ characters: [character], characterId: 0, writeExtensionField: (index, key, value) => {
+    writes.push({ index, key, value });
+    return Promise.resolve();
+  } });
+  ctx.setValuesInjectEnabled(c, true);
+  ctx.setValuesInjectPath(c, ['金钱'], true);
+  await flushTimers();
+  assert(writes.length === 1, '应写入角色卡一次');
+  assert(writes[0].value.inject && writes[0].value.inject.enabled === true, '角色卡应保存注入开关');
+  assert(writes[0].value.inject.paths.includes('金钱'), '角色卡应保存勾选路径');
+});
+
+// ---------- 父变量 / 子变量 ----------
+runner.test('注册子变量：类型 / 父变量 / 区间规则，旧键归一化为父变量', () => {
+  const c = fresh();
+  ctx.upsertValuesKey(c, '好感度', '友好互动 +5，冲突 -10，上限 100');
+  ctx.upsertValuesKey(c, '态度', '', { type: 'child', parent: '好感度', rules: [
+    { min: 0, max: 30, value: '冷淡' },
+    { min: 31, max: 60, value: '颇具好感' },
+    { min: 61, max: 100, value: '生死相依' },
+  ] });
+  const keys = ctx.getValuesKeys(c);
+  assert(keys.length === 2, '应有 2 个键');
+  const attitude = ctx.getValuesKeyByName(c, '态度');
+  assert(ctx.isValuesChildKey(attitude) === true, '态度应为子变量');
+  assert(attitude.parent === '好感度', '父变量名应保存');
+  assert(attitude.rules.length === 3, '应有 3 条区间规则');
+  assert(ctx.isValuesParentKey(ctx.getValuesKeyByName(c, '好感度')) === true, '好感度应为父变量');
+  assert(ctx.getValuesChildKeysByParent(c, '好感度').length === 1, '应能查到依赖好感度的子变量');
+  // 缺省 type 的旧键归一化为父变量
+  const c2 = fresh();
+  ctx.upsertValuesKey(c2, '金钱', '按剧情收支变化');
+  assert(ctx.getValuesKeyByName(c2, '金钱').type === 'parent', '旧键应归一化为父变量');
+});
+
+runner.test('子变量派生：按父变量值命中区间（40 → 颇具好感，90 → 生死相依）', () => {
+  const c = makeChatCtx();
+  ctx.upsertValuesKey(c, '好感度', '规则');
+  ctx.upsertValuesKey(c, '态度', '', { type: 'child', parent: '好感度', rules: [
+    { min: 0, max: 30, value: '冷淡' },
+    { min: 31, max: 60, value: '颇具好感' },
+    { min: 61, max: 100, value: '生死相依' },
+  ] });
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['张三', '好感度'], 40);
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['张三', '态度'], '未知');
+  assert(ctx.getValuesGameTree(c)['张三']['态度'] === '颇具好感', '40 应派生为颇具好感');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['张三', '好感度'], 90);
+  assert(ctx.getValuesGameTree(c)['张三']['态度'] === '生死相依', '90 应派生为生死相依');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['张三', '好感度'], 30);
+  assert(ctx.getValuesGameTree(c)['张三']['态度'] === '冷淡', '30 应命中 0~30 区间');
+  // 无规则命中（101）保持原值
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['张三', '好感度'], 101);
+  assert(ctx.getValuesGameTree(c)['张三']['态度'] === '冷淡', '超出范围应保持原值');
+});
+
+runner.test('子变量派生：默认值层就地派生；父变量缺失 / 非数值保持原值', () => {
+  const c = fresh();
+  ctx.upsertValuesKey(c, '好感度', '规则');
+  ctx.upsertValuesKey(c, '态度', '', { type: 'child', parent: '好感度', rules: [{ min: 0, max: 100, value: '友好' }] });
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['好感度'], 50);
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['态度'], '旧值');
+  assert(ctx.getValuesDefaults(c)['态度'] === '友好', '默认值层子变量应派生');
+  const c2 = makeChatCtx();
+  ctx.upsertValuesKey(c2, '好感度', '规则');
+  ctx.upsertValuesKey(c2, '态度', '', { type: 'child', parent: '好感度', rules: [{ min: 0, max: 100, value: '友好' }] });
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c2), ['态度'], '回退值');
+  assert(ctx.getValuesGameTree(c2)['态度'] === '回退值', '父变量缺失应保持原值');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c2), ['好感度'], '未知');
+  assert(ctx.getValuesGameTree(c2)['态度'] === '回退值', '父变量非数值应保持原值');
+});
+
+runner.test('子变量区间校验：重叠（含边界）/ 非法行 / 开区间', () => {
+  // 0~1000 与 1000~2000 在 1000 处重叠，必须写成 1001~2000
+  const overlap = ctx.validateValuesChildRules([
+    { min: 0, max: 1000, value: 'a' },
+    { min: 1000, max: 2000, value: 'b' },
+  ]);
+  assert(overlap.overlaps.length === 1, '含边界重叠应检出');
+  const ok = ctx.validateValuesChildRules([
+    { min: 0, max: 1000, value: 'a' },
+    { min: 1001, max: 2000, value: 'b' },
+  ]);
+  assert(ok.overlaps.length === 0, '接续区间不应重叠');
+  // 开区间：~1000 与 1001~ 不重叠；~1000 与 1000~ 重叠
+  const openOk = ctx.validateValuesChildRules([
+    { max: 1000, value: 'a' },
+    { min: 1001, value: 'b' },
+  ]);
+  assert(openOk.overlaps.length === 0, '开区间接续不应重叠');
+  const openBad = ctx.validateValuesChildRules([
+    { max: 1000, value: 'a' },
+    { min: 1000, value: 'b' },
+  ]);
+  assert(openBad.overlaps.length === 1, '开区间含边界重叠应检出');
+  // min > max 非法
+  const invalid = ctx.validateValuesChildRules([
+    { min: 100, max: 50, value: 'a' },
+  ]);
+  assert(invalid.invalid.length === 1, '下限大于上限应标记非法');
+});
+
+runner.test('AI 维护：父变量变化后子变量自动重算，AI 改子变量被覆盖', async () => {
+  const c = makeChatCtx();
+  c.chat = [
+    { is_user: true, name: '玩家', mes: '送你礼物' },
+    { is_user: false, name: '角色', mes: '谢谢！' },
+  ];
+  ctx.upsertValuesKey(c, '好感度', '友好互动 +5');
+  ctx.upsertValuesKey(c, '态度', '', { type: 'child', parent: '好感度', rules: [
+    { min: 0, max: 30, value: '冷淡' },
+    { min: 31, max: 100, value: '颇具好感' },
+  ] });
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['好感度'], 20);
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['态度'], '冷淡');
+  ctx.chatCompletion = async () => '{"好感度": 40, "态度": "AI乱改"}';
+  const settings = ctx.getSettings(c);
+  settings.apiUrl = 'https://example.com/v1';
+  settings.model = 'test-model';
+  const record = await ctx.runValuesMaintain(c, settings, { force: true });
+  assert(record.ok === true, '维护应成功');
+  const state = ctx.getValuesChatState(c);
+  assert(state.values['好感度'] === 40, '父变量应更新为 40');
+  assert(state.values['态度'] === '颇具好感', '子变量应重算为颇具好感（AI 改动被覆盖）');
+});
+
+runner.test('维护消息：子变量不列入键规则并注明派生关系', () => {
+  const c = makeChatCtx();
+  ctx.upsertValuesKey(c, '好感度', '友好互动 +5');
+  ctx.upsertValuesKey(c, '态度', '', { type: 'child', parent: '好感度', rules: [{ min: 0, max: 100, value: '友好' }] });
+  const messages = ctx.buildValuesMaintainMessages(c, '系统提示词');
+  const rulesBlock = messages[1].content;
+  assert(rulesBlock.includes('好感度: 友好互动 +5'), '应包含父变量规则');
+  assert(!rulesBlock.includes('态度:'), '子变量不应列入键规则');
+  assert(rulesBlock.includes('态度 ← 好感度'), '应注明子变量派生关系');
+});
+
+runner.test('整包 YAML 往返：子变量类型 / 父变量 / 区间规则', () => {
+  const character = makeCharacter('测试角色', 'avatar-1');
+  const c = makeContext({ characters: [character], characterId: 0, writeExtensionField: () => Promise.resolve() });
+  ctx.upsertValuesKey(c, '好感度', '友好互动 +5，冲突 -10，上限 100');
+  ctx.upsertValuesKey(c, '态度', '', { type: 'child', parent: '好感度', rules: [
+    { min: 0, max: 30, value: '冷淡' },
+    { min: 31, max: 60, value: '颇具好感' },
+    { min: 61, max: 100, value: '生死相依' },
+  ] });
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['张三', '好感度'], 40);
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['张三', '态度'], '未知');
+  const yaml = ctx.serializeValuesBundle(c);
+  assert(yaml.includes('type: child'), '应导出子变量类型');
+  assert(yaml.includes('parent: 好感度'), '应导出父变量名');
+  assert(yaml.includes('value: 颇具好感'), '应导出区间文本');
+  assert(yaml.includes('态度: 颇具好感'), '默认值树应导出派生后的子变量值');
+  const parsed = ctx.parseValuesBundle(yaml);
+  const attitude = parsed.keys.find((key) => key.name === '态度');
+  assert(attitude && attitude.type === 'child', '导入应识别子变量');
+  assert(attitude.parent === '好感度', '导入应保留父变量名');
+  assert(attitude.rules.length === 3, '导入应保留区间规则');
+  const c2 = fresh();
+  ctx.applyValuesBundle(c2, parsed, 'merge');
+  const key = ctx.getValuesKeyByName(c2, '态度');
+  assert(ctx.isValuesChildKey(key) && key.parent === '好感度', '合并导入应保留子变量');
+  assert(key.rules.length === 3, '合并导入应保留区间规则');
+});
+
+// ---------- 拖动排序：顺序表 ----------
+runner.test('键注册表重排：按名称调整顺序并保存', () => {
+  const c = makeChatCtx();
+  ctx.upsertValuesKey(c, '好感', '规则1');
+  ctx.upsertValuesKey(c, '金钱', '规则2');
+  ctx.upsertValuesKey(c, '体力', '规则3');
+  ctx.reorderValuesKeys(c, ['体力', '好感', '金钱']);
+  const names = ctx.getValuesKeys(c).map((key) => key.name);
+  assert(names.join(',') === '体力,好感,金钱', '应按给定顺序重排');
+  // 未列出的键按原相对顺序追加在末尾
+  ctx.upsertValuesKey(c, '魔力', '规则4');
+  ctx.reorderValuesKeys(c, ['金钱']);
+  const names2 = ctx.getValuesKeys(c).map((key) => key.name);
+  assert(names2.join(',') === '金钱,体力,好感,魔力', '未列出的键应追加在末尾');
+});
+
+runner.test('触发列表重排：按 id 调整顺序并保存', () => {
+  const c = makeChatCtx();
+  ctx.createValuesTrigger(c, { id: '001', name: 'A', conditions: [], content: 'x' });
+  ctx.createValuesTrigger(c, { id: '002', name: 'B', conditions: [], content: 'x' });
+  ctx.createValuesTrigger(c, { id: '003', name: 'C', conditions: [], content: 'x' });
+  ctx.reorderValuesTriggers(c, ['003', '001', '002']);
+  const ids = ctx.getValuesTriggers(c).map((trigger) => trigger.id);
+  assert(ids.join(',') === '003,001,002', '应按给定顺序重排');
+});
+
+runner.test('变量树顺序表：记录顺序 + 未记录条目按名称排序追加', () => {
+  const c = makeChatCtx();
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['张三', '好感'], 30);
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['张三', '态度'], '友好');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['李四', '金钱'], 100);
+  ctx.reorderValuesTreeAt(c, '', ['李四', '张三']);
+  ctx.reorderValuesTreeAt(c, ['张三'], ['态度', '好感']);
+  const order = ctx.getValuesTreeOrder(c);
+  assert(order[''].join(',') === '李四,张三', '顶层顺序应记录');
+  assert(order['张三'].join(',') === '态度,好感', '子级顺序应记录');
+  const root = ctx.getValuesDefaults(c);
+  assert(ctx.valuesOrderedNames(order, '', root).join(',') === '李四,张三', '顶层应按记录顺序');
+  assert(ctx.valuesOrderedNames(order, '张三', root['张三']).join(',') === '态度,好感', '子级应按记录顺序');
+  // 未记录顺序的父路径回退为名称排序
+  assert(ctx.valuesOrderedNames({}, '李四', root['李四']).join(',') === '金钱', '无记录时按名称排序');
+  // 顺序表里的失效名被过滤，新条目按名称排序追加
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['王五'], 1);
+  assert(ctx.valuesOrderedNames(order, '', root).join(',') === '李四,张三,王五', '新条目应追加在末尾');
+});
+
+runner.test('整包 YAML 往返：order 顺序表', () => {
+  const character = makeCharacter('测试角色', 'avatar-1');
+  const c = makeContext({ characters: [character], characterId: 0, writeExtensionField: () => Promise.resolve() });
+  ctx.upsertValuesKey(c, '好感', '规则');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['张三', '好感'], 30);
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['李四'], 1);
+  ctx.reorderValuesTreeAt(c, '', ['李四', '张三']);
+  const yaml = ctx.serializeValuesBundle(c);
+  assert(yaml.includes('order:'), '应导出 order 段');
+  assert(yaml.includes('path: ""'), '应导出顶层路径');
+  const parsed = ctx.parseValuesBundle(yaml);
+  assert(parsed.order[''].join(',') === '李四,张三', '导入应保留顺序');
+  const c2 = fresh();
+  ctx.applyValuesBundle(c2, parsed, 'merge');
+  assert(ctx.getValuesTreeOrder(c2)[''].join(',') === '李四,张三', '合并导入应保留顺序');
+});
+
+runner.run();

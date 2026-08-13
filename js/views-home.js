@@ -55,35 +55,23 @@ function refreshHomeStoryStatus() {
   }
 }
 
-// 首页标语旁「系统日志」小图标状态：错误 / 警告条数徽标。
+// 首页「系统日志」卡片状态：错误 / 警告条数文字提示。
 function refreshHomeLogStatus() {
-  const badge = document.getElementById(HOME_LOG_BADGE_ID);
-  if (!badge) return;
+  const status = document.getElementById(HOME_LOG_STATUS_ID);
+  if (!status) return;
   try {
     const entries = (typeof logEntries !== 'undefined' && logEntries) || [];
     const errors = entries.filter((entry) => entry.level === 'error').length;
     const warns = entries.filter((entry) => entry.level === 'warn').length;
-    if (errors > 0) {
-      badge.textContent = String(errors);
-      badge.dataset.state = 'error';
-      badge.title = `${errors} 错误 · ${warns} 警告`;
-      badge.hidden = false;
-    } else if (warns > 0) {
-      badge.textContent = String(warns);
-      badge.dataset.state = 'warn';
-      badge.title = `${warns} 警告`;
-      badge.hidden = false;
-    } else {
-      badge.textContent = '';
-      badge.dataset.state = 'idle';
-      badge.title = '';
-      badge.hidden = true;
-    }
+    const state = errors > 0 ? 'error' : (warns > 0 ? 'warn' : 'idle');
+    const text = errors > 0
+      ? errors + ' 错误 · ' + warns + ' 警告'
+      : (warns > 0 ? warns + ' 警告' : (entries.length > 0 ? '共 ' + entries.length + ' 条' : '暂无记录'));
+    status.textContent = text;
+    status.dataset.state = state;
   } catch (error) {
-    badge.textContent = '';
-    badge.dataset.state = 'idle';
-    badge.title = '';
-    badge.hidden = true;
+    status.textContent = '暂无记录';
+    status.dataset.state = 'idle';
   }
 }
 
@@ -124,10 +112,50 @@ function refreshHomeInjectStatus() {
   }
 }
 
+// 首页「变量」卡片状态：键数量 / 条目数量 + 绑定与自动维护提示。
+function refreshHomeValuesStatus() {
+  const status = document.getElementById(HOME_VALUES_STATUS_ID);
+  if (!status) return;
+  try {
+    const ctx = getContextSafe();
+    const settings = ctx ? getSettings(ctx) : null;
+    const keys = ctx ? getValuesKeys(ctx) : [];
+    const defaults = ctx ? getValuesDefaults(ctx) : {};
+    const entries = valuesCountEntries(defaults);
+    const triggers = ctx ? getValuesTriggers(ctx) : [];
+    const gameInitialized = ctx ? isValuesGameInitialized(ctx) : false;
+    const character = ctx ? getStoryCharacter(ctx) : null;
+    const card = ctx ? getValuesCardData(ctx) : null;
+    const maintainEnabled = settings ? settings.valuesAutoUpdateEnabled !== false : true;
+    const triggerEnabled = settings ? settings.valuesTriggerEnabled !== false : true;
+    if (character) {
+      status.title = card
+        ? `变量已绑定角色卡「${character.name || ''}」：默认值随角色卡导入导出；游戏值存聊天文件（${gameInitialized ? '已初始化' : '未初始化'}）`
+        : `当前角色卡还没有变量数据：首次保存后自动写入角色卡；自动维护${maintainEnabled ? '已开启' : '已关闭'}`;
+    } else {
+      status.title = '未绑定角色（群聊/未选角色）：默认值存全局设置，不随角色卡导入导出';
+    }
+    if (keys.length === 0 && entries === 0 && triggers.length === 0) {
+      status.textContent = character ? (card ? '已绑定 · 尚未添加' : '待绑定 · 尚未添加') : '尚未添加';
+      status.dataset.state = 'idle';
+    } else {
+      const parts = [`${keys.length} 变量`, `${entries} 值`];
+      if (triggers.length > 0) parts.push(`${triggers.length} 触发`);
+      if (triggers.length > 0 && !triggerEnabled) parts.push('触发已关');
+      status.textContent = parts.join(' · ');
+      status.dataset.state = 'ok';
+    }
+  } catch (error) {
+    status.textContent = '尚未添加';
+    status.dataset.state = 'idle';
+  }
+}
+
 // 首页状态统一刷新入口：后续新增卡片状态时在此挂接。
 function refreshHomeStatuses() {
   refreshHomeApiStatus();
   refreshHomeStoryStatus();
+  refreshHomeValuesStatus();
   refreshHomeLogStatus();
   refreshHomeInjectStatus();
   refreshHomePresetStatus();

@@ -59,3 +59,26 @@ function onHostEvent(ctx, eventName, handler, key) {
   globalThis[key] = wrapped;
   eventSource.on(eventType, wrapped);
 }
+
+// 宿主注入 API 适配（剧情预筛 / 变量注入共用）：标准 SillyTavern 的 getContext()
+// 会提供 extension_prompt_types / extension_prompt_roles；TauriTavern 2.x 不提供
+// 这两个对象（也不挂 globalThis），因此只把 setExtensionPrompt 作为必需项，枚举值
+// 按已知数值常量兜底：
+// extension_prompt_types: NONE=-1, IN_PROMPT=0, IN_CHAT=1, BEFORE_PROMPT=2
+// extension_prompt_roles: SYSTEM=0, USER=1, ASSISTANT=2
+// IN_PROMPT 位置 = 提示词中「World Info (after)」之后（SillyTavern 的
+// beforeScenarioAnchor / afterScenarioAnchor 锚点语义）。
+function getExtensionPromptApi(ctx) {
+  const context = ctx || getContextSafe();
+  if (!context) return null;
+  const setExtensionPrompt = typeof context.setExtensionPrompt === 'function'
+    ? context.setExtensionPrompt
+    : (typeof globalThis.setExtensionPrompt === 'function' ? globalThis.setExtensionPrompt : null);
+  if (typeof setExtensionPrompt !== 'function') return null;
+  const types = context.extension_prompt_types || globalThis.extension_prompt_types || null;
+  const roles = context.extension_prompt_roles || globalThis.extension_prompt_roles || null;
+  const inChat = (types && Number.isFinite(types.IN_CHAT)) ? types.IN_CHAT : 1;
+  const inPrompt = (types && Number.isFinite(types.IN_PROMPT)) ? types.IN_PROMPT : 0;
+  const systemRole = (roles && Number.isFinite(roles.SYSTEM)) ? roles.SYSTEM : 0;
+  return { setExtensionPrompt, inChat, inPrompt, systemRole };
+}

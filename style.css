@@ -6,7 +6,8 @@
 
 .kaleido-sphere,
 .kaleido-panel,
-.kaleido-story-dialog {
+.kaleido-story-dialog,
+.kaleido-values-dialog {
   --k-ink: #3b332a;
   --k-ink-soft: rgba(59, 51, 42, 0.45);
   --k-paper: #f7f1e3;
@@ -339,31 +340,6 @@
   transform: scale(0.96);
 }
 
-.kaleido-home__log-badge {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  min-width: 16px;
-  height: 16px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 4px;
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1;
-  color: #fdf6e3;
-  background: var(--k-cinnabar);
-  border: 1.5px solid #fdf6e3;
-  border-radius: 999px;
-  box-shadow: 0 1px 3px rgba(59, 51, 42, 0.35);
-}
-
-.kaleido-home__log-badge[data-state='warn'] {
-  background: var(--k-gold);
-  color: #4b4238;
-}
-
 /* 首页卡片：菱形纹图标徽章 */
 .kaleido-home__grid {
   display: grid;
@@ -372,6 +348,7 @@
 }
 
 .kaleido-home__card {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -903,7 +880,8 @@ select.kaleido-input {
 }
 
 /* 节点启用滑块：点击关闭（整棵子树停用），再点激活 */
-.kaleido-story__switch {
+.kaleido-story__switch,
+.kaleido-values__inject-switch {
   flex: none;
   position: relative;
   width: 30px;
@@ -916,7 +894,8 @@ select.kaleido-input {
   transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
-.kaleido-story__switch-thumb {
+.kaleido-story__switch-thumb,
+.kaleido-values__inject-switch-thumb {
   position: absolute;
   top: 1px;
   left: 1px;
@@ -928,16 +907,19 @@ select.kaleido-input {
   transition: transform 0.18s ease;
 }
 
-.kaleido-story__switch:not(.is-off) {
+.kaleido-story__switch:not(.is-off),
+.kaleido-values__inject-switch:not(.is-off) {
   background: var(--k-cinnabar);
   border-color: var(--k-cinnabar-deep);
 }
 
-.kaleido-story__switch:not(.is-off) .kaleido-story__switch-thumb {
+.kaleido-story__switch:not(.is-off) .kaleido-story__switch-thumb,
+.kaleido-values__inject-switch:not(.is-off) .kaleido-values__inject-switch-thumb {
   transform: translateX(14px);
 }
 
-.kaleido-story__switch:hover {
+.kaleido-story__switch:hover,
+.kaleido-values__inject-switch:hover {
   border-color: var(--k-cinnabar);
   box-shadow: 0 0 0 2px rgba(166, 58, 46, 0.12);
 }
@@ -1987,6 +1969,1474 @@ select.kaleido-input {
    - iOS 聚焦自动放大防抖（表单控件字号提到 16px）
    - 触控目标放大、点按反馈优化、overscroll 隔离
    ========================================================= */
+/* ---------- 变量工作台（大窗口 / 键注册 + 变量树） ---------- */
+.kaleido-values-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(25, 19, 11, 0.42);
+  pointer-events: auto;
+}
+
+.kaleido-values-dialog.is-open {
+  display: flex;
+}
+
+.kaleido-values-dialog__inner {
+  width: min(960px, calc(100vw - 24px));
+  height: min(680px, calc(100vh - 24px));
+  height: min(680px, calc(100dvh - 24px));
+  display: flex;
+  flex-direction: column;
+  font-family: var(--k-font);
+  font-size: 14px;
+  color: var(--k-ink);
+  background: var(--k-paper);
+  border: 1.5px solid rgba(59, 51, 42, 0.85);
+  border-radius: 10px;
+  box-shadow:
+    0 16px 44px rgba(25, 19, 11, 0.45),
+    0 0 0 1px rgba(184, 134, 47, 0.4);
+  overflow: hidden;
+}
+
+.kaleido-values-dialog__header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, #4b4238, #3b332a);
+  border-bottom: 2px solid var(--k-gold);
+}
+
+.kaleido-values-dialog__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: #fdf6e3;
+}
+
+.kaleido-values-dialog__title .fa-solid {
+  color: var(--k-gold-bright);
+}
+
+/* 绑定徽标：已绑定（ok）/ 待绑定（warn）/ 未绑定角色（idle） */
+.kaleido-values__binding {
+  flex: none;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  letter-spacing: 1px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(253, 246, 227, 0.35);
+  background: rgba(253, 246, 227, 0.08);
+  color: #fdf6e3;
+  cursor: default;
+}
+.kaleido-values__binding[data-state='ok'] {
+  border-color: rgba(201, 162, 39, 0.7);
+  color: #f3d98b;
+}
+.kaleido-values__binding[data-state='warn'] {
+  border-color: rgba(230, 180, 90, 0.6);
+  color: #f0c987;
+}
+.kaleido-values__binding[data-state='idle'] {
+  opacity: 0.75;
+}
+
+.kaleido-values-dialog__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kaleido-values-dialog__toolbar .kaleido-icon-btn {
+  color: #fdf6e3;
+  background: rgba(253, 246, 227, 0.08);
+  border-color: rgba(253, 246, 227, 0.35);
+}
+
+.kaleido-values-dialog__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  position: relative;
+  background: linear-gradient(180deg, #f9f4e8, #f4eddb);
+  padding: 12px;
+}
+
+/* 工作台：左导航 + 主内容 */
+.kaleido-values__workbench {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 10px;
+}
+
+/* 左侧导航栏 */
+.kaleido-values__nav {
+  flex: none;
+  width: 148px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  background: linear-gradient(180deg, #f2e9d4, #ece2c8);
+  border: 1px solid rgba(59, 51, 42, 0.16);
+  border-radius: 8px;
+}
+
+.kaleido-values__nav-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 2px 4px 7px 8px;
+  font-size: 11px;
+  letter-spacing: 4px;
+  color: rgba(59, 51, 42, 0.45);
+  border-bottom: 1px dashed rgba(59, 51, 42, 0.22);
+  margin-bottom: 4px;
+}
+
+/* 导航收起按钮 */
+.kaleido-values__nav-collapse {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 10px;
+  color: rgba(59, 51, 42, 0.5);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.kaleido-values__nav-collapse:hover {
+  color: var(--k-cinnabar);
+  background: rgba(166, 58, 46, 0.08);
+  border-color: rgba(166, 58, 46, 0.3);
+}
+
+/* 收起后的展开按钮：贴左边缘的竖条 */
+.kaleido-values__nav-expand {
+  flex: none;
+  align-self: center;
+  width: 22px;
+  height: 64px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 11px;
+  color: rgba(59, 51, 42, 0.6);
+  background: linear-gradient(180deg, #f2e9d4, #ece2c8);
+  border: 1px solid rgba(59, 51, 42, 0.18);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.kaleido-values__nav-expand:hover {
+  color: var(--k-cinnabar);
+  border-color: rgba(166, 58, 46, 0.45);
+  box-shadow: 0 2px 6px rgba(59, 51, 42, 0.12);
+}
+.kaleido-values__nav-expand[hidden] {
+  display: none;
+}
+
+/* 收起状态：隐藏导航栏 */
+.kaleido-values__workbench.is-nav-collapsed .kaleido-values__nav {
+  display: none;
+}
+
+.kaleido-values__nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  font-family: var(--k-font);
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: rgba(59, 51, 42, 0.68);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.kaleido-values__nav-item:hover:not(.is-active) {
+  color: var(--k-cinnabar);
+  background: rgba(166, 58, 46, 0.06);
+  border-color: rgba(166, 58, 46, 0.25);
+}
+.kaleido-values__nav-item.is-active {
+  color: #fdf6e3;
+  background: linear-gradient(180deg, #b03a2e, #98332a);
+  border-color: #7c2a21;
+  box-shadow: 0 2px 6px rgba(122, 42, 33, 0.22);
+}
+.kaleido-values__nav-icon {
+  flex: none;
+  width: 18px;
+  text-align: center;
+  font-size: 13px;
+}
+.kaleido-values__nav-item.is-active .kaleido-values__nav-icon {
+  color: #f3d98b;
+}
+.kaleido-values__nav-label {
+  flex: none;
+}
+.kaleido-values__nav-badge {
+  margin-left: auto;
+  min-width: 20px;
+  padding: 1px 6px;
+  font-size: 11px;
+  text-align: center;
+  border-radius: 999px;
+  background: rgba(59, 51, 42, 0.1);
+  color: rgba(59, 51, 42, 0.6);
+}
+.kaleido-values__nav-item.is-active .kaleido-values__nav-badge {
+  background: rgba(253, 246, 227, 0.18);
+  color: #fdf6e3;
+}
+.kaleido-values__nav-badge[hidden] {
+  display: none;
+}
+
+/* 主内容区 */
+.kaleido-values__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* 面板区 */
+.kaleido-values__pane {
+  flex: 1;
+  min-height: 0;
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+}
+.kaleido-values__pane.is-active {
+  display: flex;
+}
+
+/* 层切换：单行当前层指示 + 一键切换按钮 */
+.kaleido-values__layer-row {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: linear-gradient(180deg, rgba(184, 134, 47, 0.1), rgba(184, 134, 47, 0.05));
+  border: 1px solid rgba(184, 134, 47, 0.26);
+  border-left: 3px solid var(--k-gold);
+  border-radius: 8px;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+.kaleido-values__layer-row[data-layer='game'] {
+  background: linear-gradient(180deg, rgba(79, 109, 122, 0.1), rgba(79, 109, 122, 0.05));
+  border-color: rgba(79, 109, 122, 0.26);
+  border-left-color: var(--k-azure);
+}
+
+.kaleido-values__layer-icon {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  border-radius: 50%;
+  background: rgba(59, 51, 42, 0.08);
+  color: var(--k-gold);
+  transition: color 0.2s ease;
+}
+.kaleido-values__layer-row[data-layer='game'] .kaleido-values__layer-icon {
+  color: var(--k-azure);
+}
+
+.kaleido-values__layer-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+/* 状态锚点按钮（隐藏）：保留层状态语义 */
+.kaleido-values__layer-btn[hidden] {
+  display: none;
+}
+
+/* 工具栏 */
+.kaleido-values__tree-actions,
+.kaleido-values__keys-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.kaleido-values__toolbar-spacer {
+  flex: 1;
+}
+
+/* 状态条：自动维护状态 / 默认值提示 */
+.kaleido-values__status-strip {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+  padding: 3px 10px;
+  background: rgba(253, 246, 227, 0.55);
+  border: 1px solid rgba(59, 51, 42, 0.12);
+  border-radius: 6px;
+}
+
+.kaleido-values__maintain-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: rgba(59, 51, 42, 0.6);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kaleido-values__maintain-status[hidden] {
+  display: none;
+}
+.kaleido-values__maintain-status::before {
+  content: '';
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(59, 51, 42, 0.35);
+}
+.kaleido-values__maintain-status[data-state='ok']::before {
+  background: #4f6d7a;
+}
+.kaleido-values__maintain-status[data-state='warn']::before {
+  background: #b8862f;
+}
+.kaleido-values__maintain-status[data-state='error']::before {
+  background: var(--k-cinnabar);
+}
+
+/* 默认值层提示：仅手动修改，AI 自动维护只更新游戏值 */
+.kaleido-values__default-hint {
+  flex: none;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: rgba(59, 51, 42, 0.55);
+}
+.kaleido-values__default-hint[hidden] {
+  display: none;
+}
+
+/* 注入提示词条（默认数值层）：开关 + 勾选统计 */
+.kaleido-values__inject-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+  padding: 4px 10px;
+  background: rgba(79, 109, 122, 0.06);
+  border: 1px solid rgba(79, 109, 122, 0.18);
+  border-radius: 6px;
+}
+.kaleido-values__inject-bar[hidden] {
+  display: none;
+}
+.kaleido-values__inject-toggle {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #4f6d7a;
+  user-select: none;
+}
+.kaleido-values__inject-status {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: rgba(59, 51, 42, 0.55);
+}
+.kaleido-values__inject-status[data-state='ok'] {
+  color: #4f6d7a;
+}
+.kaleido-values__inject-status[data-state='warn'] {
+  color: #b8862f;
+}
+
+/* 注入预览（只读）：图标题头 + 墨色卷宗 */
+.kaleido-values__inject-preview-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(184, 134, 47, 0.4);
+}
+.kaleido-values__inject-preview-title {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--k-ink);
+}
+.kaleido-values__inject-preview-title .fa-solid {
+  font-size: 11px;
+  color: #8a6d1f;
+}
+.kaleido-values__inject-preview-hint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: rgba(59, 51, 42, 0.45);
+}
+.kaleido-values__inject-text {
+  margin: 0;
+  padding: 12px 14px;
+  font-family: ui-monospace, "Cascadia Code", Consolas, "Courier New", monospace;
+  font-size: 11.5px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: #d8e6c0;
+  background:
+    radial-gradient(130% 100% at 50% 0%, rgba(79, 109, 122, 0.22), transparent 60%),
+    linear-gradient(180deg, #2b2419, #201a12);
+  border: 1px solid rgba(201, 162, 39, 0.4);
+  border-radius: 8px;
+  box-shadow:
+    inset 0 2px 8px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(59, 51, 42, 0.7);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* 树区 */
+.kaleido-values__tree {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.kaleido-values__tree-body,
+.kaleido-values__keys-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 2px 2px 8px;
+}
+
+.kaleido-values__empty {
+  margin: 10px 4px;
+  padding: 26px 16px;
+  text-align: center;
+  white-space: pre-line;
+  font-size: 13px;
+  line-height: 1.9;
+  letter-spacing: 1px;
+  color: rgba(59, 51, 42, 0.5);
+  background: rgba(253, 246, 227, 0.4);
+  border: 1.5px dashed rgba(59, 51, 42, 0.18);
+  border-radius: 8px;
+}
+
+/* 行 */
+.kaleido-values__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding-top: 3px;
+  padding-right: 8px;
+  padding-bottom: 3px;
+  background: var(--k-paper-light);
+  border: 1px solid rgba(59, 51, 42, 0.16);
+  border-radius: 5px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.kaleido-values__row:hover {
+  border-color: rgba(166, 58, 46, 0.45);
+  box-shadow: 0 2px 6px rgba(59, 51, 42, 0.12);
+}
+
+/* 行内注入滑块半选（默认数值层）：节点下已有部分条目被勾选 */
+.kaleido-values__inject-switch.is-partial {
+  background: rgba(184, 134, 47, 0.55);
+  border-color: rgba(184, 134, 47, 0.65);
+}
+.kaleido-values__inject-switch.is-partial .kaleido-values__inject-switch-thumb {
+  transform: translateX(7px);
+}
+
+.kaleido-values__row--entry {
+  border-left: 3px solid var(--k-gold);
+  padding-left: calc(10px + var(--depth, 0) * 20px);
+}
+.kaleido-values__row--entry.is-expanded {
+  border-left-color: var(--k-cinnabar);
+}
+
+.kaleido-values__row--leaf {
+  border-left: 2px solid rgba(79, 109, 122, 0.45);
+  background: rgba(247, 241, 227, 0.72);
+  padding-left: calc(30px + var(--depth, 0) * 20px);
+}
+
+.kaleido-values__row--key {
+  border-left: 2px solid rgba(184, 134, 47, 0.55);
+  padding-left: 10px;
+}
+
+.kaleido-values__chevron {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: rgba(59, 51, 42, 0.5);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: transform 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.kaleido-values__chevron .fa-solid {
+  font-size: 11px;
+  transition: transform 0.15s ease;
+}
+.kaleido-values__row--entry.is-expanded .kaleido-values__chevron .fa-solid {
+  transform: rotate(90deg);
+}
+.kaleido-values__chevron.is-empty {
+  visibility: hidden;
+}
+.kaleido-values__chevron:hover {
+  color: var(--k-cinnabar);
+  background: rgba(166, 58, 46, 0.08);
+}
+
+.kaleido-values__row-name {
+  flex: none;
+  max-width: 30%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+.kaleido-values__row-name.is-registered {
+  color: var(--k-cinnabar);
+}
+
+.kaleido-values__row-count {
+  flex: none;
+  font-size: 11px;
+  color: rgba(59, 51, 42, 0.5);
+}
+
+/* 键值胶囊 */
+.kaleido-values__row-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: #4f6d7a;
+  background: rgba(79, 109, 122, 0.07);
+  border: 1px solid rgba(79, 109, 122, 0.16);
+  border-radius: 999px;
+  padding: 1px 10px;
+}
+
+.kaleido-values__row-rule {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: rgba(59, 51, 42, 0.6);
+}
+
+/* 变量类型徽标：父变量（黛蓝）/ 子变量（金） */
+.kaleido-values__row-type-badge {
+  flex: none;
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 3px;
+  color: var(--k-azure);
+  background: rgba(79, 109, 122, 0.1);
+  border: 1px solid rgba(79, 109, 122, 0.35);
+  white-space: nowrap;
+}
+.kaleido-values__row-type-badge.is-child {
+  color: #8a6d1a;
+  background: rgba(184, 134, 47, 0.1);
+  border-color: rgba(184, 134, 47, 0.4);
+}
+
+/* 树行派生徽标：子变量（金） */
+.kaleido-values__row-derived-badge {
+  flex: none;
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 3px;
+  color: #8a6d1a;
+  background: rgba(184, 134, 47, 0.1);
+  border: 1px solid rgba(184, 134, 47, 0.4);
+  white-space: nowrap;
+}
+
+/* 子变量叶子：派生值不可手动编辑 */
+.kaleido-values__row--leaf.is-derived {
+  border-left-color: rgba(184, 134, 47, 0.55);
+  background: rgba(247, 241, 227, 0.55);
+}
+.kaleido-values__row--leaf.is-derived .kaleido-values__row-value {
+  color: #8a6d1a;
+  background: rgba(184, 134, 47, 0.08);
+  border-color: rgba(184, 134, 47, 0.25);
+}
+.kaleido-values__row--leaf.is-derived .kaleido-values__icon-btn[disabled] {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* 子变量区间规则编辑器 */
+.kaleido-values__key-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.kaleido-values__key-rule-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.kaleido-values__key-rule-row .kaleido-input {
+  height: 34px;
+  padding: 0 8px;
+}
+.kaleido-values__key-rule-min,
+.kaleido-values__key-rule-max {
+  flex: 0 1 64px;
+  min-width: 0;
+}
+.kaleido-values__key-rule-value {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.kaleido-values__key-rule-tilde {
+  flex: none;
+  color: rgba(59, 51, 42, 0.5);
+  font-size: 12px;
+}
+.kaleido-values__key-rules-empty {
+  font-size: 12px;
+  color: rgba(59, 51, 42, 0.55);
+  background: rgba(79, 109, 122, 0.06);
+  border: 1px dashed rgba(79, 109, 122, 0.3);
+  border-radius: 5px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+
+/* 区间行冲突标红：重叠 / 下限大于上限 */
+.kaleido-values__key-rule-row.is-conflict .kaleido-input {
+  border-color: rgba(166, 58, 46, 0.65);
+  background: rgba(166, 58, 46, 0.06);
+}
+
+/* 派生区间提示 */
+.kaleido-values__key-rules-hint {
+  font-size: 11px;
+  color: rgba(59, 51, 42, 0.5);
+  margin-top: 6px;
+}
+
+/* 编辑器提示（子变量值可留空） */
+.kaleido-values__editor-hint {
+  display: block;
+  font-size: 11px;
+  color: #8a6d1a;
+  margin-top: 4px;
+}
+
+/* 拖动排序把手 */
+.kaleido-values__drag-handle {
+  flex: none;
+  width: 20px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 11px;
+  color: rgba(59, 51, 42, 0.35);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: grab;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.kaleido-values__drag-handle:hover {
+  color: rgba(59, 51, 42, 0.75);
+  background: rgba(59, 51, 42, 0.08);
+}
+.kaleido-values__row.is-dragging {
+  opacity: 0.55;
+  border-color: rgba(166, 58, 46, 0.6);
+  box-shadow: 0 4px 10px rgba(59, 51, 42, 0.18);
+}
+.kaleido-values__row.is-dragging .kaleido-values__drag-handle {
+  cursor: grabbing;
+}
+.kaleido-values__tree-body.is-reordering,
+.kaleido-values__keys-body.is-reordering,
+.kaleido-values__triggers-body.is-reordering {
+  user-select: none;
+}
+
+.kaleido-values__row-actions {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0.35;
+  transition: opacity 0.15s ease;
+}
+.kaleido-values__row:hover .kaleido-values__row-actions {
+  opacity: 1;
+}
+
+.kaleido-values__icon-btn {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 11px;
+  color: rgba(59, 51, 42, 0.6);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.kaleido-values__icon-btn:hover {
+  color: var(--k-cinnabar);
+  background: rgba(166, 58, 46, 0.08);
+  border-color: rgba(166, 58, 46, 0.3);
+}
+.kaleido-values__icon-btn--danger:hover {
+  color: #fdf6e3;
+  background: var(--k-cinnabar);
+  border-color: var(--k-cinnabar);
+}
+
+/* 编辑器浮层 */
+.kaleido-values-dialog__editor[hidden],
+.kaleido-values__editor[hidden] {
+  display: none !important;
+}
+.kaleido-values-dialog__editor {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  width: 350px;
+  max-width: calc(100% - 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: var(--k-paper);
+  border: 1.5px solid rgba(59, 51, 42, 0.55);
+  border-top: 3px solid var(--k-cinnabar);
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(59, 51, 42, 0.35);
+  overflow-y: auto;
+  z-index: 2;
+}
+
+.kaleido-values__editor-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kaleido-values__editor-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.kaleido-values__editor-spacer {
+  flex: 1;
+}
+
+.kaleido-values__textarea {
+  resize: vertical;
+  line-height: 1.7;
+  font-family: var(--k-font);
+}
+
+.kaleido-values__textarea--small {
+  min-height: 40px;
+}
+
+.kaleido-values__editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+/* 「＋」新建菜单：节点 / 变量二选一 */
+.kaleido-values__add-menu {
+  position: fixed;
+  z-index: 3;
+  min-width: 136px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: var(--k-paper-light);
+  border: 1.5px solid rgba(59, 51, 42, 0.4);
+  border-radius: 6px;
+  box-shadow: 0 8px 20px rgba(59, 51, 42, 0.28);
+}
+
+.kaleido-values__add-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  font-family: var(--k-font);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--k-ink);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.kaleido-values__add-menu-item:hover {
+  background: rgba(166, 58, 46, 0.08);
+  color: var(--k-cinnabar);
+}
+
+.kaleido-values__add-menu-item .fa-solid {
+  width: 16px;
+  text-align: center;
+  color: var(--k-gold);
+}
+
+.kaleido-values__add-menu[hidden] {
+  display: none;
+}
+
+/* 编辑变量时只读显示的变量名 */
+.kaleido-values__editor-key-name {
+  display: block;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--k-ink);
+  background: rgba(59, 51, 42, 0.06);
+  border: 1.5px dashed rgba(59, 51, 42, 0.3);
+  border-radius: 4px;
+}
+
+/* 手机端：面板内视图 */
+.kaleido-values__binding-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.kaleido-values__binding-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kaleido-values-view .kaleido-values__pane {
+  min-height: 0;
+}
+
+/* ---------- 剧情触发（变量条件确定性触发） ---------- */
+.kaleido-values__triggers-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.kaleido-values__triggers-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 2px 2px 8px;
+}
+
+.kaleido-values__row--trigger {
+  border-left: 2px solid rgba(166, 58, 46, 0.55);
+  padding-left: 10px;
+}
+.kaleido-values__row--trigger.is-disabled {
+  opacity: 0.55;
+}
+
+.kaleido-values__row-trigger {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 11px;
+  color: rgba(59, 51, 42, 0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 触发事件类型徽标：一次性（朱砂）/ 常驻（黛蓝） */
+.kaleido-values__row-trigger-type {
+  flex: none;
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 3px;
+  color: var(--k-azure);
+  background: rgba(79, 109, 122, 0.1);
+  border: 1px solid rgba(79, 109, 122, 0.35);
+  white-space: nowrap;
+}
+.kaleido-values__row-trigger-type.is-once {
+  color: var(--k-cinnabar);
+  background: rgba(166, 58, 46, 0.08);
+  border-color: rgba(166, 58, 46, 0.35);
+}
+
+.kaleido-values__trigger-conditions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.kaleido-values__trigger-condition {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+.kaleido-values__trigger-condition-path {
+  flex: 1 1 55%;
+  min-width: 0;
+  height: 34px;
+}
+.kaleido-values__trigger-condition-op-center {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+}
+.kaleido-values__trigger-condition-op-wrap {
+  position: relative;
+  flex: 0 1 auto;
+  min-width: 44px;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+}
+.kaleido-values__trigger-condition-op {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+.kaleido-values__trigger-condition-op-text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 34px;
+  padding: 0 8px;
+  font-family: var(--k-font);
+  font-size: 13px;
+  color: var(--k-ink);
+  background: var(--k-paper-light);
+  border: 1.5px solid rgba(59, 51, 42, 0.3);
+  border-radius: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.kaleido-values__trigger-condition-op-wrap:focus-within .kaleido-values__trigger-condition-op-text {
+  border-color: var(--k-cinnabar);
+  background: #fffdf6;
+  box-shadow: 0 0 0 3px rgba(166, 58, 46, 0.12);
+}
+.kaleido-values__trigger-condition-value {
+  flex: 0 1 110px;
+  min-width: 0;
+  height: 34px;
+}
+.kaleido-values__trigger-condition-remove {
+  align-self: center;
+}
+
+/* ---------- 游戏模式：玩家档案 · 数值总览 ---------- */
+.kaleido-panel__dialog.is-game-mode {
+  width: 540px;
+}
+
+.kaleido-game {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 档案封面：宣纸题签 + 朱砂印角饰 */
+.kaleido-game__cover {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 15px;
+  background:
+    radial-gradient(110% 190% at 6% -35%, rgba(184, 134, 47, 0.14), transparent 55%),
+    linear-gradient(180deg, rgba(251, 247, 236, 0.92), rgba(244, 236, 219, 0.8));
+  border: 1px solid rgba(59, 51, 42, 0.22);
+  border-radius: 9px;
+  box-shadow:
+    inset 0 1px 0 rgba(253, 246, 227, 0.95),
+    0 4px 14px rgba(59, 51, 42, 0.12);
+}
+.kaleido-game__cover::before,
+.kaleido-game__cover::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-color: rgba(166, 58, 46, 0.6);
+  border-style: solid;
+  pointer-events: none;
+}
+.kaleido-game__cover::before { top: 4px; left: 4px; border-width: 1.5px 0 0 1.5px; }
+.kaleido-game__cover::after { bottom: 4px; right: 4px; border-width: 0 1.5px 1.5px 0; }
+
+/* 印章徽记 */
+.kaleido-game__cover-seal {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: #fbf3e0;
+  background: linear-gradient(150deg, #b84638, #8f2f26);
+  border-radius: 6px;
+  box-shadow:
+    inset 0 0 0 1.5px rgba(253, 246, 227, 0.32),
+    inset 0 0 10px rgba(0, 0, 0, 0.22),
+    0 2px 5px rgba(59, 51, 42, 0.3);
+  transform: rotate(-3deg);
+}
+
+.kaleido-game__cover-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.kaleido-game__cover-title {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 5px;
+  color: var(--k-ink);
+  text-shadow: 0 1px 0 rgba(253, 246, 227, 0.9);
+}
+.kaleido-game__cover-updated {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  color: rgba(59, 51, 42, 0.5);
+}
+.kaleido-game__cover-updated[hidden] { display: none; }
+.kaleido-game__cover-spacer { flex: 1; }
+
+.kaleido-game__refresh {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 13px;
+  font-family: var(--k-font);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--k-ink);
+  background: rgba(253, 246, 227, 0.55);
+  border: 1px solid rgba(59, 51, 42, 0.28);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+}
+.kaleido-game__refresh:hover {
+  color: var(--k-cinnabar);
+  border-color: rgba(166, 58, 46, 0.5);
+  box-shadow: 0 0 10px rgba(166, 58, 46, 0.18);
+  transform: translateY(-1px);
+}
+.kaleido-game__refresh:active { transform: scale(0.95); }
+
+/* 房子：返回工作台主页 */
+.kaleido-game__gear {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 14px;
+  color: var(--k-ink);
+  background: rgba(253, 246, 227, 0.55);
+  border: 1px solid rgba(59, 51, 42, 0.28);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+}
+.kaleido-game__gear:hover {
+  color: var(--k-cinnabar);
+  border-color: rgba(166, 58, 46, 0.5);
+  box-shadow: 0 0 10px rgba(166, 58, 46, 0.18);
+  transform: translateY(-1px);
+}
+.kaleido-game__gear:active { transform: scale(0.92); }
+
+/* 档案正文：滚动区 */
+.kaleido-game__tree {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 6px 4px 8px;
+  overscroll-behavior: contain;
+}
+.kaleido-game__tree::-webkit-scrollbar { width: 7px; }
+.kaleido-game__tree::-webkit-scrollbar-track { background: transparent; }
+.kaleido-game__tree::-webkit-scrollbar-thumb {
+  background: rgba(184, 134, 47, 0.35);
+  border-radius: 4px;
+}
+
+/* 空档案 */
+.kaleido-game__empty {
+  margin: 2px;
+  padding: 30px 18px;
+  text-align: center;
+  white-space: pre-line;
+  font-size: 12.5px;
+  line-height: 2;
+  letter-spacing: 1.5px;
+  color: rgba(59, 51, 42, 0.5);
+  background: rgba(251, 247, 236, 0.55);
+  border: 1.5px dashed rgba(166, 58, 46, 0.35);
+  border-radius: 9px;
+}
+.kaleido-game__empty::before {
+  content: '◇ 档案尚未建立';
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13px;
+  letter-spacing: 3px;
+  color: rgba(166, 58, 46, 0.7);
+}
+
+/* 条目组：按层级缩进 */
+.kaleido-game__entries {
+  display: flex;
+  flex-direction: column;
+  padding-left: calc(var(--depth, 0) * 16px);
+}
+
+/* 档案条目：名称 · 点线目次 · 数值 */
+.kaleido-game__entry {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 32px;
+  padding: 7px 4px;
+  border-bottom: 1px dashed rgba(59, 51, 42, 0.14);
+}
+.kaleido-game__entry:last-child { border-bottom: none; }
+
+.kaleido-game__entry-name {
+  flex: none;
+  max-width: 44%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--k-ink);
+}
+
+.kaleido-game__entry-leader {
+  flex: 1;
+  min-width: 14px;
+  margin: 0 2px;
+  border-bottom: 1px dotted rgba(59, 51, 42, 0.38);
+  transform: translateY(-3px);
+}
+
+.kaleido-game__entry-value {
+  flex: none;
+  max-width: 44%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+  letter-spacing: 0.5px;
+  color: rgba(59, 51, 42, 0.78);
+}
+.kaleido-game__entry-value.is-numeric {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--k-cinnabar);
+}
+
+/* 章节：朱砂印 + 鎏金分隔线 */
+.kaleido-game__chapter {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.kaleido-game__chapter-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 4px 8px;
+  padding-left: calc(4px + var(--depth, 0) * 16px);
+}
+.kaleido-game__chapter-seal {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 21px;
+  padding: 0 9px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #fbf3e0;
+  background: linear-gradient(150deg, #b84638, #8f2f26);
+  border-radius: 3px;
+  box-shadow:
+    inset 0 0 0 1px rgba(253, 246, 227, 0.3),
+    0 1px 3px rgba(59, 51, 42, 0.25);
+}
+.kaleido-game__chapter-rule {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(184, 134, 47, 0.65), rgba(184, 134, 47, 0.12));
+}
+@media (max-width: 640px) {
+  .kaleido-values-dialog__inner {
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    border-radius: 0;
+    border: none;
+  }
+
+  .kaleido-values-dialog__body {
+    padding: 8px;
+  }
+
+  /* 工作台改为上下堆叠：导航栏横排 */
+  .kaleido-values__workbench {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .kaleido-values__nav {
+    width: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px;
+  }
+
+  .kaleido-values__nav-head {
+    display: none;
+  }
+
+  .kaleido-values__nav-item {
+    flex: 1;
+    justify-content: center;
+    padding: 8px 6px;
+  }
+
+  .kaleido-values__nav-expand {
+    align-self: stretch;
+    width: 100%;
+    height: 28px;
+  }
+
+  .kaleido-values__nav-badge {
+    margin-left: 4px;
+  }
+
+  .kaleido-values__layer-row {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  .kaleido-values__row-name {
+    max-width: 40%;
+  }
+
+  .kaleido-values__row-actions {
+    opacity: 1;
+  }
+
+  .kaleido-values__row:hover {
+    box-shadow: none;
+    border-color: rgba(59, 51, 42, 0.16);
+  }
+
+  .kaleido-values__icon-btn:hover {
+    color: rgba(59, 51, 42, 0.72);
+    background: transparent;
+    border-color: transparent;
+  }
+
+  .kaleido-values__chevron:hover {
+    color: rgba(59, 51, 42, 0.55);
+    background: transparent;
+  }
+
+  .kaleido-values__add-menu-item:hover {
+    background: transparent;
+    color: var(--k-ink);
+  }
+
+  .kaleido-values__tree-actions {
+    row-gap: 6px;
+  }
+
+  .kaleido-values__inject-bar {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .kaleido-values__inject-toggle {
+    min-height: 32px;
+  }
+
+  .kaleido-values__inject-switch.is-partial .kaleido-values__inject-switch-thumb {
+    transform: translateX(9px);
+  }
+
+  .kaleido-values__row-trigger {
+    display: none;
+  }
+
+  .kaleido-values__trigger-condition {
+    flex-wrap: wrap;
+  }
+  .kaleido-values__trigger-condition-path {
+    flex: 1 1 100%;
+  }
+  .kaleido-values__trigger-condition-op-center {
+    flex: 1 1 auto;
+  }
+  .kaleido-values__trigger-condition-value {
+    flex: 1 1 auto;
+  }
+}
 @media (max-width: 640px) {
   /* ---------- 普通面板：与 SoulLink 一致，始终由内联 left/top 定位 ----------
      面板不再按视图分级铺边/居中：打开时 ensurePanelPosition 写入内联
@@ -2031,6 +3481,12 @@ select.kaleido-input {
   }
 
   .kaleido-home__log-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 15px;
+  }
+
+  .kaleido-game__gear {
     width: 36px;
     height: 36px;
     font-size: 15px;
@@ -2088,20 +3544,23 @@ select.kaleido-input {
     font-size: 13px;
   }
 
-  .kaleido-story__switch {
+  .kaleido-story__switch,
+  .kaleido-values__inject-switch {
     width: 40px;
     height: 22px;
     border-radius: 11px;
   }
 
-  .kaleido-story__switch-thumb {
+  .kaleido-story__switch-thumb,
+  .kaleido-values__inject-switch-thumb {
     top: 2px;
     left: 2px;
     width: 16px;
     height: 16px;
   }
 
-  .kaleido-story__switch:not(.is-off) .kaleido-story__switch-thumb {
+  .kaleido-story__switch:not(.is-off) .kaleido-story__switch-thumb,
+  .kaleido-values__inject-switch:not(.is-off) .kaleido-values__inject-switch-thumb {
     transform: translateX(18px);
   }
 
@@ -2162,6 +3621,7 @@ select.kaleido-input {
   .kaleido-panel .kaleido-icon-btn,
   .kaleido-panel .kaleido-home__card,
   .kaleido-panel .kaleido-home__log-btn,
+  .kaleido-panel .kaleido-game__gear,
   .kaleido-panel .kaleido-log__chip,
   .kaleido-panel .kaleido-log__action,
   .kaleido-panel .kaleido-preset__tab,
@@ -2169,8 +3629,28 @@ select.kaleido-input {
   .kaleido-story-dialog .kaleido-icon-btn,
   .kaleido-story-dialog .kaleido-story__icon-btn,
   .kaleido-story-dialog .kaleido-story__chevron,
-  .kaleido-story-dialog .kaleido-story__switch {
+  .kaleido-story-dialog .kaleido-story__switch,
+  .kaleido-values__inject-switch {
     touch-action: manipulation;
+  }
+
+  /* ---------- 游戏模式：移动端适配 ---------- */
+  .kaleido-game__cover {
+    flex-wrap: wrap;
+    padding: 11px 12px;
+  }
+
+  .kaleido-game__cover-updated {
+    max-width: 220px;
+  }
+
+  .kaleido-game__refresh {
+    margin-left: auto;
+  }
+
+  .kaleido-game__entry-name,
+  .kaleido-game__entry-value {
+    max-width: 40%;
   }
 }
 
@@ -2257,5 +3737,10 @@ select.kaleido-input {
   .kaleido-story__add-menu-item:hover {
     background: transparent;
     color: var(--k-ink);
+  }
+
+  .kaleido-game__refresh:hover {
+    transform: none;
+    box-shadow: none;
   }
 }

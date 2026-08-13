@@ -28,6 +28,12 @@ const FILES = [
   'js/story-data.js',
   'js/story-gate.js',
   'js/views-story.js',
+  'js/values-data.js',
+  'js/values-maintain.js',
+  'js/values-inject.js',
+  'js/values-trigger.js',
+  'js/views-values.js',
+  'js/views-game.js',
   'js/main.js',
 ];
 

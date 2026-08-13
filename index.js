@@ -2,7 +2,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '0.7.10';
+const MODULE_VERSION = '0.13.3';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 
 // ---------- DOM ID / class ----------
@@ -18,6 +18,20 @@ const NODE_ICON_CLASS = 'fa-solid fa-code-branch';
 const INJECT_ICON_CLASS = 'fa-solid fa-arrow-right-to-bracket';
 const LOG_ICON_CLASS = 'fa-solid fa-book';
 const PRESET_ICON_CLASS = 'fa-solid fa-file-lines';
+const VALUES_ICON_CLASS = 'fa-solid fa-gauge-high';
+const VALUES_ADD_CHILD_ICON_CLASS = 'fa-solid fa-plus';
+const VALUES_EDIT_ICON_CLASS = 'fa-solid fa-pen';
+const VALUES_DELETE_ICON_CLASS = 'fa-solid fa-trash-can';
+const VALUES_CHEVRON_ICON_CLASS = 'fa-solid fa-chevron-right';
+const VALUES_DRAG_ICON_CLASS = 'fa-solid fa-grip-vertical';
+const VALUES_EXPORT_ICON_CLASS = 'fa-solid fa-download';
+const VALUES_IMPORT_ICON_CLASS = 'fa-solid fa-file-import';
+const VALUES_SPARK_ICON_CLASS = 'fa-solid fa-wand-magic-sparkles';
+const VALUES_TREE_ICON_CLASS = 'fa-solid fa-sitemap';
+const VALUES_KEYS_ICON_CLASS = 'fa-solid fa-key';
+const VALUES_LAYER_GAME_ICON_CLASS = 'fa-solid fa-gamepad';
+const VALUES_LAYER_SWAP_ICON_CLASS = 'fa-solid fa-arrows-rotate';
+const VALUES_LAYER_DEFAULT_ICON_CLASS = 'fa-solid fa-book-open';
 const PANEL_TITLE_ID = 'kaleido-panel-title';
 const PANEL_BACK_ID = 'kaleido-panel-back';
 const HOME_VIEW_ID = 'kaleido-home-view';
@@ -44,13 +58,15 @@ const INJECT_GATE_TEXT_ID = 'kaleido-inject-gate-text';
 const INJECT_EVENTS_ID = 'kaleido-inject-events';
 const INJECT_TEXT_ID = 'kaleido-inject-text';
 const INJECT_COPY_ID = 'kaleido-inject-copy';
+// 注入实录 · 剧情触发（变量条件确定性触发）最近一轮
+const INJECT_TRIGGER_SUMMARY_ID = 'kaleido-inject-trigger-summary';
+const INJECT_TRIGGER_EVENTS_ID = 'kaleido-inject-trigger-events';
+const INJECT_TRIGGER_TEXT_ID = 'kaleido-inject-trigger-text';
 
 // 系统日志
 const LOG_VIEW_ID = 'kaleido-log-view';
 const HOME_LOG_CARD_ID = 'kaleido-home-log-card';
 const HOME_LOG_STATUS_ID = 'kaleido-home-log-status';
-const HOME_LOG_BUTTON_ID = 'kaleido-home-log-button';
-const HOME_LOG_BADGE_ID = 'kaleido-home-log-badge';
 const LOG_SEARCH_ID = 'kaleido-log-search';
 const LOG_SOURCE_ID = 'kaleido-log-source';
 const LOG_MAX_ID = 'kaleido-log-max';
@@ -79,6 +95,12 @@ const PRESET_COUNT_ID = 'kaleido-preset-count';
 // 剧情预筛（预设模版设置区）
 const PRESET_GATE_TOGGLE_ID = 'kaleido-preset-gate-toggle';
 const PRESET_GATE_STATUS_ID = 'kaleido-preset-gate-status';
+// 变量自动维护（预设模版设置区）
+const PRESET_VALUES_TOGGLE_ID = 'kaleido-preset-values-toggle';
+const PRESET_VALUES_STATUS_ID = 'kaleido-preset-values-status';
+// 剧情触发（预设模版设置区）
+const PRESET_TRIGGER_TOGGLE_ID = 'kaleido-preset-trigger-toggle';
+const PRESET_TRIGGER_STATUS_ID = 'kaleido-preset-trigger-status';
 
 // 剧情脉络（Storyline）· 可视化工作台
 const STORY_DIALOG_ID = 'kaleido-story-dialog';
@@ -132,6 +154,180 @@ const STORY_CARD_EXTENSION_KEY = 'kaleidoscope_story';
 const STORY_CARD_DATA_VERSION = 1;
 const STORY_CARD_SAVE_DEBOUNCE_MS = 500;
 const STORY_CARD_SAVE_TIMER_KEY = '__kaleido_story_card_save_timer__';
+// ---------- 变量系统（键注册表 + 默认值 / 游戏值两层）----------
+const VALUES_VIEW_ID = 'kaleido-values-view';
+const VALUES_DIALOG_ID = 'kaleido-values-dialog';
+const VALUES_DIALOG_KEY = '__kaleido_values_dialog_key__';
+const VALUES_CLOSE_BTN_ID = 'kaleido-values-close-btn';
+const HOME_VALUES_CARD_ID = 'kaleido-home-values-card';
+const HOME_VALUES_STATUS_ID = 'kaleido-home-values-status';
+const VALUES_IMPORT_BTN_ID = 'kaleido-values-import-btn';
+const VALUES_IMPORT_INPUT_ID = 'kaleido-values-import-input';
+const VALUES_EXPORT_BTN_ID = 'kaleido-values-export-btn';
+const VALUES_TAB_TREE_ID = 'kaleido-values-tab-tree';
+const VALUES_NAV_TREE_COUNT_ID = 'kaleido-values-nav-tree-count';
+const VALUES_NAV_KEYS_COUNT_ID = 'kaleido-values-nav-keys-count';
+const VALUES_NAV_COLLAPSE_ID = 'kaleido-values-nav-collapse';
+const VALUES_NAV_EXPAND_ID = 'kaleido-values-nav-expand';
+const VALUES_NAV_COLLAPSE_ICON_CLASS = 'fa-solid fa-chevron-left';
+const VALUES_TAB_KEYS_ID = 'kaleido-values-tab-keys';
+const VALUES_TREE_PANE_ID = 'kaleido-values-tree-pane';
+const VALUES_KEYS_PANE_ID = 'kaleido-values-keys-pane';
+const VALUES_BINDING_ID = 'kaleido-values-binding';
+const VALUES_LAYER_ROW_ID = 'kaleido-values-layer-row';
+const VALUES_LAYER_TOGGLE_ID = 'kaleido-values-layer-toggle';
+const VALUES_LAYER_ICON_ID = 'kaleido-values-layer-icon';
+const VALUES_LAYER_TITLE_ID = 'kaleido-values-layer-title';
+const VALUES_LAYER_DEFAULT_ID = 'kaleido-values-layer-default';
+const VALUES_LAYER_GAME_ID = 'kaleido-values-layer-game';
+const VALUES_MAINTAIN_STATUS_ID = 'kaleido-values-maintain-status';
+const VALUES_MAINTAIN_NOW_ID = 'kaleido-values-maintain-now';
+const VALUES_RESET_GAME_ID = 'kaleido-values-reset-game';
+const VALUES_DEFAULT_HINT_ID = 'kaleido-values-default-hint';
+const VALUES_TREE_ID = 'kaleido-values-tree';
+const VALUES_TREE_BODY_ID = 'kaleido-values-tree-body';
+const VALUES_ADD_ROOT_ID = 'kaleido-values-add-root';
+const VALUES_KEYS_BODY_ID = 'kaleido-values-keys-body';
+const VALUES_ADD_KEY_ID = 'kaleido-values-add-key';
+const VALUES_EDITOR_ID = 'kaleido-values-editor';
+const VALUES_EDITOR_TITLE_ID = 'kaleido-values-editor-title';
+const VALUES_EDITOR_NAME_ID = 'kaleido-values-editor-name';
+const VALUES_EDITOR_KEY_SELECT_ID = 'kaleido-values-editor-key-select';
+const VALUES_EDITOR_VALUE_ID = 'kaleido-values-editor-value';
+const VALUES_EDITOR_VALUE_LABEL_ID = 'kaleido-values-editor-value-label';
+const VALUES_EDITOR_SAVE_ID = 'kaleido-values-editor-save';
+const VALUES_EDITOR_CANCEL_ID = 'kaleido-values-editor-cancel';
+const VALUES_EDITOR_NODE_FIELDS_ID = 'kaleido-values-editor-node-fields';
+const VALUES_EDITOR_KEY_FIELDS_ID = 'kaleido-values-editor-key-fields';
+const VALUES_EDITOR_PARENT_SELECT_ID = 'kaleido-values-editor-parent-select';
+const VALUES_EDITOR_KEY_NAME_ID = 'kaleido-values-editor-key-name';
+const VALUES_ADD_MENU_ID = 'kaleido-values-add-menu';
+const VALUES_ADD_MENU_NODE_ID = 'kaleido-values-add-menu-node';
+const VALUES_ADD_MENU_KEY_ID = 'kaleido-values-add-menu-key';
+const VALUES_KEY_EDITOR_ID = 'kaleido-values-key-editor';
+const VALUES_KEY_EDITOR_TITLE_ID = 'kaleido-values-key-editor-title';
+const VALUES_KEY_EDITOR_NAME_ID = 'kaleido-values-key-editor-name';
+const VALUES_KEY_EDITOR_RULE_ID = 'kaleido-values-key-editor-rule';
+const VALUES_KEY_EDITOR_SAVE_ID = 'kaleido-values-key-editor-save';
+const VALUES_KEY_EDITOR_CANCEL_ID = 'kaleido-values-key-editor-cancel';
+// 变量类型：父变量（AI 按变化规则维护）/ 子变量（按父变量值自动派生）。
+const VALUES_KEY_TYPE_PARENT = 'parent';
+const VALUES_KEY_TYPE_CHILD = 'child';
+const VALUES_KEY_EDITOR_TYPE_ID = 'kaleido-values-key-editor-type';
+const VALUES_KEY_EDITOR_PARENT_ID = 'kaleido-values-key-editor-parent';
+const VALUES_KEY_EDITOR_CHILD_FIELDS_ID = 'kaleido-values-key-editor-child-fields';
+const VALUES_KEY_EDITOR_RULE_FIELDS_ID = 'kaleido-values-key-editor-rule-fields';
+const VALUES_KEY_EDITOR_RULES_ID = 'kaleido-values-key-editor-rules';
+const VALUES_KEY_EDITOR_RULES_ADD_ID = 'kaleido-values-key-editor-rules-add';
+const VALUES_KEY_EDITOR_RULE_ROW_CLASS = 'kaleido-values__key-rule-row';
+const VALUES_KEY_EDITOR_RULE_MIN_CLASS = 'kaleido-values__key-rule-min';
+const VALUES_KEY_EDITOR_RULE_MAX_CLASS = 'kaleido-values__key-rule-max';
+const VALUES_KEY_EDITOR_RULE_VALUE_CLASS = 'kaleido-values__key-rule-value';
+const VALUES_KEY_EDITOR_RULE_REMOVE_CLASS = 'kaleido-values__key-rule-remove';
+const VALUES_EDITOR_CHILD_HINT_ID = 'kaleido-values-editor-child-hint';
+// 变量 · 角色卡绑定（与剧情脉络同模式）：数据存角色卡 extensions，
+// 随角色卡导入/导出自动携带；群聊/未选角色时回退全局设置 valuesData。
+const VALUES_CARD_EXTENSION_KEY = 'kaleidoscope_values';
+const VALUES_CARD_DATA_VERSION = 1;
+const VALUES_CARD_SAVE_DEBOUNCE_MS = 500;
+const VALUES_CARD_SAVE_TIMER_KEY = '__kaleido_values_card_save_timer__';
+// 变量 · 聊天文件绑定：游戏值存 chatMetadata[kaleidoscope_values]，
+// 随聊天文件（jsonl 首行 chat_metadata）保存 / 加载自动携带。
+const VALUES_CHAT_KEY = 'kaleidoscope_values';
+const VALUES_CHAT_SAVE_DEBOUNCE_MS = 400;
+const VALUES_CHAT_SAVE_TIMER_KEY = '__kaleido_values_chat_save_timer__';
+// 整包 YAML 的自描述格式标记与文件名前缀。
+const VALUES_BUNDLE_FORMAT = 'kaleidoscope-values';
+const VALUES_BUNDLE_FILENAME_PREFIX = '万华镜-变量';
+const VALUES_CARD_BUNDLE_FILENAME_PREFIX = '变量: ';
+// 变量自动维护（AI 维护管线）
+const VALUES_AUTO_UPDATE_ENABLED = true;
+const VALUES_MAINTAIN_RECENT_COUNT = 2;
+const VALUES_MAINTAIN_TIMEOUT_MS = 60000;
+const VALUES_MAINTAIN_MAX_TOKENS = 2000;
+const VALUES_MAINTAIN_HANDLER_KEY = '__kaleido_values_maintain_handler__';
+const VALUES_MAINTAIN_STARTED_KEY = '__kaleido_values_maintain_started__';
+const VALUES_MAINTAIN_STOPPED_KEY = '__kaleido_values_maintain_stopped__';
+const VALUES_MAINTAIN_CHAT_CHANGED_KEY = '__kaleido_values_maintain_chat_changed__';
+const VALUES_MAINTAIN_STATE_KEY = '__kaleido_values_maintain_state__';
+const VALUES_LAST_ROUND_KEY = '__kaleido_values_last_round__';
+// 变量注入提示词（默认数值层勾选 → 发送前注入 World Info after 之后）
+const VALUES_INJECT_KEY = 'Kaleidoscope_Values';
+const VALUES_INJECT_BAR_ID = 'kaleido-values-inject-bar';
+const VALUES_INJECT_TOGGLE_ID = 'kaleido-values-inject-toggle';
+const VALUES_INJECT_STATUS_ID = 'kaleido-values-inject-status';
+const VALUES_INJECT_ICON_CLASS = 'fa-solid fa-bullhorn';
+const VALUES_INJECT_CLEANUP_ENDED_KEY = '__kaleido_values_inject_cleanup_ended__';
+const VALUES_INJECT_CLEANUP_STOPPED_KEY = '__kaleido_values_inject_cleanup_stopped__';
+// 注入预览：变量系统内查看实际注入提示词的 <Values> 内容（只读）。
+const VALUES_INJECT_PREVIEW_ICON_CLASS = 'fa-solid fa-scroll';
+const VALUES_TAB_INJECT_ID = 'kaleido-values-tab-inject';
+const VALUES_INJECT_PANE_ID = 'kaleido-values-inject-pane';
+const VALUES_INJECT_TEXT_ID = 'kaleido-values-inject-text';
+// 剧情触发（变量条件确定性触发）：不依赖 API，按变量当前值判定事件是否触发。
+const VALUES_TRIGGER_ICON_CLASS = 'fa-solid fa-bolt';
+const VALUES_TAB_TRIGGERS_ID = 'kaleido-values-tab-triggers';
+const VALUES_NAV_TRIGGERS_COUNT_ID = 'kaleido-values-nav-triggers-count';
+const VALUES_TRIGGERS_PANE_ID = 'kaleido-values-triggers-pane';
+const VALUES_TRIGGERS_TOGGLE_ID = 'kaleido-values-triggers-toggle';
+const VALUES_TRIGGERS_ADD_ID = 'kaleido-values-triggers-add';
+const VALUES_TRIGGERS_BODY_ID = 'kaleido-values-triggers-body';
+const VALUES_TRIGGER_EDITOR_ID = 'kaleido-values-trigger-editor';
+const VALUES_TRIGGER_EDITOR_TITLE_ID = 'kaleido-values-trigger-editor-title';
+const VALUES_TRIGGER_EDITOR_NAME_ID = 'kaleido-values-trigger-editor-name';
+const VALUES_TRIGGER_EDITOR_LOGIC_ID = 'kaleido-values-trigger-editor-logic';
+const VALUES_TRIGGER_EDITOR_ONCE_ID = 'kaleido-values-trigger-editor-once';
+const VALUES_TRIGGER_EDITOR_DESC_ID = 'kaleido-values-trigger-editor-desc';
+const VALUES_TRIGGER_EDITOR_CONDITIONS_ID = 'kaleido-values-trigger-editor-conditions';
+const VALUES_TRIGGER_EDITOR_CONDITION_ADD_ID = 'kaleido-values-trigger-editor-condition-add';
+const VALUES_TRIGGER_EDITOR_CONTENT_ID = 'kaleido-values-trigger-editor-content';
+const VALUES_TRIGGER_EDITOR_SAVE_ID = 'kaleido-values-trigger-editor-save';
+const VALUES_TRIGGER_EDITOR_CANCEL_ID = 'kaleido-values-trigger-editor-cancel';
+const VALUES_TRIGGER_CONDITION_ROW_CLASS = 'kaleido-values__trigger-condition';
+const VALUES_TRIGGER_CONDITION_PATH_CLASS = 'kaleido-values__trigger-condition-path';
+const VALUES_TRIGGER_CONDITION_OP_CLASS = 'kaleido-values__trigger-condition-op';
+const VALUES_TRIGGER_CONDITION_OP_CENTER_CLASS = 'kaleido-values__trigger-condition-op-center';
+const VALUES_TRIGGER_CONDITION_OP_WRAP_CLASS = 'kaleido-values__trigger-condition-op-wrap';
+const VALUES_TRIGGER_CONDITION_OP_TEXT_CLASS = 'kaleido-values__trigger-condition-op-text';
+const VALUES_TRIGGER_CONDITION_VALUE_CLASS = 'kaleido-values__trigger-condition-value';
+const VALUES_TRIGGER_CONDITION_REMOVE_CLASS = 'kaleido-values__trigger-condition-remove';
+// 剧情触发 · 注入与轮次记录
+const VALUES_TRIGGER_INJECT_KEY = 'Kaleidoscope_Trigger_Event';
+const VALUES_TRIGGER_LAST_ROUND_KEY = '__kaleido_values_trigger_last_round__';
+const VALUES_TRIGGER_CLEANUP_ENDED_KEY = '__kaleido_values_trigger_cleanup_ended__';
+const VALUES_TRIGGER_CLEANUP_STOPPED_KEY = '__kaleido_values_trigger_cleanup_stopped__';
+// 剧情触发 · 条件运算符与逻辑选项
+const VALUES_TRIGGER_OPS = Object.freeze([
+  { value: '==', label: '等于（==）' },
+  { value: '!=', label: '不等于（!=）' },
+  { value: '>', label: '大于（>）' },
+  { value: '>=', label: '大于等于（>=）' },
+  { value: '<', label: '小于（<）' },
+  { value: '<=', label: '小于等于（<=）' },
+  { value: 'contains', label: '包含（contains）' },
+  { value: 'exists', label: '存在（exists）' },
+  { value: 'not exists', label: '不存在（not exists）' },
+]);
+const VALUES_TRIGGER_LOGIC_OPTIONS = Object.freeze([
+  { value: 'all', label: '全部满足（且）' },
+  { value: 'any', label: '任一满足（或）' },
+]);
+// 事件类型：once = 一次性（触发后自动关闭，默认）；persistent = 常驻（可重复触发）。
+const VALUES_TRIGGER_ONCE_OPTIONS = Object.freeze([
+  { value: 'once', label: '一次性事件（触发后自动关闭）' },
+  { value: 'persistent', label: '常驻事件（可重复触发）' },
+]);
+// ---------- 游戏模式（玩家数据展示面板）----------
+// 只读展示「变量系统」注入提示词的那些变量：当前游戏值总览，
+// 让玩家随时看到当前游戏中的各种数据（角色属性、资源、好感、状态等）。
+const GAME_VIEW_ID = 'kaleido-game-view';
+const HOME_GAME_BUTTON_ID = 'kaleido-home-game-button';
+const GAME_ICON_CLASS = 'fa-solid fa-gamepad';
+const GAME_UPDATED_ID = 'kaleido-game-updated';
+const GAME_REFRESH_ID = 'kaleido-game-refresh';
+const GAME_GEAR_ID = 'kaleido-game-gear';
+const GAME_TREE_ID = 'kaleido-game-tree';
+const GAME_REFRESH_ENDED_KEY = '__kaleido_game_refresh_ended__';
 // ---------- 剧情预筛（Story Gate）----------
 const STORY_GATE_INJECT_KEY = 'Kaleidoscope_Story_Event';
 const STORY_GATE_RECENT_COUNT = 4;
@@ -259,7 +455,9 @@ const DEFAULT_SETTINGS = Object.freeze({
   storyNodes: [],
   storyScripts: [],
   storyGateEnabled: true,
+  valuesTriggerEnabled: true,
   storyGatePrompt: '',
+  valuesNavCollapsed: false,
 });
 
 // 宿主上下文不可扩展时的兜底设置存储（WeakMap 随上下文释放）。
@@ -305,6 +503,36 @@ const DEFAULT_STORY_GATE_PROMPT = [
   '- 关联判定从宽：拿不准是否与本轮相关时，若触发条件已满足且剧情已推进到附近，倾向列入。',
 ].join('\n');
 
+// ---------- 变量自动维护默认提示词 ----------
+// 与「变量维护」的输入说明保持一致：输入有 <Key_Rules>（键注册表及其变化规则）、
+// <Current_Values>（当前游戏值，YAML）与 <Recent_Messages>（最近 2 条消息）。
+// 输出约定：YAML 映射：只列出有变化的键，未提及的键保持原值；值写 null 表示删除。
+const DEFAULT_VALUES_MAINTAIN_PROMPT = [
+  '【任务】',
+  '你是「变量维护」子 agent。',
+  '你的职责：每轮生成结束后，根据最新剧情维护当前聊天中的游戏变量（角色属性、资源、好感、关系、状态等），让变量与剧情保持一致。',
+  '这是高频轻量调用：只更新确有变化的变量，没有变化就不改动；直接输出结果，不要解释、不要分析过程、不要任何多余文字。',
+  '',
+  '【输入】',
+  '本轮输入包含三份材料：',
+  '- <Key_Rules>：全部已注册变量及其变化规则。规则是变量变化的唯一依据，规则之外的变量不要随意改动。',
+  '- <Current_Values>：当前游戏变量（YAML 格式）。这是唯一可改动的数据，结构、条目名与层级必须原样保留。',
+  '- <Recent_Messages>：最新两条消息（用户消息 + AI 回复），是本轮维护的依据。',
+  '',
+  '【维护原则】',
+  '1. 只依据 <Recent_Messages> 中的剧情更新变量：角色实际做了什么、获得或失去了什么、关系发生了什么变化。',
+  '2. 严格遵循 <Key_Rules> 中各变量的变化规则：规则规定了增减方式、范围（上限/下限）、触发条件；与规则冲突的改动一律不做。',
+  '3. 消息中没有明确体现的变化不要改；拿不准时保持不变，宁可漏更也不可乱更。',
+  '4. 保持结构与命名：顶层条目（人名、资源名）与层级不要删除、改名或合并，除非剧情明确要求；只更新叶子值。',
+  '5. 变量必须是 YAML 标量（数字 / 字符串 / 布尔）：数字保留变量形态，字符串按剧情原样书写。',
+  '',
+  '【输出】',
+  '你的回复必须且只能是一个 YAML 映射（可用 ```yaml 代码块包裹），内容为更新后的变量树：',
+  '- 只列出确实需要更新的变量；未提及的变量保持原值不动。',
+  '- 需要删除某个变量时，把它的值写成 null。',
+  '- 不要输出解释、备注或任何前后缀文字。',
+].join('\n');
+
 // ---------- 预设模版 ----------
 // 各子系统默认提示词的编辑元信息：settingsKey 指向 settings 中的存储字段
 // （空字符串 = 使用内置默认），与 API 连接页的提示词编辑区共用同一数据源。
@@ -317,6 +545,13 @@ const PRESET_META = Object.freeze({
     settingsKey: 'storyGatePrompt',
     getDefault: () => DEFAULT_STORY_GATE_PROMPT,
   }),
+  valuesMaintain: Object.freeze({
+    label: '变量维护',
+    title: '变量维护提示词',
+    description: '每轮生成结束后自动调用 AI 维护游戏变量：依据已注册变量的变化规则与最新两条消息更新聊天中的变量。',
+    settingsKey: 'valuesMaintainPrompt',
+    getDefault: () => DEFAULT_VALUES_MAINTAIN_PROMPT,
+  }),
 });
 
 // 视图标题表：showPanelView 切换时更新面板标题。
@@ -327,6 +562,8 @@ const PANEL_VIEW_TITLES = Object.freeze({
   [PRESET_VIEW_ID]: '预设模版',
   [INJECT_VIEW_ID]: '注入实录',
   [STORY_VIEW_ID]: '剧情脉络',
+  [VALUES_VIEW_ID]: '变量系统',
+  [GAME_VIEW_ID]: '游戏模式',
 });
 // 宽视图模式：日志视图需要更宽的窗口展示时间/级别/来源/内容。
 const PANEL_WIDE_MODES = Object.freeze({
@@ -334,10 +571,13 @@ const PANEL_WIDE_MODES = Object.freeze({
   [PRESET_VIEW_ID]: 'is-preset-mode',
   [INJECT_VIEW_ID]: 'is-inject-mode',
   [STORY_VIEW_ID]: 'is-story-mode',
+  [VALUES_VIEW_ID]: 'is-values-mode',
+  [GAME_VIEW_ID]: 'is-game-mode',
 });
 const ESC_KEY_HANDLER_KEY = '__kaleido_esc_key_handler__';
 const MENU_RECOVERY_OBSERVER_KEY = '__kaleido_menu_recovery_observer__';
 const HOST_EVENT_WATCHDOG_KEY = '__kaleido_host_event_watchdog__';
+
 
 
 // ===== js/utils.js =====
@@ -973,6 +1213,29 @@ function onHostEvent(ctx, eventName, handler, key) {
   eventSource.on(eventType, wrapped);
 }
 
+// 宿主注入 API 适配（剧情预筛 / 变量注入共用）：标准 SillyTavern 的 getContext()
+// 会提供 extension_prompt_types / extension_prompt_roles；TauriTavern 2.x 不提供
+// 这两个对象（也不挂 globalThis），因此只把 setExtensionPrompt 作为必需项，枚举值
+// 按已知数值常量兜底：
+// extension_prompt_types: NONE=-1, IN_PROMPT=0, IN_CHAT=1, BEFORE_PROMPT=2
+// extension_prompt_roles: SYSTEM=0, USER=1, ASSISTANT=2
+// IN_PROMPT 位置 = 提示词中「World Info (after)」之后（SillyTavern 的
+// beforeScenarioAnchor / afterScenarioAnchor 锚点语义）。
+function getExtensionPromptApi(ctx) {
+  const context = ctx || getContextSafe();
+  if (!context) return null;
+  const setExtensionPrompt = typeof context.setExtensionPrompt === 'function'
+    ? context.setExtensionPrompt
+    : (typeof globalThis.setExtensionPrompt === 'function' ? globalThis.setExtensionPrompt : null);
+  if (typeof setExtensionPrompt !== 'function') return null;
+  const types = context.extension_prompt_types || globalThis.extension_prompt_types || null;
+  const roles = context.extension_prompt_roles || globalThis.extension_prompt_roles || null;
+  const inChat = (types && Number.isFinite(types.IN_CHAT)) ? types.IN_CHAT : 1;
+  const inPrompt = (types && Number.isFinite(types.IN_PROMPT)) ? types.IN_PROMPT : 0;
+  const systemRole = (roles && Number.isFinite(roles.SYSTEM)) ? roles.SYSTEM : 0;
+  return { setExtensionPrompt, inChat, inPrompt, systemRole };
+}
+
 
 // ===== js/send-barrier.js =====
 // ===== 跨扩展发送屏障协议 v1（Kaleidoscope / SoulLink 共用，两边实现必须保持一致）=====
@@ -1363,7 +1626,7 @@ function openPanel() {
   const panel = getPanel();
   if (!panel) return;
   logApp('debug', '面板已打开');
-  showPanelView(HOME_VIEW_ID);
+  showPanelView(GAME_VIEW_ID);
   refreshHomeStatuses();
   panel.classList.add('is-open');
   panel.setAttribute('aria-hidden', 'false');
@@ -1403,7 +1666,7 @@ function showPanelView(viewId) {
     if (wideMode) dialog.classList.add(wideMode);
   }
   const back = document.getElementById(PANEL_BACK_ID);
-  if (back) back.style.visibility = viewId === HOME_VIEW_ID ? 'hidden' : 'visible';
+  if (back) back.style.visibility = (viewId === HOME_VIEW_ID || viewId === GAME_VIEW_ID) ? 'hidden' : 'visible';
   const title = document.getElementById(PANEL_TITLE_ID);
   if (title) title.textContent = PANEL_VIEW_TITLES[viewId] || MODULE_DISPLAY_NAME;
   if (viewId === LOG_VIEW_ID) {
@@ -1417,6 +1680,13 @@ function showPanelView(viewId) {
     renderStoryTree();
     refreshHomeStoryStatus();
   }
+  if (viewId === VALUES_VIEW_ID) {
+    renderValuesTree();
+    refreshHomeValuesStatus();
+  }
+  if (viewId === GAME_VIEW_ID) {
+    renderGameView();
+  }
   ensurePanelPosition(panel);
 }
 
@@ -1428,9 +1698,14 @@ function initPanelViews(panel) {
     if (isNarrowViewport()) showPanelView(STORY_VIEW_ID);
     else openStoryWorkbench();
   });
-  document.getElementById(HOME_LOG_BUTTON_ID)?.addEventListener('click', () => showPanelView(LOG_VIEW_ID));
+  document.getElementById(HOME_GAME_BUTTON_ID)?.addEventListener('click', () => showPanelView(GAME_VIEW_ID));
   document.getElementById(HOME_PRESET_CARD_ID)?.addEventListener('click', () => showPanelView(PRESET_VIEW_ID));
   document.getElementById(HOME_INJECT_CARD_ID)?.addEventListener('click', () => showPanelView(INJECT_VIEW_ID));
+  document.getElementById(HOME_VALUES_CARD_ID)?.addEventListener('click', () => {
+    if (isNarrowViewport()) showPanelView(VALUES_VIEW_ID);
+    else openValuesWorkbench();
+  });
+  document.getElementById(HOME_LOG_CARD_ID)?.addEventListener('click', () => showPanelView(LOG_VIEW_ID));
   document.getElementById(INJECT_COPY_ID)?.addEventListener('click', copyInjectInjectionText);
   panel.dataset.viewsReady = 'true';
 }
@@ -1455,41 +1730,54 @@ function createPanel() {
         <section id="${HOME_VIEW_ID}" class="kaleido-view is-active" aria-hidden="false">
           <div class="kaleido-home__hero">
             <p class="kaleido-home__slogan"><span class="kaleido-home__slogan-first" aria-hidden="true">镜</span>中万象，皆是文章</p>
-            <button type="button" id="${HOME_LOG_BUTTON_ID}" class="kaleido-home__log-btn" title="系统日志：后台运行记录与网络请求" aria-label="系统日志">
-              <span class="${LOG_ICON_CLASS}"></span>
-              <span id="${HOME_LOG_BADGE_ID}" class="kaleido-home__log-badge" data-state="idle" hidden></span>
+            <button type="button" id="${HOME_GAME_BUTTON_ID}" class="kaleido-home__log-btn" title="游戏模式：玩家数据档案" aria-label="游戏模式">
+              <span class="${GAME_ICON_CLASS}"></span>
             </button>
           </div>
           <div class="kaleido-home__grid">
-            <button type="button" id="${HOME_API_CARD_ID}" class="kaleido-home__card" title="配置 AI 接口，引擎的基石">
+<button type="button" id="${HOME_API_CARD_ID}" class="kaleido-home__card" title="配置 AI 接口，引擎的基石">
               <span class="kaleido-home__card-icon"><span class="${API_ICON_CLASS}"></span></span>
               <span class="kaleido-home__card-text">
                 <span class="kaleido-home__card-title">API 连接</span>
                 <span id="${HOME_API_STATUS_ID}" class="kaleido-home__card-status" data-state="idle">尚未连接</span>
               </span>
             </button>
-            <button type="button" id="${HOME_STORY_CARD_ID}" class="kaleido-home__card" title="剧情脉络：节点与事件的工作台">
-              <span class="kaleido-home__card-icon"><span class="${STORY_ICON_CLASS}"></span></span>
-              <span class="kaleido-home__card-text">
-                <span class="kaleido-home__card-title">剧情脉络</span>
-                <span id="${HOME_STORY_STATUS_ID}" class="kaleido-home__card-status" data-state="idle">尚未添加</span>
-              </span>
-            </button>
-            <button type="button" id="${HOME_PRESET_CARD_ID}" class="kaleido-home__card" title="预设模版：修改与重置默认提示词">
+<button type="button" id="${HOME_PRESET_CARD_ID}" class="kaleido-home__card" title="预设模版：修改与重置默认提示词">
               <span class="kaleido-home__card-icon"><span class="${PRESET_ICON_CLASS}"></span></span>
               <span class="kaleido-home__card-text">
                 <span class="kaleido-home__card-title">预设模版</span>
                 <span id="${HOME_PRESET_STATUS_ID}" class="kaleido-home__card-status" data-state="idle">默认配置</span>
               </span>
             </button>
-            <button type="button" id="${HOME_INJECT_CARD_ID}" class="kaleido-home__card" title="剧情预筛：点击发送时自动挑选并注入本轮事件">
+<button type="button" id="${HOME_VALUES_CARD_ID}" class="kaleido-home__card" title="变量系统：变量注册 + 默认值 / 游戏值，AI 自动维护">
+              <span class="kaleido-home__card-icon"><span class="${VALUES_ICON_CLASS}"></span></span>
+              <span class="kaleido-home__card-text">
+                <span class="kaleido-home__card-title">变量系统</span>
+                <span id="${HOME_VALUES_STATUS_ID}" class="kaleido-home__card-status" data-state="idle">尚未添加</span>
+              </span>
+            </button>
+<button type="button" id="${HOME_STORY_CARD_ID}" class="kaleido-home__card" title="剧情脉络：节点与事件的工作台">
+              <span class="kaleido-home__card-icon"><span class="${STORY_ICON_CLASS}"></span></span>
+              <span class="kaleido-home__card-text">
+                <span class="kaleido-home__card-title">剧情脉络</span>
+                <span id="${HOME_STORY_STATUS_ID}" class="kaleido-home__card-status" data-state="idle">尚未添加</span>
+              </span>
+            </button>
+<button type="button" id="${HOME_LOG_CARD_ID}" class="kaleido-home__card" title="系统日志：后台运行记录与网络请求">
+              <span class="kaleido-home__card-icon"><span class="${LOG_ICON_CLASS}"></span></span>
+              <span class="kaleido-home__card-text">
+                <span class="kaleido-home__card-title">系统日志</span>
+                <span id="${HOME_LOG_STATUS_ID}" class="kaleido-home__card-status" data-state="idle">暂无记录</span>
+              </span>
+            </button>
+<button type="button" id="${HOME_INJECT_CARD_ID}" class="kaleido-home__card" title="剧情预筛：点击发送时自动挑选并注入本轮事件">
               <span class="kaleido-home__card-icon"><span class="${INJECT_ICON_CLASS}"></span></span>
               <span class="kaleido-home__card-text">
                 <span class="kaleido-home__card-title">注入实录</span>
                 <span id="${HOME_INJECT_STATUS_ID}" class="kaleido-home__card-status" data-state="idle">尚未运行</span>
               </span>
             </button>
-          </div>
+</div>
         </section>
         <section id="${API_VIEW_ID}" class="kaleido-view" aria-hidden="true">
           <div class="kaleido-api">
@@ -1601,6 +1889,28 @@ function createPanel() {
                 <button type="button" id="${PRESET_GATE_TOGGLE_ID}" class="kaleido-btn kaleido-api__concurrency-toggle" title="开启/关闭剧情预筛">🎬 剧情预筛：开</button>
               </div>
             </div>
+            <div class="kaleido-preset__gate">
+              <div class="kaleido-preset__gate-head">
+                <span class="kaleido-preset__gate-title">变量自动维护</span>
+                <span id="${PRESET_VALUES_STATUS_ID}" class="kaleido-preset__status" data-state="idle">未启用</span>
+              </div>
+              <p class="kaleido-preset__gate-hint">每轮生成结束后，自动调用 AI 依据「已注册变量的变化规则 + 当前游戏值 + 最新 2 条消息」维护聊天中的游戏值（存聊天文件）。</p>
+              <div class="kaleido-preset__gate-row">
+                <span class="kaleido-preset__gate-label">启用变量自动维护</span>
+                <button type="button" id="${PRESET_VALUES_TOGGLE_ID}" class="kaleido-btn kaleido-api__concurrency-toggle" title="开启/关闭变量自动维护">✨ 变量自动维护：开</button>
+              </div>
+            </div>
+            <div class="kaleido-preset__gate">
+              <div class="kaleido-preset__gate-head">
+                <span class="kaleido-preset__gate-title">剧情触发</span>
+                <span id="${PRESET_TRIGGER_STATUS_ID}" class="kaleido-preset__status" data-state="idle">未启用</span>
+              </div>
+              <p class="kaleido-preset__gate-hint">不依赖 AI 判断：每次发送前按「某节点下变量的当前值」是否满足预设条件，确定性触发对应剧情事件并注入上下文（条件与事件在变量工作台「剧情触发」页配置）。</p>
+              <div class="kaleido-preset__gate-row">
+                <span class="kaleido-preset__gate-label">启用剧情触发</span>
+                <button type="button" id="${PRESET_TRIGGER_TOGGLE_ID}" class="kaleido-btn kaleido-api__concurrency-toggle" title="开启/关闭剧情触发">⚡ 剧情触发：开</button>
+              </div>
+            </div>
             <p class="kaleido-preset__note">各子系统提示词按标签页切换编辑，改完点「💾 保存」；「↺ 恢复默认」可还原出厂内容。</p>
             <div id="${PRESET_TABS_ID}" class="kaleido-preset__tabs" role="tablist" aria-label="选择要编辑的提示词">
               ${Object.entries(PRESET_META).map(([key, meta]) => `
@@ -1638,6 +1948,12 @@ function createPanel() {
               <button type="button" id="${INJECT_COPY_ID}" class="kaleido-btn kaleido-btn--ghost kaleido-inject__copy">⧉ 复制</button>
             </div>
             <pre id="${INJECT_TEXT_ID}" class="kaleido-inject__inject-text" hidden></pre>
+            <div class="kaleido-inject__trigger-head" hidden>
+              <span class="kaleido-panel__section-title">剧情触发（变量条件）</span>
+            </div>
+            <div id="${INJECT_TRIGGER_SUMMARY_ID}" class="kaleido-inject__summary" hidden></div>
+            <div id="${INJECT_TRIGGER_EVENTS_ID}" class="kaleido-inject__events" hidden></div>
+            <pre id="${INJECT_TRIGGER_TEXT_ID}" class="kaleido-inject__inject-text" hidden></pre>
           </div>
         </section>
       </div>
@@ -1652,6 +1968,8 @@ function createPanel() {
   initPanelViews(panel);
   initApiSection(panel);
   initStorySection(panel);
+  initValuesSection(panel);
+  initGameSection(panel);
   initLogView(panel);
   initPresetSection(panel);
   panel.querySelector('.kaleido-panel__close')?.addEventListener('click', closePanel);
@@ -1660,7 +1978,7 @@ function createPanel() {
       if (event.key !== 'Escape') return;
       if (isStoryWorkbenchOpen()) return;
       const activeView = panel.querySelector('.kaleido-view.is-active');
-      if (activeView && activeView.id !== HOME_VIEW_ID) {
+      if (activeView && activeView.id !== HOME_VIEW_ID && activeView.id !== GAME_VIEW_ID) {
         showPanelView(HOME_VIEW_ID);
         return;
       }
@@ -2830,6 +3148,69 @@ function toggleStoryGate() {
   globalThis.toastr?.info?.('剧情预筛已' + (settings.storyGateEnabled ? '开启' : '关闭'), '[' + MODULE_DISPLAY_NAME + ']');
 }
 
+// ---------- 变量自动维护设置（自变量工作台联动） ----------
+function renderPresetValuesControl() {
+  const toggle = document.getElementById(PRESET_VALUES_TOGGLE_ID);
+  const status = document.getElementById(PRESET_VALUES_STATUS_ID);
+  if (!toggle && !status) return;
+  const ctx = getContextSafe();
+  const settings = ctx ? getSettings(ctx) : null;
+  if (!settings) return;
+  const enabled = settings.valuesAutoUpdateEnabled !== false;
+  if (toggle) {
+    toggle.textContent = enabled ? '✨ 变量自动维护：开' : '✨ 变量自动维护：关';
+    toggle.classList.toggle('is-active', enabled);
+    toggle.title = enabled ? '点击关闭：每轮生成结束后不再自动维护变量' : '点击开启：每轮生成结束后自动调用 AI 维护变量';
+  }
+  if (status) {
+    status.textContent = enabled ? '已启用' : '未启用';
+    status.dataset.state = enabled ? 'ok' : 'idle';
+  }
+}
+
+function toggleValuesAutoUpdate() {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const settings = getSettings(ctx);
+  settings.valuesAutoUpdateEnabled = !(settings.valuesAutoUpdateEnabled !== false);
+  saveSettings(ctx);
+  renderPresetValuesControl();
+  refreshHomeValuesStatus();
+  logApp('info', settings.valuesAutoUpdateEnabled ? '变量自动维护已开启' : '变量自动维护已关闭');
+  globalThis.toastr?.info?.('变量自动维护已' + (settings.valuesAutoUpdateEnabled ? '开启' : '关闭'), '[' + MODULE_DISPLAY_NAME + ']');
+}
+
+// ---------- 剧情触发设置（与变量工作台联动） ----------
+function renderPresetTriggerControl() {
+  const toggle = document.getElementById(PRESET_TRIGGER_TOGGLE_ID);
+  const status = document.getElementById(PRESET_TRIGGER_STATUS_ID);
+  if (!toggle && !status) return;
+  const ctx = getContextSafe();
+  const settings = ctx ? getSettings(ctx) : null;
+  if (!settings) return;
+  const enabled = settings.valuesTriggerEnabled !== false;
+  if (toggle) {
+    toggle.textContent = enabled ? '⚡ 剧情触发：开' : '⚡ 剧情触发：关';
+    toggle.classList.toggle('is-active', enabled);
+    toggle.title = enabled ? '点击关闭：发送前不再按变量条件触发剧情事件' : '点击开启：发送前按变量条件确定性触发剧情事件';
+  }
+  if (status) {
+    status.textContent = enabled ? '已启用' : '未启用';
+    status.dataset.state = enabled ? 'ok' : 'idle';
+  }
+}
+
+function toggleValuesTrigger() {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const settings = getSettings(ctx);
+  settings.valuesTriggerEnabled = !(settings.valuesTriggerEnabled !== false);
+  saveSettings(ctx);
+  renderPresetTriggerControl();
+  refreshHomeValuesStatus();
+  logApp('info', settings.valuesTriggerEnabled ? '剧情触发已开启' : '剧情触发已关闭');
+  globalThis.toastr?.info?.('剧情触发已' + (settings.valuesTriggerEnabled ? '开启' : '关闭'), '[' + MODULE_DISPLAY_NAME + ']');
+}
 // 首页「预设模版」卡片状态：已自定义的提示词份数。
 function refreshHomePresetStatus() {
   const status = document.getElementById(HOME_PRESET_STATUS_ID);
@@ -2912,9 +3293,13 @@ function initPresetSection(panel) {
   document.getElementById(PRESET_SAVE_ID)?.addEventListener('click', () => savePreset(presetActiveKey));
   document.getElementById(PRESET_RESET_ID)?.addEventListener('click', () => resetPreset(presetActiveKey));
   document.getElementById(PRESET_GATE_TOGGLE_ID)?.addEventListener('click', toggleStoryGate);
+  document.getElementById(PRESET_VALUES_TOGGLE_ID)?.addEventListener('click', toggleValuesAutoUpdate);
+  document.getElementById(PRESET_TRIGGER_TOGGLE_ID)?.addEventListener('click', toggleValuesTrigger);
 
   renderPresetEditor();
   renderPresetGateControl();
+  renderPresetValuesControl();
+  renderPresetTriggerControl();
   refreshHomePresetStatus();
   panel.dataset.presetReady = 'true';
   logApp('info', '预设模版已就绪');
@@ -2979,35 +3364,23 @@ function refreshHomeStoryStatus() {
   }
 }
 
-// 首页标语旁「系统日志」小图标状态：错误 / 警告条数徽标。
+// 首页「系统日志」卡片状态：错误 / 警告条数文字提示。
 function refreshHomeLogStatus() {
-  const badge = document.getElementById(HOME_LOG_BADGE_ID);
-  if (!badge) return;
+  const status = document.getElementById(HOME_LOG_STATUS_ID);
+  if (!status) return;
   try {
     const entries = (typeof logEntries !== 'undefined' && logEntries) || [];
     const errors = entries.filter((entry) => entry.level === 'error').length;
     const warns = entries.filter((entry) => entry.level === 'warn').length;
-    if (errors > 0) {
-      badge.textContent = String(errors);
-      badge.dataset.state = 'error';
-      badge.title = `${errors} 错误 · ${warns} 警告`;
-      badge.hidden = false;
-    } else if (warns > 0) {
-      badge.textContent = String(warns);
-      badge.dataset.state = 'warn';
-      badge.title = `${warns} 警告`;
-      badge.hidden = false;
-    } else {
-      badge.textContent = '';
-      badge.dataset.state = 'idle';
-      badge.title = '';
-      badge.hidden = true;
-    }
+    const state = errors > 0 ? 'error' : (warns > 0 ? 'warn' : 'idle');
+    const text = errors > 0
+      ? errors + ' 错误 · ' + warns + ' 警告'
+      : (warns > 0 ? warns + ' 警告' : (entries.length > 0 ? '共 ' + entries.length + ' 条' : '暂无记录'));
+    status.textContent = text;
+    status.dataset.state = state;
   } catch (error) {
-    badge.textContent = '';
-    badge.dataset.state = 'idle';
-    badge.title = '';
-    badge.hidden = true;
+    status.textContent = '暂无记录';
+    status.dataset.state = 'idle';
   }
 }
 
@@ -3048,10 +3421,50 @@ function refreshHomeInjectStatus() {
   }
 }
 
+// 首页「变量」卡片状态：键数量 / 条目数量 + 绑定与自动维护提示。
+function refreshHomeValuesStatus() {
+  const status = document.getElementById(HOME_VALUES_STATUS_ID);
+  if (!status) return;
+  try {
+    const ctx = getContextSafe();
+    const settings = ctx ? getSettings(ctx) : null;
+    const keys = ctx ? getValuesKeys(ctx) : [];
+    const defaults = ctx ? getValuesDefaults(ctx) : {};
+    const entries = valuesCountEntries(defaults);
+    const triggers = ctx ? getValuesTriggers(ctx) : [];
+    const gameInitialized = ctx ? isValuesGameInitialized(ctx) : false;
+    const character = ctx ? getStoryCharacter(ctx) : null;
+    const card = ctx ? getValuesCardData(ctx) : null;
+    const maintainEnabled = settings ? settings.valuesAutoUpdateEnabled !== false : true;
+    const triggerEnabled = settings ? settings.valuesTriggerEnabled !== false : true;
+    if (character) {
+      status.title = card
+        ? `变量已绑定角色卡「${character.name || ''}」：默认值随角色卡导入导出；游戏值存聊天文件（${gameInitialized ? '已初始化' : '未初始化'}）`
+        : `当前角色卡还没有变量数据：首次保存后自动写入角色卡；自动维护${maintainEnabled ? '已开启' : '已关闭'}`;
+    } else {
+      status.title = '未绑定角色（群聊/未选角色）：默认值存全局设置，不随角色卡导入导出';
+    }
+    if (keys.length === 0 && entries === 0 && triggers.length === 0) {
+      status.textContent = character ? (card ? '已绑定 · 尚未添加' : '待绑定 · 尚未添加') : '尚未添加';
+      status.dataset.state = 'idle';
+    } else {
+      const parts = [`${keys.length} 变量`, `${entries} 值`];
+      if (triggers.length > 0) parts.push(`${triggers.length} 触发`);
+      if (triggers.length > 0 && !triggerEnabled) parts.push('触发已关');
+      status.textContent = parts.join(' · ');
+      status.dataset.state = 'ok';
+    }
+  } catch (error) {
+    status.textContent = '尚未添加';
+    status.dataset.state = 'idle';
+  }
+}
+
 // 首页状态统一刷新入口：后续新增卡片状态时在此挂接。
 function refreshHomeStatuses() {
   refreshHomeApiStatus();
   refreshHomeStoryStatus();
+  refreshHomeValuesStatus();
   refreshHomeLogStatus();
   refreshHomeInjectStatus();
   refreshHomePresetStatus();
@@ -3066,6 +3479,41 @@ function refreshHomeStatuses() {
 
 function getStoryGateLastRound() {
   return globalThis[STORY_GATE_LAST_ROUND_KEY] || null;
+}
+
+function getValuesTriggerLastRound() {
+  return globalThis[VALUES_TRIGGER_LAST_ROUND_KEY] || null;
+}
+
+// 剧情触发摘要：本轮结果 + 统计 + 触发事件名单。
+function buildValuesTriggerSummary(round) {
+  const wrap = document.createElement('div');
+  wrap.className = 'kaleido-inject__summary';
+  const outcome = document.createElement('span');
+  outcome.className = 'kaleido-inject__summary-outcome';
+  if (round.injected) {
+    const autoDisabled = Array.isArray(round.autoDisabledIds) ? round.autoDisabledIds.length : 0;
+    outcome.textContent = '已注入 ' + round.triggeredIds.length + ' 个事件'
+      + (autoDisabled > 0 ? '，' + autoDisabled + ' 个一次性事件已自动关闭' : '');
+    outcome.dataset.state = 'ok';
+  } else if (round.skipped) {
+    outcome.textContent = '本轮无事件满足条件';
+    outcome.dataset.state = 'idle';
+  } else {
+    outcome.textContent = '未注入';
+    outcome.dataset.state = 'warn';
+  }
+  const stats = document.createElement('span');
+  stats.className = 'kaleido-inject__summary-stats';
+  stats.textContent = '候选 ' + round.totalTriggers + ' 个触发 · 满足 ' + round.triggeredIds.length + ' 个';
+  wrap.append(outcome, stats);
+  if (Array.isArray(round.triggeredEvents) && round.triggeredEvents.length > 0) {
+    const names = document.createElement('span');
+    names.className = 'kaleido-inject__summary-names';
+    names.textContent = '触发：' + round.triggeredEvents.map((event) => event.name || event.id).join('、');
+    wrap.appendChild(names);
+  }
+  return wrap;
 }
 
 // 摘要：本轮结果 + 统计 + 触发事件名单。
@@ -3114,10 +3562,11 @@ function buildInjectEventCard(event) {
   id.textContent = event.id || '';
   head.append(name, id);
   card.appendChild(head);
-  if (String(event.trigger || '').trim()) {
+  const triggerText = String(event.trigger || event.conditions || '').trim();
+  if (triggerText) {
     const trigger = document.createElement('p');
     trigger.className = 'kaleido-inject__event-line';
-    trigger.textContent = '触发条件：' + event.trigger;
+    trigger.textContent = '触发条件：' + triggerText;
     card.appendChild(trigger);
   }
   if (String(event.description || '').trim()) {
@@ -3178,6 +3627,39 @@ function renderInjectView() {
   injectHead.hidden = !hasInjection;
   injectText.hidden = !hasInjection;
   injectText.textContent = round.injectionText || '';
+  renderValuesTriggerSection();
+}
+
+// 剧情触发段：摘要 → 触发事件 → 注入提示词原文。
+function renderValuesTriggerSection() {
+  const head = document.querySelector('.kaleido-inject__trigger-head');
+  const summary = document.getElementById(INJECT_TRIGGER_SUMMARY_ID);
+  const events = document.getElementById(INJECT_TRIGGER_EVENTS_ID);
+  const text = document.getElementById(INJECT_TRIGGER_TEXT_ID);
+  if (!head || !summary || !events || !text) return;
+  const round = getValuesTriggerLastRound();
+  if (!round) {
+    head.hidden = true;
+    summary.hidden = true;
+    events.hidden = true;
+    text.hidden = true;
+    return;
+  }
+  head.hidden = false;
+  summary.hidden = false;
+  summary.textContent = '';
+  summary.appendChild(buildValuesTriggerSummary(round));
+  const hasEvents = Array.isArray(round.triggeredEvents) && round.triggeredEvents.length > 0;
+  events.hidden = !hasEvents;
+  events.textContent = '';
+  if (hasEvents) {
+    for (const event of round.triggeredEvents) {
+      events.appendChild(buildInjectEventCard(event));
+    }
+  }
+  const hasInjection = Boolean(String(round.injectionText || '').trim());
+  text.hidden = !hasInjection;
+  text.textContent = round.injectionText || '';
 }
 
 // 复制注入提示词原文：优先 Clipboard API，回退隐藏 textarea + execCommand。
@@ -4286,17 +4768,7 @@ function buildStoryGateInjectionText(ctx, events) {
 // extension_prompt_types: NONE=-1, IN_PROMPT=0, IN_CHAT=1, BEFORE_PROMPT=2
 // extension_prompt_roles: SYSTEM=0, USER=1, ASSISTANT=2
 function getStoryGateExtensionPromptApi(ctx) {
-  const context = ctx || getContextSafe();
-  if (!context) return null;
-  const setExtensionPrompt = typeof context.setExtensionPrompt === 'function'
-    ? context.setExtensionPrompt
-    : (typeof globalThis.setExtensionPrompt === 'function' ? globalThis.setExtensionPrompt : null);
-  if (typeof setExtensionPrompt !== 'function') return null;
-  const types = context.extension_prompt_types || globalThis.extension_prompt_types || null;
-  const roles = context.extension_prompt_roles || globalThis.extension_prompt_roles || null;
-  const inChat = (types && Number.isFinite(types.IN_CHAT)) ? types.IN_CHAT : 1;
-  const systemRole = (roles && Number.isFinite(roles.SYSTEM)) ? roles.SYSTEM : 0;
-  return { setExtensionPrompt, inChat, systemRole };
+  return getExtensionPromptApi(ctx);
 }
 
 function clearStoryGateInjection(ctx) {
@@ -5381,6 +5853,3984 @@ function initStorySection(panel) {
 }
 
 
+// ===== js/values-data.js =====
+// ===== 万华镜（Kaleidoscope）变量系统：数据模型 / 双层存储 / YAML 导入导出 =====
+// 数据模型：
+// - 键注册表（keys）：玩家统一注册的键，每个键带「变化规则」，是 AI 自动维护的唯一依据。
+// - 默认值（defaults）：与角色卡绑定（character.data.extensions.kaleidoscope_values），
+//   随角色卡导入/导出自动携带；群聊 / 未选角色时回退全局设置 valuesData。
+// - 游戏值（game values）：与聊天文件绑定（chatMetadata.kaleidoscope_values，jsonl 首行
+//   chat_metadata 随聊天文件保存/加载），是每轮生成结束后由 AI 维护的实际变量。
+// 变量树是 YAML 式结构：映射可嵌套（如「张三 → 好感」），叶子是标量。
+
+// ---------- 键注册表 / 默认值：角色卡绑定 ----------
+// 当前角色卡里的变量包（无角色 / 卡上无数据时返回 null）；返回前就地归一化。
+function getValuesCardData(ctx) {
+  const character = getStoryCharacter(ctx);
+  if (!character) return null;
+  const extensions = character?.data?.extensions;
+  if (!extensions || typeof extensions !== 'object') return null;
+  const card = extensions[VALUES_CARD_EXTENSION_KEY];
+  if (!card || typeof card !== 'object' || Array.isArray(card)) return null;
+  if (!Array.isArray(card.keys)) card.keys = [];
+  if (!card.defaults || typeof card.defaults !== 'object' || Array.isArray(card.defaults)) card.defaults = {};
+  return card;
+}
+
+// 把变量包写入角色卡对象（内存态，持久化由 scheduleValuesCardSave 完成）。
+function setValuesCardData(character, card) {
+  if (!character || typeof character !== 'object') return;
+  if (!character.data || typeof character.data !== 'object') character.data = {};
+  if (!character.data.extensions || typeof character.data.extensions !== 'object') character.data.extensions = {};
+  character.data.extensions[VALUES_CARD_EXTENSION_KEY] = card;
+}
+
+// 确保当前角色卡有变量数据容器：无卡时用旧版全局数据初始化（并清空全局兜底）。
+// 无角色 / 宿主不支持写角色卡时返回 null（保持全局设置路径）。
+function ensureValuesCardData(ctx) {
+  const character = getStoryCharacter(ctx);
+  if (!character || typeof ctx?.writeExtensionField !== 'function') return null;
+  let card = getValuesCardData(ctx);
+  if (card) return card;
+  const settings = getSettings(ctx);
+  const legacy = settings?.valuesData;
+  card = {
+    version: VALUES_CARD_DATA_VERSION,
+    keys: Array.isArray(legacy?.keys) ? legacy.keys : [],
+    defaults: legacy?.defaults && typeof legacy.defaults === 'object' && !Array.isArray(legacy.defaults)
+      ? legacy.defaults
+      : {},
+    inject: legacy?.inject && typeof legacy.inject === 'object' && !Array.isArray(legacy.inject)
+      ? legacy.inject
+      : { enabled: false, paths: [] },
+    triggers: Array.isArray(legacy?.triggers) ? legacy.triggers : [],
+    order: legacy?.order && typeof legacy.order === 'object' && !Array.isArray(legacy.order)
+      ? legacy.order
+      : {},
+  };
+  setValuesCardData(character, card);
+  if (Array.isArray(legacy?.keys) && legacy.keys.length > 0) {
+    settings.valuesData = null;
+    logApp('info', '变量已绑定角色卡', '旧版全局数据已迁入当前角色卡');
+    try {
+      globalThis.toastr?.info?.('变量已绑定当前角色卡，旧版全局数据已迁入；导入/导出角色卡时自动携带', `[${MODULE_DISPLAY_NAME}]`);
+    } catch {}
+  }
+  return card;
+}
+// 写入角色卡失败 / 角色已删除 / 宿主不支持时的兜底：数据落回全局设置，避免丢失。
+function fallbackValuesDataToSettings(ctx, card) {
+  const settings = getSettings(ctx);
+  settings.valuesData = {
+    version: VALUES_CARD_DATA_VERSION,
+    keys: Array.isArray(card?.keys) ? card.keys : [],
+    defaults: card?.defaults && typeof card.defaults === 'object' && !Array.isArray(card.defaults)
+      ? card.defaults
+      : {},
+    inject: card?.inject && typeof card.inject === 'object' && !Array.isArray(card.inject)
+      ? card.inject
+      : { enabled: false, paths: [] },
+    triggers: Array.isArray(card?.triggers) ? card.triggers : [],
+    order: card?.order && typeof card.order === 'object' && !Array.isArray(card.order)
+      ? card.order
+      : {},
+  };
+  saveSettings(ctx);
+  logApp('warn', '变量写入角色卡失败，已回退全局设置');
+}
+
+// 防抖持久化（与剧情脉络同模式）：按 avatar 定位角色，避免防抖期间切换角色写错卡。
+function scheduleValuesCardSave(ctx, character, card) {
+  const avatar = String(character?.avatar || '');
+  if (globalThis[VALUES_CARD_SAVE_TIMER_KEY]) {
+    clearTimeout(globalThis[VALUES_CARD_SAVE_TIMER_KEY]);
+  }
+  globalThis[VALUES_CARD_SAVE_TIMER_KEY] = setTimeout(() => {
+    globalThis[VALUES_CARD_SAVE_TIMER_KEY] = null;
+    persistValuesCardData(ctx, avatar, card).catch((error) => {
+      logApp('warn', '写入角色卡失败', String(error?.message || error));
+    });
+  }, VALUES_CARD_SAVE_DEBOUNCE_MS);
+}
+
+async function persistValuesCardData(ctx, avatar, card) {
+  const characters = Array.isArray(ctx?.characters) ? ctx.characters : [];
+  const index = characters.findIndex((character) => String(character?.avatar || '') === avatar);
+  if (index < 0) {
+    fallbackValuesDataToSettings(ctx, card);
+    return;
+  }
+  const write = ctx?.writeExtensionField;
+  if (typeof write !== 'function') {
+    fallbackValuesDataToSettings(ctx, card);
+    return;
+  }
+  try {
+    await write.call(ctx, index, VALUES_CARD_EXTENSION_KEY, card);
+  } catch (error) {
+    fallbackValuesDataToSettings(ctx, card);
+    throw error;
+  }
+}
+
+// 变量包读取：优先角色卡绑定的内容；只有群聊 / 未选角色 / 宿主不支持写角色卡时
+// 才用全局设置 valuesData 兜底（避免把别的角色/旧数据串到当前角色卡上）。
+function getValuesBundle(ctx) {
+  const card = ctx ? getValuesCardData(ctx) : null;
+  if (card) return card;
+  const settings = ctx ? getSettings(ctx) : null;
+  if (!settings) return { version: VALUES_CARD_DATA_VERSION, keys: [], defaults: {} };
+  // 无角色卡时用全局设置兜底：首次读取即初始化容器，保证后续变更落在活对象上
+  // （与剧情脉络的 settings.storyNodes 同模式，避免一次性对象导致变更丢失）。
+  let fallback = settings.valuesData;
+  if (!fallback || typeof fallback !== 'object' || Array.isArray(fallback)) {
+    fallback = { version: VALUES_CARD_DATA_VERSION, keys: [], defaults: {} };
+    settings.valuesData = fallback;
+  }
+  if (!Array.isArray(fallback.keys)) fallback.keys = [];
+  if (!fallback.defaults || typeof fallback.defaults !== 'object' || Array.isArray(fallback.defaults)) {
+    fallback.defaults = {};
+  }
+  if (!Array.isArray(fallback.triggers)) fallback.triggers = [];
+  if (!fallback.order || typeof fallback.order !== 'object' || Array.isArray(fallback.order)) fallback.order = {};
+  return fallback;
+}
+
+// 保存：有角色且宿主支持写角色卡 → 确保角色卡容器存在后防抖持久化；否则写全局设置。
+function saveValuesData(ctx) {
+  const character = getStoryCharacter(ctx);
+  if (!character || typeof ctx?.writeExtensionField !== 'function') {
+    const bundle = getValuesBundle(ctx);
+    const settings = getSettings(ctx);
+    settings.valuesData = {
+      version: VALUES_CARD_DATA_VERSION,
+      keys: bundle.keys,
+      defaults: bundle.defaults,
+      inject: bundle.inject && typeof bundle.inject === 'object' && !Array.isArray(bundle.inject)
+        ? bundle.inject
+        : { enabled: false, paths: [] },
+      triggers: Array.isArray(bundle.triggers) ? bundle.triggers : [],
+      order: bundle.order && typeof bundle.order === 'object' && !Array.isArray(bundle.order)
+        ? bundle.order
+        : {},
+    };
+    saveSettings(ctx);
+    return;
+  }
+  let card = getValuesCardData(ctx);
+  if (!card) {
+    const settings = getSettings(ctx);
+    const legacy = settings?.valuesData;
+    card = {
+      version: VALUES_CARD_DATA_VERSION,
+      keys: Array.isArray(legacy?.keys) ? legacy.keys : [],
+      defaults: legacy?.defaults && typeof legacy.defaults === 'object' && !Array.isArray(legacy.defaults)
+        ? legacy.defaults
+        : {},
+      inject: legacy?.inject && typeof legacy.inject === 'object' && !Array.isArray(legacy.inject)
+        ? legacy.inject
+        : { enabled: false, paths: [] },
+      triggers: Array.isArray(legacy?.triggers) ? legacy.triggers : [],
+      order: legacy?.order && typeof legacy.order === 'object' && !Array.isArray(legacy.order)
+        ? legacy.order
+        : {},
+    };
+    setValuesCardData(character, card);
+    if (Array.isArray(legacy?.keys) && legacy.keys.length > 0) {
+      settings.valuesData = null;
+      logApp('info', '变量已绑定角色卡', '旧版全局数据已迁入当前角色卡');
+      try {
+        globalThis.toastr?.info?.('变量已绑定当前角色卡，旧版全局数据已迁入；导入/导出角色卡时自动携带', `[${MODULE_DISPLAY_NAME}]`);
+      } catch {}
+    }
+  }
+  scheduleValuesCardSave(ctx, character, card);
+}
+
+// ---------- 键注册表 ----------
+function getValuesKeys(ctx) {
+  const bundle = ctx ? getValuesBundle(ctx) : null;
+  if (!bundle) return [];
+  // 就地归一化：type 缺省为父变量；子变量补全 parent / rules 字段。
+  for (const key of bundle.keys) {
+    if (!key || typeof key !== 'object' || Array.isArray(key)) continue;
+    if (String(key.type || '') !== VALUES_KEY_TYPE_CHILD) {
+      key.type = VALUES_KEY_TYPE_PARENT;
+    } else {
+      key.parent = String(key.parent || '').trim();
+      if (!Array.isArray(key.rules)) key.rules = [];
+    }
+  }
+  return bundle.keys;
+}
+
+function getValuesRegistryNames(ctx) {
+  return new Set(getValuesKeys(ctx).map((key) => String(key?.name || '').trim()).filter(Boolean));
+}
+
+function getValuesKeyByName(ctx, name) {
+  const target = String(name || '').trim();
+  return getValuesKeys(ctx).find((key) => String(key?.name || '').trim() === target) || null;
+}
+
+// 变量树条目顺序表：{ [父路径]: [条目名, ...] }，父路径为 path.join('/')（顶层为 ''）。
+// 只记录玩家拖动过的顺序；未记录的条目按名称排序追加在末尾。
+function getValuesTreeOrder(ctx) {
+  const bundle = ctx ? getValuesBundle(ctx) : null;
+  if (!bundle) return {};
+  if (!bundle.order || typeof bundle.order !== 'object' || Array.isArray(bundle.order)) {
+    bundle.order = {};
+  }
+  return bundle.order;
+}
+
+// 注册 / 更新键（以名称为身份）；返回保存后的键对象。
+// extra 可携带 { type, parent, rules }：type 为 child 时按子变量保存（parent 为
+// 父变量名，rules 为区间规则 [{ min, max, value }]），否则按父变量保存。
+function upsertValuesKey(ctx, name, rule, extra = {}) {
+  const bundle = getValuesBundle(ctx);
+  const target = String(name || '').trim();
+  if (!target) return null;
+  const type = String(extra?.type || '') === VALUES_KEY_TYPE_CHILD ? VALUES_KEY_TYPE_CHILD : VALUES_KEY_TYPE_PARENT;
+  const existing = bundle.keys.find((key) => String(key?.name || '').trim() === target);
+  const now = new Date().toISOString();
+  if (existing) {
+    existing.rule = String(rule || '').trim();
+    existing.type = type;
+    if (type === VALUES_KEY_TYPE_CHILD) {
+      existing.parent = String(extra?.parent || '').trim();
+      existing.rules = normalizeValuesChildRules(extra?.rules);
+    } else {
+      delete existing.parent;
+      delete existing.rules;
+    }
+    existing.updatedAt = now;
+  } else {
+    const key = { name: target, rule: String(rule || '').trim(), type, createdAt: now, updatedAt: now };
+    if (type === VALUES_KEY_TYPE_CHILD) {
+      key.parent = String(extra?.parent || '').trim();
+      key.rules = normalizeValuesChildRules(extra?.rules);
+    }
+    bundle.keys.push(key);
+  }
+  saveValuesData(ctx);
+  return existing || bundle.keys[bundle.keys.length - 1];
+}
+
+function deleteValuesKey(ctx, name) {
+  const bundle = getValuesBundle(ctx);
+  const target = String(name || '').trim();
+  const index = bundle.keys.findIndex((key) => String(key?.name || '').trim() === target);
+  if (index < 0) return false;
+  bundle.keys.splice(index, 1);
+  saveValuesData(ctx);
+  return true;
+}
+
+// 按名称重排键注册表顺序（拖动排序用）；未列出的键按原相对顺序追加在末尾。
+function reorderValuesKeys(ctx, names) {
+  const bundle = getValuesBundle(ctx);
+  const wanted = Array.isArray(names) ? names.map((name) => String(name || '').trim()).filter(Boolean) : [];
+  const byName = new Map(bundle.keys.map((key) => [String(key?.name || '').trim(), key]));
+  const reordered = [];
+  const seen = new Set();
+  for (const name of wanted) {
+    const key = byName.get(name);
+    if (key && !seen.has(name)) {
+      reordered.push(key);
+      seen.add(name);
+    }
+  }
+  for (const key of bundle.keys) {
+    const name = String(key?.name || '').trim();
+    if (!seen.has(name)) reordered.push(key);
+  }
+  bundle.keys = reordered;
+  saveValuesData(ctx);
+  return bundle.keys;
+}
+
+// ---------- 父变量 / 子变量 ----------
+// 父变量：由 AI 按「变化规则」维护；子变量：不参与 AI 维护，值由同路径下的
+// 父变量按区间规则（rules）自动派生（如 好感度 40 → 态度「颇具好感」）。
+function isValuesChildKey(key) {
+  return Boolean(key && String(key.type || '') === VALUES_KEY_TYPE_CHILD);
+}
+
+function isValuesParentKey(key) {
+  return !isValuesChildKey(key);
+}
+
+function getValuesChildKeys(ctx) {
+  return getValuesKeys(ctx).filter(isValuesChildKey);
+}
+
+// 依赖指定父变量的全部子变量（删除父变量前的依赖检查用）。
+function getValuesChildKeysByParent(ctx, parentName) {
+  const target = String(parentName || '').trim();
+  return getValuesKeys(ctx).filter((key) => isValuesChildKey(key) && String(key.parent || '').trim() === target);
+}
+
+// 归一化子变量区间规则：{ min?, max?, value }，min / max 可省略（省略 = 不设
+// 边界），value 必填；数字字段只接受有限数值，非法条目丢弃。
+function normalizeValuesChildRules(rules) {
+  if (!Array.isArray(rules)) return [];
+  const normalized = [];
+  for (const item of rules) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const value = String(item.value ?? '').trim();
+    if (value === '') continue;
+    const rule = { value };
+    if (item.min !== undefined && item.min !== null && item.min !== '') {
+      const min = Number(item.min);
+      if (Number.isFinite(min)) rule.min = min;
+    }
+    if (item.max !== undefined && item.max !== null && item.max !== '') {
+      const max = Number(item.max);
+      if (Number.isFinite(max)) rule.max = max;
+    }
+    normalized.push(rule);
+  }
+  return normalized;
+}
+
+// 校验子变量区间规则：返回 { invalid, overlaps }。
+// - invalid：min > max 的非法行下标；
+// - overlaps：存在交集（含边界）的规则对下标，如 0~1000 与 1000~2000 在 1000
+//   处重叠，必须写成 1001~2000；min / max 省略视为不设边界（-∞ / +∞）。
+function validateValuesChildRules(rules) {
+  const list = Array.isArray(rules) ? rules : [];
+  const invalid = [];
+  const overlaps = [];
+  for (let i = 0; i < list.length; i += 1) {
+    const a = list[i];
+    if (a?.min !== undefined && a?.max !== undefined && a.min > a.max) invalid.push(i);
+    for (let j = i + 1; j < list.length; j += 1) {
+      const b = list[j];
+      const aMin = a?.min !== undefined ? a.min : -Infinity;
+      const aMax = a?.max !== undefined ? a.max : Infinity;
+      const bMin = b?.min !== undefined ? b.min : -Infinity;
+      const bMax = b?.max !== undefined ? b.max : Infinity;
+      if (Math.max(aMin, bMin) <= Math.min(aMax, bMax)) overlaps.push([i, j]);
+    }
+  }
+  return { invalid, overlaps };
+}
+
+// 单叶子派生：按子变量规则，用同路径父变量值计算子变量值（就地写入）。
+// 规则按顺序匹配，首个满足的生效；父变量缺失 / 非数值 / 无规则命中时保持原值。
+function deriveValuesChildAt(tree, path, childKey) {
+  const parentName = String(childKey?.parent || '').trim();
+  if (!parentName || !Array.isArray(path) || path.length === 0) return false;
+  const parentValue = valuesGetAtPath(tree, path.slice(0, -1).concat(parentName));
+  let numeric = null;
+  if (typeof parentValue === 'number') {
+    numeric = parentValue;
+  } else if (typeof parentValue === 'string' && parentValue.trim() !== '') {
+    const parsed = Number(parentValue);
+    if (Number.isFinite(parsed)) numeric = parsed;
+  }
+  if (numeric === null) return false;
+  for (const rule of Array.isArray(childKey?.rules) ? childKey.rules : []) {
+    if (rule.min !== undefined && numeric < rule.min) continue;
+    if (rule.max !== undefined && numeric > rule.max) continue;
+    valuesSetAtPath(tree, path, String(rule.value));
+    return true;
+  }
+  return false;
+}
+
+// 遍历整棵树，把所有已注册子变量叶子按父变量派生（就地修改，返回同一棵树）。
+// 多轮收敛：允许导入数据里出现「子变量的父变量也是子变量」的链式场景。
+function deriveValuesChildren(tree, keys) {
+  if (!valuesIsContainer(tree)) return tree;
+  const childKeys = new Map();
+  for (const key of Array.isArray(keys) ? keys : []) {
+    if (isValuesChildKey(key)) childKeys.set(String(key.name || '').trim(), key);
+  }
+  if (childKeys.size === 0) return tree;
+  for (let pass = 0; pass < 10; pass += 1) {
+    let changed = false;
+    const walk = (node, path) => {
+      if (!valuesIsContainer(node)) return;
+      for (const name of Object.keys(node)) {
+        const childPath = path.concat(name);
+        const child = node[name];
+        if (valuesIsContainer(child)) {
+          walk(child, childPath);
+        } else {
+          const childKey = childKeys.get(name);
+          if (childKey && deriveValuesChildAt(tree, childPath, childKey)) changed = true;
+        }
+      }
+    };
+    walk(tree, []);
+    if (!changed) break;
+  }
+  return tree;
+}
+
+// ---------- 默认值树 ----------
+function getValuesDefaults(ctx) {
+  const bundle = ctx ? getValuesBundle(ctx) : null;
+  if (!bundle) return {};
+  // 就地派生：默认值层的子变量也按父变量显示（确定性计算，不触发保存）。
+  return deriveValuesChildren(bundle.defaults, bundle.keys);
+}
+
+// ---------- 游戏值：聊天文件绑定 ----------
+// 游戏值存 chatMetadata[VALUES_CHAT_KEY] = { version, values, updatedAt, lastSignature }，
+// 随聊天文件保存/加载自动携带（jsonl 首行 chat_metadata）。
+function getValuesChatMetadata(ctx) {
+  const context = ctx || getContextSafe();
+  if (!context) return null;
+  return context.chatMetadata && typeof context.chatMetadata === 'object'
+    ? context.chatMetadata
+    : (globalThis.chat_metadata && typeof globalThis.chat_metadata === 'object' ? globalThis.chat_metadata : null);
+}
+
+function getValuesChatState(ctx) {
+  const metadata = getValuesChatMetadata(ctx);
+  const state = metadata ? metadata[VALUES_CHAT_KEY] : null;
+  if (!state || typeof state !== 'object' || Array.isArray(state)) return null;
+  if (!state.values || typeof state.values !== 'object' || Array.isArray(state.values)) return null;
+  return state;
+}
+
+// 游戏值读取：聊天里已有状态 → 用它；还没有（新聊天/首次）→ 从默认值克隆，
+// 此时不写聊天文件，等首次修改或 AI 维护后再持久化。
+function getValuesGameTree(ctx) {
+  const state = getValuesChatState(ctx);
+  const tree = state ? cloneValue(state.values) : cloneValue(getValuesDefaults(ctx));
+  // 读取即派生：子变量始终按父变量当前值计算（即使聊天文件里存的是旧值）。
+  return deriveValuesChildren(tree, ctx ? getValuesKeys(ctx) : []);
+}
+
+// 聊天文件写入入口：写 chatMetadata 后防抖调用宿主保存接口。
+function saveChatNow(ctx) {
+  const context = ctx || getContextSafe();
+  if (!context) return;
+  try {
+    if (typeof context.saveChat === 'function') {
+      context.saveChat();
+      return;
+    }
+    if (typeof globalThis.saveChatConditional === 'function') {
+      globalThis.saveChatConditional();
+      return;
+    }
+    if (typeof globalThis.saveChat === 'function') {
+      globalThis.saveChat();
+      return;
+    }
+    if (typeof context.saveMetadata === 'function') {
+      context.saveMetadata();
+      return;
+    }
+    if (typeof globalThis.saveMetadataDebounced === 'function') {
+      globalThis.saveMetadataDebounced();
+    }
+  } catch (error) {
+    logApp('warn', '保存聊天文件失败', String(error?.message || error));
+  }
+}
+
+function scheduleValuesChatSave(ctx, immediate) {
+  const context = ctx || getContextSafe();
+  if (!context) return;
+  if (globalThis[VALUES_CHAT_SAVE_TIMER_KEY]) {
+    clearTimeout(globalThis[VALUES_CHAT_SAVE_TIMER_KEY]);
+  }
+  if (immediate) {
+    saveChatNow(context);
+    return;
+  }
+  globalThis[VALUES_CHAT_SAVE_TIMER_KEY] = setTimeout(() => {
+    globalThis[VALUES_CHAT_SAVE_TIMER_KEY] = null;
+    saveChatNow(context);
+  }, VALUES_CHAT_SAVE_DEBOUNCE_MS);
+}
+
+// 写入游戏值：metadata[key] = 状态包，防抖保存聊天文件。meta 可携带 updatedAt /
+// lastSignature 等附加字段。
+function saveValuesChatState(ctx, values, meta = {}) {
+  const context = ctx || getContextSafe();
+  if (!context) return false;
+  let metadata = getValuesChatMetadata(context);
+  if (!metadata) {
+    try {
+      context.chatMetadata = {};
+      metadata = context.chatMetadata;
+    } catch (error) {
+      logApp('warn', '聊天元数据不可写', String(error?.message || error));
+      return false;
+    }
+  }
+  metadata[VALUES_CHAT_KEY] = {
+    version: VALUES_CARD_DATA_VERSION,
+    values,
+    updatedAt: String(meta.updatedAt || new Date().toISOString()),
+    lastSignature: String(meta.lastSignature || ''),
+  };
+  scheduleValuesChatSave(context, !!meta.immediate);
+  return true;
+}
+
+// 游戏值「未初始化」判断：聊天里还没有独立状态（当前显示的是默认值的克隆）。
+function isValuesGameInitialized(ctx) {
+  return Boolean(getValuesChatState(ctx));
+}
+
+// ---------- 变量树工具 ----------
+function valuesIsContainer(value) {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+
+// 按路径读取节点；路径不存在返回 undefined。
+function valuesGetAtPath(tree, path) {
+  let node = tree;
+  for (const key of path) {
+    if (!valuesIsContainer(node) || !Object.prototype.hasOwnProperty.call(node, key)) return undefined;
+    node = node[key];
+  }
+  return node;
+}
+
+// 按路径写入叶子值；路径上的中间层必须已是容器。
+function valuesSetAtPath(tree, path, value) {
+  if (path.length === 0) return false;
+  let node = tree;
+  for (let i = 0; i < path.length - 1; i += 1) {
+    const key = path[i];
+    if (!valuesIsContainer(node[key])) {
+      node[key] = {};
+    }
+    node = node[key];
+  }
+  node[path[path.length - 1]] = value;
+  return true;
+}
+
+// 按路径删除；只删叶子或空容器，容器删除由 UI 确认（连同子树）。
+function valuesDeleteAtPath(tree, path) {
+  if (path.length === 0) return false;
+  let node = tree;
+  for (let i = 0; i < path.length - 1; i += 1) {
+    if (!valuesIsContainer(node[path[i]])) return false;
+    node = node[path[i]];
+  }
+  const key = path[path.length - 1];
+  if (!Object.prototype.hasOwnProperty.call(node, key)) return false;
+  delete node[key];
+  return true;
+}
+
+// 统计树中叶子数量（顶层条目数 = 键数量）。
+function valuesCountEntries(tree) {
+  let count = 0;
+  const walk = (node) => {
+    if (!valuesIsContainer(node)) {
+      count += 1;
+      return;
+    }
+    for (const key of Object.keys(node)) walk(node[key]);
+  };
+  walk(tree);
+  return count;
+}
+
+// 按顺序表返回节点下的条目名：已记录顺序的条目按记录排列，未记录的按名称排序追加。
+function valuesOrderedNames(order, parentPath, node) {
+  const names = valuesIsContainer(node) ? Object.keys(node) : [];
+  if (!Array.isArray(order?.[parentPath]) || order[parentPath].length === 0) {
+    return names.slice().sort();
+  }
+  const present = new Set(names);
+  const ordered = [];
+  const seen = new Set();
+  for (const name of order[parentPath]) {
+    const key = String(name || '').trim();
+    if (key && present.has(key) && !seen.has(key)) {
+      ordered.push(key);
+      seen.add(key);
+    }
+  }
+  const rest = names.filter((name) => !seen.has(name)).sort();
+  return ordered.concat(rest);
+}
+
+// 记录某父路径下条目的显示顺序（拖动排序用）；保存后返回顺序表。
+function reorderValuesTreeAt(ctx, parentPath, names) {
+  const order = getValuesTreeOrder(ctx);
+  const key = Array.isArray(parentPath) ? parentPath.join('/') : String(parentPath || '');
+  order[key] = Array.isArray(names)
+    ? names.map((name) => String(name || '').trim()).filter(Boolean)
+    : [];
+  saveValuesData(ctx);
+  return order;
+}
+
+// ---------- 注入提示词配置（默认数值层勾选）----------
+// 配置存变量包 inject 字段：{ enabled, paths }。paths 是打开条目的路径数组
+// （path.join('/')），节点上下级联动：打开下级自动提升全部祖先，关闭上级
+// 级联关闭全部后代；随角色卡 / 全局设置保存。
+function getValuesInjectConfig(ctx) {
+  const bundle = ctx ? getValuesBundle(ctx) : null;
+  if (!bundle) return { enabled: false, paths: [] };
+  if (!bundle.inject || typeof bundle.inject !== 'object' || Array.isArray(bundle.inject)) {
+    bundle.inject = { enabled: false, paths: [] };
+  }
+  if (typeof bundle.inject.enabled !== 'boolean') bundle.inject.enabled = false;
+  if (!Array.isArray(bundle.inject.paths)) bundle.inject.paths = [];
+  return bundle.inject;
+}
+
+function saveValuesInjectConfig(ctx, config) {
+  const bundle = getValuesBundle(ctx);
+  bundle.inject = {
+    enabled: Boolean(config?.enabled),
+    paths: Array.isArray(config?.paths)
+      ? config.paths.filter((item) => typeof item === 'string' && String(item).trim() !== '')
+      : [],
+  };
+  saveValuesData(ctx);
+  return bundle.inject;
+}
+
+function setValuesInjectEnabled(ctx, enabled) {
+  const config = getValuesInjectConfig(ctx);
+  config.enabled = Boolean(enabled);
+  saveValuesData(ctx);
+  return config;
+}
+
+// 打开 / 关闭一个条目（节点上下级联动）：
+// - 打开条目 = 自身 + 全部祖先打开（下级打开 → 上级必须打开）；
+// - 关闭条目 = 自身 + 全部后代关闭（上级关闭 → 下级全部关闭）；
+// - 打开节点不自动打开后代（上级打开 → 下级选择性打开）。
+function setValuesInjectPath(ctx, path, checked) {
+  const config = getValuesInjectConfig(ctx);
+  const key = Array.isArray(path) ? path.join('/') : String(path || '');
+  if (!key) return config;
+  if (checked) {
+    const segments = key.split('/');
+    for (let i = 1; i <= segments.length; i += 1) {
+      const ancestorKey = segments.slice(0, i).join('/');
+      if (!config.paths.includes(ancestorKey)) config.paths.push(ancestorKey);
+    }
+  } else {
+    config.paths = config.paths.filter((item) => !(item === key || item.startsWith(key + '/')));
+  }
+  saveValuesData(ctx);
+  return config;
+}
+
+function toggleValuesInjectPath(ctx, path) {
+  const config = getValuesInjectConfig(ctx);
+  const key = Array.isArray(path) ? path.join('/') : String(path || '');
+  return setValuesInjectPath(ctx, path, !config.paths.includes(key));
+}
+
+// 某路径是否已被覆盖勾选（自身或任一祖先被勾选）。
+function isValuesInjectPathSelected(ctx, path) {
+  const config = getValuesInjectConfig(ctx);
+  const key = Array.isArray(path) ? path.join('/') : String(path || '');
+  if (!key) return false;
+  if (config.paths.includes(key)) return true;
+  return config.paths.some((item) => key.startsWith(item + '/'));
+}
+
+// ---------- AI 维护：补丁合并 ----------
+// 把 AI 返回的补丁合并进当前树：
+// - 值写 null → 删除该键；
+// - 两侧都是容器 → 递归合并；
+// - 其余情况 → 用补丁值替换；
+// - 补丁里出现当前树不存在的新键时，只有「已注册键」才允许新增（人名/条目等
+//   新容器由玩家在界面创建，AI 不得擅自发明结构）。
+// 返回 { tree, changed, ignored }：tree 是合并后的新树（不修改入参），
+// changed 是实际变化的路径列表，ignored 是被丢弃的新键路径列表。
+function mergeValuesPatch(current, patch, registeredNames) {
+  const tree = cloneValue(current);
+  const changed = [];
+  const ignored = [];
+  const walk = (target, patchNode, path) => {
+    if (!valuesIsContainer(patchNode)) {
+      if (patchNode === null || patchNode === undefined) {
+        const existed = valuesGetAtPath(target, path) !== undefined;
+        if (existed) {
+          valuesDeleteAtPath(target, path);
+          changed.push(path.join('.'));
+        }
+        return;
+      }
+      const current = valuesGetAtPath(target, path);
+      // 节点（容器）不能变成值：AI 不得把节点改成标量。
+      if (valuesIsContainer(current)) {
+        ignored.push(path.join('.'));
+        return;
+      }
+      const oldValue = current;
+      if (oldValue !== patchNode && JSON.stringify(oldValue) !== JSON.stringify(patchNode)) {
+        valuesSetAtPath(target, path, patchNode);
+        changed.push(path.join('.'));
+      }
+      return;
+    }
+    const current = valuesGetAtPath(target, path);
+    // 键（叶子）不能变成节点：AI 不得给键挂子条目。
+    if (current !== undefined && !valuesIsContainer(current)) {
+      ignored.push(path.join('.'));
+      return;
+    }
+    for (const key of Object.keys(patchNode)) {
+      const childPath = path.concat(key);
+      const targetChild = valuesGetAtPath(target, path);
+      const exists = valuesIsContainer(targetChild) && Object.prototype.hasOwnProperty.call(targetChild, key);
+      if (exists) {
+        walk(target, patchNode[key], childPath);
+      } else if (registeredNames.has(key)) {
+        valuesSetAtPath(target, childPath, cloneValue(patchNode[key]));
+        changed.push(childPath.join('.'));
+      } else if (patchNode[key] !== null && patchNode[key] !== undefined) {
+        ignored.push(childPath.join('.'));
+      }
+    }
+  };
+  walk(tree, patch, []);
+  return { tree, changed, ignored };
+}
+
+// 解析 AI 维护返回：优先 JSON（代码块或裸对象），失败回退轻量 YAML。
+function parseValuesPatch(text) {
+  const source = String(text || '').trim();
+  if (!source) return null;
+  let parsed = null;
+  try {
+    if (source.includes('{')) parsed = parseAgentJson(source);
+  } catch {}
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    try {
+      const yaml = parseYamlSubset(source);
+      if (yaml && typeof yaml === 'object' && !Array.isArray(yaml)) parsed = yaml;
+    } catch (error) {
+      logApp('debug', '变量维护：YAML 解析失败', String(error?.message || error));
+    }
+  }
+  return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+}
+
+// ---------- YAML 导入导出 ----------
+// 变量标量序列化：数字 / 布尔 / null 保持原生形态（不引号化），字符串沿用
+// yamlScalar 的引号规则（形如数字的字符串加引号，导入后仍是字符串）。
+function yamlValueScalar(value) {
+  if (typeof value === 'number') return String(value);
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
+  if (value === null || value === undefined) return 'null';
+  return yamlScalar(value);
+}
+
+// 树序列化：映射（可嵌套）→ 缩进 YAML；叶子经 yamlValueScalar / yamlBlockScalarText。
+function serializeValuesTree(value, baseIndent) {
+  const indent = baseIndent || '';
+  const lines = [];
+  const walk = (node, currentIndent) => {
+    if (!valuesIsContainer(node)) return;
+    for (const key of Object.keys(node)) {
+      const child = node[key];
+      const prefix = `${currentIndent}${key}: `;
+      if (valuesIsContainer(child)) {
+        lines.push(`${currentIndent}${key}:`);
+        walk(child, `${currentIndent}  `);
+      } else if (child === null || child === undefined) {
+        lines.push(`${prefix}null`);
+      } else if (typeof child === 'string' && child.includes('\n')) {
+        lines.push(`${currentIndent}${key}: ${yamlBlockScalarText(child, currentIndent)}`);
+      } else {
+        lines.push(`${prefix}${yamlValueScalar(child)}`);
+      }
+    }
+  };
+  walk(value, indent);
+  return lines.join('\n');
+}
+
+// 整包导出：format 标记 + keys（注册表）+ defaults（默认值树）。
+// 自描述头部：format 固定输出，character 只写当前绑定的角色卡名（群聊/未选角色省略）。
+function serializeValuesBundle(ctx) {
+  const bundle = ctx ? getValuesBundle(ctx) : { keys: [], defaults: {} };
+  const character = ctx ? getStoryCharacter(ctx) : null;
+  // 导出前派生一次：默认值树里的子变量按父变量当前值输出。
+  deriveValuesChildren(bundle.defaults, bundle.keys);
+  const lines = ['format: ' + yamlScalar(VALUES_BUNDLE_FORMAT)];
+  if (character) lines.push('character: ' + yamlScalar(String(character.name || '')));
+  lines.push('keys:');
+  for (const key of bundle.keys) {
+    lines.push(`  - name: ${yamlScalar(String(key?.name || ''))}`);
+    if (isValuesChildKey(key)) {
+      lines.push('    type: child');
+      lines.push(`    parent: ${yamlScalar(String(key?.parent || ''))}`);
+      lines.push('    rules:');
+      const rules = Array.isArray(key?.rules) ? key.rules : [];
+      if (rules.length === 0) {
+        lines.push('      []');
+      } else {
+        for (const rule of rules) {
+          lines.push(`      - min: ${rule?.min !== undefined ? String(rule.min) : 'null'}`);
+          lines.push(`        max: ${rule?.max !== undefined ? String(rule.max) : 'null'}`);
+          lines.push(`        value: ${yamlScalar(String(rule?.value || ''))}`);
+        }
+      }
+    } else {
+      lines.push('    type: parent');
+      lines.push(`    rule: ${yamlBlockScalarText(String(key?.rule || ''), '    ')}`);
+    }
+  }
+  lines.push('defaults:');
+  const defaultsText = serializeValuesTree(bundle.defaults, '  ');
+  if (defaultsText) lines.push(defaultsText);
+  else lines.push('  {}');
+  lines.push('order:');
+  const order = getValuesTreeOrder(ctx);
+  const orderPaths = Object.keys(order).filter((path) => Array.isArray(order[path]) && order[path].length > 0);
+  if (orderPaths.length === 0) {
+    lines.push('  []');
+  } else {
+    for (const path of orderPaths) {
+      lines.push(`  - path: ${yamlScalar(path)}`);
+      lines.push('    names:');
+      for (const name of order[path]) {
+        lines.push(`      - ${yamlScalar(String(name))}`);
+      }
+    }
+  }
+  lines.push('triggers:');
+  const triggers = Array.isArray(bundle.triggers) ? bundle.triggers : [];
+  if (triggers.length === 0) {
+    lines.push('  []');
+  } else {
+    for (const trigger of triggers) {
+      lines.push(`  - id: ${yamlScalar(String(trigger?.id || ''))}`);
+      lines.push(`    name: ${yamlScalar(String(trigger?.name || ''))}`);
+      lines.push(`    enabled: ${trigger?.enabled === false ? 'false' : 'true'}`);
+      lines.push(`    once: ${trigger?.once === false ? 'false' : 'true'}`);
+      lines.push(`    logic: ${String(trigger?.logic || 'all') === 'any' ? 'any' : 'all'}`);
+      if (String(trigger?.description || '').trim()) {
+        lines.push(`    description: ${yamlScalar(String(trigger?.description || ''))}`);
+      }
+      lines.push('    conditions:');
+      const conditions = Array.isArray(trigger?.conditions) ? trigger.conditions : [];
+      if (conditions.length === 0) {
+        lines.push('      []');
+      } else {
+        for (const condition of conditions) {
+          lines.push(`      - path: ${yamlScalar(String(condition?.path || ''))}`);
+          lines.push(`        op: ${yamlScalar(String(condition?.op || '==').trim())}`);
+          lines.push(`        value: ${yamlValueScalar(condition?.value)}`);
+        }
+      }
+      lines.push(`    content: ${yamlBlockScalarText(String(trigger?.content || ''), '    ')}`);
+    }
+  }
+  return lines.join('\n');
+}
+
+// 整包解析：识别 format 标记（兼容缺标记的裸包：keys 列表 + defaults 映射），
+// 校验字段并归一化。返回 { keys, defaults }；格式不可识别时抛错。
+function parseValuesBundle(text) {
+  const parsed = parseYamlSubset(text);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('无法解析为 YAML 映射');
+  }
+  if (parsed.format && String(parsed.format) !== VALUES_BUNDLE_FORMAT) {
+    throw new Error(`不是万华镜变量包（format=${String(parsed.format)}）`);
+  }
+  const keys = [];
+  if (parsed.keys !== undefined) {
+    if (!Array.isArray(parsed.keys)) throw new Error('keys 必须是列表');
+    for (const item of parsed.keys) {
+      const name = String(item?.name || '').trim();
+      if (!name) throw new Error('变量缺少 name');
+      const type = String(item?.type || '').trim() === VALUES_KEY_TYPE_CHILD ? VALUES_KEY_TYPE_CHILD : VALUES_KEY_TYPE_PARENT;
+      const key = { name, type };
+      if (type === VALUES_KEY_TYPE_CHILD) {
+        key.parent = String(item?.parent || '').trim();
+        key.rules = normalizeValuesChildRules(item?.rules);
+      } else {
+        key.rule = String(item?.rule || '').trim();
+      }
+      keys.push(key);
+    }
+  }
+  const defaults = parsed.defaults && typeof parsed.defaults === 'object' && !Array.isArray(parsed.defaults)
+    ? parsed.defaults
+    : {};
+  const triggers = [];
+  if (parsed.triggers !== undefined) {
+    if (!Array.isArray(parsed.triggers)) throw new Error('triggers 必须是列表');
+    for (const item of parsed.triggers) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+      const id = String(item.id || '').trim();
+      if (!id) throw new Error('触发缺少 id');
+      const conditions = [];
+      if (item.conditions !== undefined) {
+        if (!Array.isArray(item.conditions)) throw new Error(`触发「${id}」的 conditions 必须是列表`);
+        for (const condition of item.conditions) {
+          if (!condition || typeof condition !== 'object' || Array.isArray(condition)) continue;
+          const path = String(condition.path || '').trim();
+          if (!path) continue;
+          conditions.push({
+            path,
+            op: String(condition.op || '==').trim(),
+            value: condition.value !== undefined ? condition.value : null,
+          });
+        }
+      }
+      triggers.push({
+        id,
+        name: String(item.name || '').trim() || '未命名触发',
+        enabled: item.enabled !== false,
+        once: item.once !== false,
+        logic: String(item.logic || 'all').trim() === 'any' ? 'any' : 'all',
+        description: String(item.description || '').trim(),
+        conditions,
+        content: String(item.content || ''),
+      });
+    }
+  }
+  const order = {};
+  if (parsed.order !== undefined) {
+    if (!Array.isArray(parsed.order)) throw new Error('order 必须是列表');
+    for (const item of parsed.order) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+      const path = String(item.path ?? '').trim();
+      const names = Array.isArray(item.names)
+        ? item.names.map((name) => String(name ?? '').trim()).filter(Boolean)
+        : [];
+      if (names.length > 0) order[path] = names;
+    }
+  }
+  return { keys, defaults, triggers, order };
+}
+
+// 整包导出文件名：绑定角色卡 → 「变量: 角色卡名.yaml」；群聊 / 未选角色时回退时间戳名。
+function getValuesBundleFilename(ctx) {
+  const character = ctx ? getStoryCharacter(ctx) : null;
+  if (character) return `${VALUES_CARD_BUNDLE_FILENAME_PREFIX}${sanitizeStoryFilename(String(character.name || ''))}.yaml`;
+  return `${VALUES_BUNDLE_FILENAME_PREFIX}-${storyTimestamp()}.yaml`;
+}
+
+// 导入合并：同名校的键更新规则，其余追加；defaults 深合并（同路径补丁覆盖，其余保留）。
+function applyValuesBundle(ctx, parsed, mode) {
+  const bundle = getValuesBundle(ctx);
+  if (mode === 'replace') {
+    bundle.keys.length = 0;
+    bundle.defaults = {};
+    bundle.order = {};
+  }
+  for (const key of parsed.keys) {
+    const existing = bundle.keys.find((item) => String(item?.name || '').trim() === String(key.name || '').trim());
+    if (existing) {
+      existing.rule = String(key.rule || '').trim();
+      existing.type = key.type === VALUES_KEY_TYPE_CHILD ? VALUES_KEY_TYPE_CHILD : VALUES_KEY_TYPE_PARENT;
+      if (existing.type === VALUES_KEY_TYPE_CHILD) {
+        existing.parent = String(key.parent || '').trim();
+        existing.rules = normalizeValuesChildRules(key.rules);
+      } else {
+        delete existing.parent;
+        delete existing.rules;
+      }
+    } else {
+      bundle.keys.push(cloneValue(key));
+    }
+  }
+  const patch = parsed.defaults || {};
+  const merged = mergeValuesTreeMaps(bundle.defaults, patch);
+  bundle.defaults = merged;
+  const order = getValuesTreeOrder(ctx);
+  for (const path of Object.keys(parsed.order || {})) {
+    order[path] = (parsed.order[path] || []).slice();
+  }
+  const triggers = getValuesTriggers(ctx);
+  if (mode === 'replace') {
+    triggers.length = 0;
+  }
+  for (const trigger of Array.isArray(parsed.triggers) ? parsed.triggers : []) {
+    const existing = triggers.find((item) => item.id === trigger.id);
+    if (existing) Object.assign(existing, cloneValue(trigger));
+    else triggers.push(cloneValue(trigger));
+  }
+  saveValuesData(ctx);
+  return { keyCount: bundle.keys.length, defaults: bundle.defaults, triggerCount: triggers.length };
+}
+
+// 深合并两个映射（补丁覆盖，其余保留；不处理 null 删除，导入即覆盖语义）。
+function mergeValuesTreeMaps(base, patch) {
+  const result = cloneValue(valuesIsContainer(base) ? base : {});
+  const walk = (target, patchNode) => {
+    if (!valuesIsContainer(patchNode)) return;
+    for (const key of Object.keys(patchNode)) {
+      if (valuesIsContainer(patchNode[key]) && valuesIsContainer(target[key])) {
+        walk(target[key], patchNode[key]);
+      } else {
+        target[key] = cloneValue(patchNode[key]);
+      }
+    }
+  };
+  walk(result, patch);
+  return result;
+}
+
+// 游戏值导出（单独）：只导出当前聊天游戏值树，供玩家备份/查看。
+function serializeValuesGameTree(ctx) {
+  return serializeValuesTree(getValuesGameTree(ctx), '');
+}
+
+
+// ===== js/values-maintain.js =====
+// ===== 万华镜（Kaleidoscope）变量自动维护：AI 维护管线 =====
+// 触发时机：宿主每轮生成结束（generationEnded）且确实产出了新的 AI 回复。
+// 与 SoulLink 自动档案维护同款稳定设计：
+// - 「generationStarted → generationEnded」配对判定主生成流程，其他插件自行
+//   广播的 generationEnded（无配对 / 末条未变化）直接跳过；
+// - 末条签名去重 + 运行锁：同一末条只处理一次，上一轮还在飞时新事件直接跳过；
+// - 中断检查：生成被用户中止时跳过，不对半截回复发起维护；
+// - 失败即跳过本轮：调用失败不降级、不重试轰炸，本轮视为已处理。
+// 请求体：system 维护提示词 → <Key_Rules>（键注册表 + 变化规则）→
+// <Current_Values>（当前游戏值 YAML）→ <Recent_Messages>（最新 2 条消息）。
+// 解析：AI 返回 YAML/JSON 补丁 → 与当前树合并（仅已注册键可新增）→
+// 有变化才写聊天文件。
+
+const valuesMaintainState = {
+  running: false,
+  lastSignature: '',
+};
+
+// 主生成流程跟踪：generationStarted 记录末条签名，generationEnded 时末条必须变化。
+const valuesMainGenerationState = {
+  startChatSignature: '',
+};
+
+function buildValuesSignature(message) {
+  if (!message) return '';
+  return [
+    message.is_user ? 'user' : 'assistant',
+    String(message.name || ''),
+    String(message.mes || ''),
+  ].join('|');
+}
+
+function onValuesGenerationStarted() {
+  const ctx = getContextSafe();
+  const chat = Array.isArray(ctx?.chat) ? ctx.chat : [];
+  const last = chat[chat.length - 1];
+  valuesMainGenerationState.startChatSignature = last ? buildValuesSignature(last) : '';
+}
+
+function onValuesGenerationStopped() {
+  valuesMainGenerationState.startChatSignature = '';
+}
+
+// 切换/加载聊天时清空跟踪，避免残留签名被其他插件的 generationEnded 误用。
+function onValuesChatChanged() {
+  valuesMainGenerationState.startChatSignature = '';
+}
+
+// 维护提示词：自定义优先，空则回退默认。
+function getValuesMaintainPrompt(ctx) {
+  const settings = ctx ? getSettings(ctx) : null;
+  const saved = String(settings?.valuesMaintainPrompt || '').trim();
+  return saved || DEFAULT_VALUES_MAINTAIN_PROMPT;
+}
+
+// 请求体：system 提示词 → 键规则块 → 当前值块 → 最近消息块。
+// 与「变量维护」默认提示词的输入说明保持一致：键规则是唯一依据，
+// 当前值 YAML 是唯一可改动的数据，recent_messages 严格取最新 2 条。
+function buildValuesMaintainMessages(ctx, prompt) {
+  const keys = getValuesKeys(ctx);
+  // 子变量是派生变量：不参与 AI 维护，规则块里只列父变量并注明子变量由系统计算。
+  const parentKeys = keys.filter(isValuesParentKey);
+  const childKeys = keys.filter(isValuesChildKey);
+  const keyRulesText = parentKeys
+    .map((key) => `- ${String(key?.name || '')}: ${String(key?.rule || '')}`)
+    .join('\n') || '（尚未注册任何父变量）';
+  const childNote = childKeys.length > 0
+    ? '\n\n（子变量为派生变量，由系统按父变量自动计算，禁止修改：' +
+      childKeys.map((key) => `${String(key?.name || '')} ← ${String(key?.parent || '')}`).join('、') +
+      '）'
+    : '';
+  const current = getValuesGameTree(ctx);
+  const currentText = serializeValuesTree(current, '') || '{}';
+  const recentMessages = getStoryGateRecentMessages(VALUES_MAINTAIN_RECENT_COUNT, ctx);
+  return [
+    { role: 'system', content: prompt },
+    {
+      role: 'user',
+      content: [
+        '以下被 <Key_Rules>...</Key_Rules> 包裹的是全部已注册变量及其变化规则，这是变量变化的唯一依据。',
+        '<Key_Rules>\n' + keyRulesText + childNote + '\n</Key_Rules>',
+      ].join('\n'),
+    },
+    {
+      role: 'user',
+      content: [
+        '以下被 <Current_Values>...</Current_Values> 包裹的是当前游戏变量（YAML 格式），这是唯一可改动的数据，结构、条目名与层级必须原样保留。',
+        '<Current_Values>\n' + currentText + '\n</Current_Values>',
+      ].join('\n'),
+    },
+    {
+      role: 'user',
+      content: [
+        '以下被 <Recent_Messages>...</Recent_Messages> 包裹的是最新 ' + VALUES_MAINTAIN_RECENT_COUNT + ' 条消息，是本轮维护的依据。',
+        '<Recent_Messages>\n' + JSON.stringify(recentMessages) + '\n</Recent_Messages>',
+      ].join('\n'),
+    },
+  ];
+}
+
+// 主维护管线：返回最近一轮记录对象（写 globalThis[VALUES_LAST_ROUND_KEY] 并刷新首页）。
+// options.force=true 时跳过「末条已处理」去重（手动维护按钮用）。
+async function runValuesMaintain(ctx, settings, options = {}) {
+  const startedAt = Date.now();
+  const controller = new AbortController();
+  const deadline = setTimeout(() => controller.abort(), VALUES_MAINTAIN_TIMEOUT_MS);
+  const record = {
+    at: new Date().toISOString(),
+    mode: options.force ? 'manual' : 'auto',
+    durationMs: 0,
+    ok: false,
+    changed: [],
+    ignored: [],
+    raw: '',
+    error: '',
+  };
+  const finish = (overrides = {}) => {
+    clearTimeout(deadline);
+    record.durationMs = Date.now() - startedAt;
+    Object.assign(record, overrides);
+    globalThis[VALUES_LAST_ROUND_KEY] = record;
+    try {
+      refreshHomeValuesStatus();
+    } catch {}
+    try {
+      refreshGameViewIfActive();
+    } catch {}
+  };
+  try {
+    const keys = getValuesKeys(ctx);
+    const current = getValuesGameTree(ctx);
+    if (keys.length === 0 && valuesCountEntries(current) === 0) {
+      logApp('debug', '变量维护跳过：没有已注册变量也没有现有变量');
+      finish({ skipped: true });
+      return record;
+    }
+    const prompt = getValuesMaintainPrompt(ctx);
+    const messages = buildValuesMaintainMessages(ctx, prompt);
+    logApp('info', '变量维护：AI 开始', `${record.mode} · ${keys.length} 个变量 · ${VALUES_MAINTAIN_RECENT_COUNT} 条消息`);
+    const content = await chatCompletion(settings, messages, {
+      signal: controller.signal,
+      maxTokens: VALUES_MAINTAIN_MAX_TOKENS,
+      temperature: 0.2,
+    });
+    record.raw = String(content || '');
+    const patch = parseValuesPatch(content);
+    if (!patch) {
+      logApp('warn', '变量维护：AI 返回无法解析，本轮保持原值', String(content || '').slice(0, 160));
+      finish({ error: 'AI 返回无法解析' });
+      return record;
+    }
+    const merged = mergeValuesPatch(current, patch, getValuesRegistryNames(ctx));
+    // 子变量派生：AI 可能改了父变量，合并后按最新父变量重算子变量（AI 对
+    // 子变量的任何改动都会被派生结果覆盖，保证子变量始终与父变量一致）。
+    deriveValuesChildren(merged.tree, keys);
+    // 子变量路径不计入变化：其值由父变量决定，父变量变化时已体现在父变量路径上。
+    const childKeyNames = new Set(getValuesChildKeys(ctx).map((key) => String(key.name || '').trim()));
+    record.changed = merged.changed.filter((path) => {
+      const leafName = String(path || '').split('.').pop();
+      return !childKeyNames.has(leafName);
+    });
+    record.ignored = merged.ignored;
+    if (merged.ignored.length > 0) {
+      logApp('info', '变量维护：忽略未注册的新变量', merged.ignored.join('、'));
+    }
+    if (merged.changed.length === 0) {
+      logApp('debug', '变量维护：本轮无变化');
+      finish({ ok: true });
+      return record;
+    }
+    const saved = saveValuesChatState(ctx, merged.tree, { lastSignature: options.signature || '' });
+    logApp('info', '变量维护完成', `更新 ${record.changed.length} 项：${record.changed.join('、')}${saved ? '' : '（写入聊天文件失败）'}`);
+    if (!saved) {
+      globalThis.toastr?.warning?.('变量维护完成，但写入聊天文件失败', `[${MODULE_DISPLAY_NAME}]`);
+    }
+    finish({ ok: true });
+    return record;
+  } catch (error) {
+    const cancelled = controller.signal.aborted;
+    const message = String(error?.message || error);
+    logApp('warn', '变量维护失败', cancelled ? '超时中止' : message);
+    finish({ error: cancelled ? '超时中止' : message.slice(0, 200) });
+    return record;
+  } finally {
+    valuesMaintainState.running = false;
+  }
+}
+
+// generationEnded 入口：主生成配对 + 末条变化 + 去重 + 运行锁 + 配置检查。
+async function onValuesGenerationEnded() {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  let settings;
+  try {
+    settings = getSettings(ctx);
+  } catch (error) {
+    console.warn(`[${MODULE_DISPLAY_NAME}] 变量维护：读取设置失败`, error);
+    return;
+  }
+  if (settings.valuesAutoUpdateEnabled === false) return;
+  // 用户中断生成：跳过，避免对半截回复发起维护。
+  if (ctx?.streamingProcessor?.abortController?.signal?.aborted) {
+    logApp('info', '变量维护跳过：生成被中断');
+    return;
+  }
+  const chat = Array.isArray(ctx.chat) ? ctx.chat : [];
+  const lastMessage = chat[chat.length - 1];
+  // 末条不是 AI 回复（空生成/失败/系统消息）：本轮没有可维护的新剧情。
+  if (!lastMessage || lastMessage.is_user || lastMessage.is_system) {
+    logApp('debug', '变量维护跳过：末条不是 AI 回复');
+    return;
+  }
+  // 非主生成流程的 generationEnded（其他插件自行广播）直接跳过。
+  if (valuesMainGenerationState.startChatSignature === '') {
+    logApp('debug', '变量维护跳过：非主生成流程的 generationEnded');
+    return;
+  }
+  const startSignature = valuesMainGenerationState.startChatSignature;
+  valuesMainGenerationState.startChatSignature = '';
+  const signature = buildValuesSignature(lastMessage);
+  if (signature === startSignature) {
+    logApp('debug', '变量维护跳过：末条消息未变化');
+    return;
+  }
+  if (valuesMaintainState.lastSignature === signature) {
+    logApp('debug', '变量维护跳过：本轮已处理');
+    return;
+  }
+  if (valuesMaintainState.running) {
+    logApp('debug', '变量维护跳过：上一轮仍在运行');
+    return;
+  }
+  if (!getApiBase(settings) || !String(settings.model || '').trim()) {
+    logApp('debug', '变量维护跳过：API 未配置');
+    return;
+  }
+  valuesMaintainState.running = true;
+  valuesMaintainState.lastSignature = signature;
+  await runValuesMaintain(ctx, settings, { signature });
+}
+
+// 手动维护（工作台按钮触发）：不受主生成配对约束，直接对当前游戏值跑一轮。
+async function runValuesMaintainNow() {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  let settings;
+  try {
+    settings = getSettings(ctx);
+  } catch (error) {
+    console.warn(`[${MODULE_DISPLAY_NAME}] 变量维护：读取设置失败`, error);
+    return;
+  }
+  if (!getApiBase(settings) || !String(settings.model || '').trim()) {
+    logApp('warn', '变量维护：API 未配置');
+    globalThis.toastr?.warning?.('变量维护需要先配置 API（Base URL / 模型）', `[${MODULE_DISPLAY_NAME}]`);
+    return;
+  }
+  if (valuesMaintainState.running) {
+    globalThis.toastr?.info?.('上一轮变量维护仍在进行', `[${MODULE_DISPLAY_NAME}]`);
+    return;
+  }
+  valuesMaintainState.running = true;
+  await runValuesMaintain(ctx, settings, { force: true });
+}
+
+
+// ===== js/values-inject.js =====
+// ===== 万华镜（Kaleidoscope）变量注入：默认数值层勾选 → 发送前注入提示词 =====
+// 触发时机：用户点击发送（messageSent，经跨扩展发送屏障），把勾选的节点 / 变量
+// 以 YAML 形式注入到提示词中；注入位置 = IN_PROMPT（SillyTavern 的
+// 「World Info (after)」之后，见 host.js getExtensionPromptApi 注释）；
+// generationEnded / generationStopped 后清空注入，下一轮发送前重新注入最新值。
+// 注入内容：当前游戏值（未初始化时回退默认值）按勾选路径裁剪后的 YAML 树。
+
+// 注入文本：<Values> 块 + 说明 + YAML。只注入「自身打开」的变量（叶子）；
+// 容器节点本身不注入内容（打开节点 = 允许子树，具体注入哪些变量由各后代
+// 自己的开关决定）；祖先未打开的路径防御性跳过；路径不存在时跳过。
+function buildValuesInjectText(ctx) {
+  const config = getValuesInjectConfig(ctx);
+  if (!config.enabled || !Array.isArray(config.paths) || config.paths.length === 0) return '';
+  const tree = getValuesGameTree(ctx);
+  const selected = {};
+  for (const item of config.paths) {
+    const path = String(item || '').split('/').filter(Boolean);
+    if (path.length === 0) continue;
+    const node = valuesGetAtPath(tree, path);
+    if (node === undefined || valuesIsContainer(node)) continue;
+    // 防御：祖先必须全部打开（正常交互下由自动提升保证）。
+    let ancestorsOk = true;
+    for (let i = 1; i < path.length; i += 1) {
+      if (!config.paths.includes(path.slice(0, i).join('/'))) {
+        ancestorsOk = false;
+        break;
+      }
+    }
+    if (!ancestorsOk) continue;
+    valuesSetAtPath(selected, path, cloneValue(node));
+  }
+  const yaml = serializeValuesTree(selected, '');
+  if (!yaml) return '';
+  return [
+    '<Values>',
+    '【系统信息】本块不是剧情正文，是当前变量状态（YAML 格式）。请让接下来的剧情与这些变量保持一致；变量发生变化时按规则自然体现，不要复述本块原文。',
+    '',
+    yaml,
+    '</Values>',
+  ].join('\n');
+}
+
+// 注入：setExtensionPrompt(IN_PROMPT, depth 0) = World Info (after) 之后。
+// 未开启 / 未勾选 / 无内容时不做任何调用（清理统一由 generationEnded 负责）。
+function injectValuesIntoPrompt(ctx) {
+  const api = getExtensionPromptApi(ctx);
+  if (!api) return false;
+  const text = buildValuesInjectText(ctx);
+  if (!text) return false;
+  api.setExtensionPrompt(VALUES_INJECT_KEY, text, api.inPrompt, 0, false, api.systemRole);
+  return true;
+}
+
+function clearValuesInjection(ctx) {
+  const api = getExtensionPromptApi(ctx);
+  if (!api) return;
+  try {
+    api.setExtensionPrompt(VALUES_INJECT_KEY, '', api.inPrompt, 0);
+  } catch (error) {
+    logApp('warn', '清理变量注入失败', String(error?.message || error));
+  }
+}
+
+// 发送前任务（注册进跨扩展发送屏障）：同步注入，失败静默降级，绝不阻塞发送。
+// 只处理「用户点击发送」产生的新消息；系统消息 / 非用户末条一律跳过。
+function runValuesInjectBarrierTask(ctx) {
+  const chat = Array.isArray(ctx?.chat) ? ctx.chat : [];
+  const lastMessage = chat[chat.length - 1];
+  if (!lastMessage || !lastMessage.is_user) return Promise.resolve();
+  try {
+    injectValuesIntoPrompt(ctx);
+  } catch (error) {
+    logApp('warn', '变量注入失败', String(error?.message || error));
+  }
+  return Promise.resolve();
+}
+
+// 生成结束 / 停止后清空注入：swipes / 重生成 / 后续轮次不会复用本轮的旧值，
+// 下一轮发送前会重新注入最新值。
+function onValuesInjectGenerationCleanup() {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  clearValuesInjection(ctx);
+}
+
+// 注册进跨扩展发送屏障：与剧情预筛并发执行，保证注入在主请求发出前完成。
+getPreSendBarrier()?.register('kaleidoscope-values-inject', runValuesInjectBarrierTask);
+
+// ===== js/values-trigger.js =====
+// ===== 万华镜（Kaleidoscope）剧情触发：变量条件确定性触发 =====
+// 与「剧情脉络」互补：剧情脉络由预筛 AI 依据对话判断触发；剧情触发不依赖 API，
+// 直接按「某节点下变量的当前值」是否满足预设条件，确定性判定剧情事件是否触发。
+// 触发时机：用户点击发送（messageSent，经跨扩展发送屏障），与剧情预筛并发执行；
+// 满足条件的事件以 <Story_Trigger> 块注入（IN_CHAT, SYSTEM），generationEnded /
+// generationStopped 后清空，下一轮发送前重新判定。
+// 数据存储：随变量包（角色卡 kaleidoscope_values / 全局设置 valuesData）的
+// triggers 字段保存，随角色卡导入/导出自动携带；YAML 导入导出见 values-data.js。
+
+// ---------- 数据读写 ----------
+function getValuesTriggers(ctx) {
+  const bundle = ctx ? getValuesBundle(ctx) : null;
+  if (!bundle) return [];
+  if (!Array.isArray(bundle.triggers)) bundle.triggers = [];
+  return bundle.triggers;
+}
+
+function getValuesTriggerById(ctx, id) {
+  return getValuesTriggers(ctx).find((trigger) => trigger.id === id) || null;
+}
+
+// 按 id 重排触发列表顺序（拖动排序用）；未列出的触发按原相对顺序追加在末尾。
+function reorderValuesTriggers(ctx, ids) {
+  const triggers = getValuesTriggers(ctx);
+  const wanted = Array.isArray(ids) ? ids.map((id) => String(id || '').trim()).filter(Boolean) : [];
+  const byId = new Map(triggers.map((trigger) => [String(trigger?.id || '').trim(), trigger]));
+  const reordered = [];
+  const seen = new Set();
+  for (const id of wanted) {
+    const trigger = byId.get(id);
+    if (trigger && !seen.has(id)) {
+      reordered.push(trigger);
+      seen.add(id);
+    }
+  }
+  for (const trigger of triggers) {
+    const id = String(trigger?.id || '').trim();
+    if (!seen.has(id)) reordered.push(trigger);
+  }
+  triggers.length = 0;
+  for (const trigger of reordered) triggers.push(trigger);
+  saveValuesData(ctx);
+  return triggers;
+}
+
+// 触发 ID：默认从 001 开始逐次递增；excludeId 为正在编辑的触发自身 id（不计入）。
+function nextValuesTriggerId(ctx, excludeId) {
+  const triggers = getValuesTriggers(ctx);
+  let max = 0;
+  for (const trigger of triggers) {
+    if (trigger.id === excludeId) continue;
+    const match = /(?:^|\D)(\d+)$/.exec(String(trigger.id || ''));
+    if (match) max = Math.max(max, parseInt(match[1], 10));
+  }
+  return String(max + 1).padStart(3, '0');
+}
+
+// 计算触发实际使用的 id：给定 id 非空且未被占用则沿用；为空或与其他触发重复时，
+// 按 001 序列自动顺延到未注册的 id。excludeId 为正在编辑的触发自身 id。
+function resolveValuesTriggerId(ctx, requested, excludeId) {
+  const triggers = getValuesTriggers(ctx);
+  const used = new Set();
+  for (const trigger of triggers) {
+    if (trigger.id !== excludeId) used.add(trigger.id);
+  }
+  const candidate = String(requested ?? '').trim();
+  if (candidate && !used.has(candidate)) return candidate;
+  let id = nextValuesTriggerId(ctx, excludeId);
+  while (used.has(id)) {
+    const match = /(\d+)$/.exec(id);
+    id = String((match ? parseInt(match[1], 10) : 0) + 1).padStart(3, '0');
+  }
+  return id;
+}
+
+// 归一化单条触发：补全字段、过滤非法条件（空路径丢弃）。
+function normalizeValuesTrigger(raw) {
+  const conditions = Array.isArray(raw?.conditions) ? raw.conditions : [];
+  return {
+    id: String(raw?.id || '').trim(),
+    name: String(raw?.name || '').trim() || '未命名触发',
+    enabled: raw?.enabled !== false,
+    once: raw?.once !== false,
+    logic: String(raw?.logic || 'all').trim() === 'any' ? 'any' : 'all',
+    description: String(raw?.description || '').trim(),
+    conditions: conditions
+      .filter((condition) => condition && typeof condition === 'object' && !Array.isArray(condition))
+      .map((condition) => ({
+        path: String(condition?.path || '').trim(),
+        op: String(condition?.op || '==').trim(),
+        value: condition?.value !== undefined ? condition.value : null,
+      }))
+      .filter((condition) => condition.path !== ''),
+    content: String(raw?.content || ''),
+  };
+}
+
+function createValuesTrigger(ctx, data) {
+  const triggers = getValuesTriggers(ctx);
+  const now = new Date().toISOString();
+  const trigger = {
+    ...normalizeValuesTrigger(data),
+    id: resolveValuesTriggerId(ctx, data?.id, ''),
+    createdAt: now,
+    updatedAt: now,
+  };
+  triggers.push(trigger);
+  saveValuesData(ctx);
+  return trigger;
+}
+
+function updateValuesTrigger(ctx, id, data) {
+  const trigger = getValuesTriggerById(ctx, id);
+  if (!trigger) return null;
+  const next = normalizeValuesTrigger({ ...trigger, ...data, id: trigger.id });
+  if (data?.id !== undefined && String(data.id).trim() !== trigger.id) {
+    next.id = resolveValuesTriggerId(ctx, data.id, id);
+  }
+  Object.assign(trigger, next, { updatedAt: new Date().toISOString() });
+  saveValuesData(ctx);
+  return trigger;
+}
+
+function deleteValuesTrigger(ctx, id) {
+  const triggers = getValuesTriggers(ctx);
+  const index = triggers.findIndex((trigger) => trigger.id === id);
+  if (index < 0) return false;
+  triggers.splice(index, 1);
+  saveValuesData(ctx);
+  return true;
+}
+
+// 一次性事件触发后自动关闭：把已触发的一次性事件置为停用并持久化，
+// 返回被自动关闭的触发 id 列表。常驻事件（once === false）不受影响。
+function autoDisableFiredValuesTriggers(ctx, triggered) {
+  const disabled = [];
+  for (const trigger of Array.isArray(triggered) ? triggered : []) {
+    if (trigger.once !== false) {
+      trigger.enabled = false;
+      trigger.updatedAt = new Date().toISOString();
+      disabled.push(trigger.id);
+    }
+  }
+  if (disabled.length > 0) saveValuesData(ctx);
+  return disabled;
+}
+
+// 触发启用开关：关闭后该触发不再参与判定；再点一次重新激活。
+function toggleValuesTriggerEnabled(ctx, id) {
+  const trigger = getValuesTriggerById(ctx, id);
+  if (!trigger) return null;
+  trigger.enabled = trigger.enabled === false;
+  trigger.updatedAt = new Date().toISOString();
+  saveValuesData(ctx);
+  return trigger;
+}
+
+// ---------- 条件求值 ----------
+// 运算符：== != > >= < <= contains exists not exists。
+// 语义：路径不存在（变量未定义）时除 exists / not exists 外一律不满足；
+// 数值与数值按数字比较，字符串与字符串按文本比较，混合时先尝试转数字。
+function evaluateValuesCondition(value, op, expected) {
+  const operator = String(op || '==').trim();
+  const defined = value !== undefined && value !== null;
+  if (operator === 'exists') return defined;
+  if (operator === 'not exists') return !defined;
+  if (!defined) return false;
+  if (operator === 'contains') {
+    return String(value).includes(String(expected ?? ''));
+  }
+  const left = value;
+  const right = expected;
+  const leftNum = typeof left === 'number' ? left : Number(left);
+  const rightNum = typeof right === 'number' ? right : Number(right);
+  const numeric = (typeof left === 'number' || typeof right === 'number')
+    ? Number.isFinite(leftNum) && Number.isFinite(rightNum)
+    : false;
+  const a = numeric ? leftNum : String(left);
+  const b = numeric ? rightNum : String(right);
+  switch (operator) {
+    case '==': return numeric ? a === b : String(left) === String(right);
+    case '!=': return numeric ? a !== b : String(left) !== String(right);
+    case '>': return a > b;
+    case '>=': return a >= b;
+    case '<': return a < b;
+    case '<=': return a <= b;
+    default: return false;
+  }
+}
+
+// 单条触发判定：全部条件按 logic（all=且 / any=或）组合；无条件恒不触发。
+function evaluateValuesTrigger(ctx, trigger) {
+  const tree = getValuesGameTree(ctx);
+  const conditions = Array.isArray(trigger?.conditions) ? trigger.conditions : [];
+  if (conditions.length === 0) return false;
+  const results = conditions.map((condition) => {
+    const path = String(condition?.path || '').split('/').filter(Boolean);
+    const value = valuesGetAtPath(tree, path);
+    return evaluateValuesCondition(value, condition?.op, condition?.value);
+  });
+  return String(trigger?.logic || 'all') === 'any' ? results.some(Boolean) : results.every(Boolean);
+}
+
+// 当前满足条件且启用的触发（按创建顺序）。
+function evaluateValuesTriggers(ctx) {
+  return getValuesTriggers(ctx).filter((trigger) => trigger.enabled !== false && evaluateValuesTrigger(ctx, trigger));
+}
+
+// 条件摘要文本：张三/好感 >= 70 且 张三/是否已知真相 == true。
+function formatValuesTriggerConditions(trigger) {
+  const conditions = Array.isArray(trigger?.conditions) ? trigger.conditions : [];
+  const parts = conditions.map((condition) => {
+    const path = String(condition?.path || '');
+    const op = String(condition?.op || '==').trim();
+    if (op === 'exists' || op === 'not exists') return `${path} ${op}`;
+    const value = condition?.value;
+    const valueText = value === null || value === undefined ? 'null' : String(value);
+    return `${path} ${op} ${valueText}`;
+  });
+  if (parts.length === 0) return '（无条件）';
+  const joiner = String(trigger?.logic || 'all') === 'any' ? ' 或 ' : ' 且 ';
+  return parts.join(joiner);
+}
+
+// ---------- 注入 ----------
+// 注入块：<Story_Trigger> 块 + 说明 + 每个满足条件的事件（含触发条件 / 说明 / 正文）。
+// 与剧情预筛的 <Story_Event> 同款强制指令，保证主模型真实落地事件内容。
+function buildValuesTriggerInjectionText(ctx, triggers) {
+  const lines = [
+    '<Story_Trigger>',
+    '【系统导演注 · 强制指令】本块不是剧情正文，也不是任何角色的台词、旁白或可引用文本；它是系统在发送前依据「变量条件」确定性判定「本轮应该触发的剧情事件」（相关变量的当前值已满足预设条件）。以下规则必须逐条执行，不得忽略、不得淡化，不得以任何理由整体弃用。',
+    '',
+    '执行规则：',
+    '1. 直接驱动：本块中的事件内容必须真实落地到接下来的剧情中（对象、方式、时机都要兑现）；禁止敷衍带过、写与事件无关的日常。',
+    '2. 自然衔接：事件内容要与当前对话无缝衔接，作为剧情的一部分自然发生，不得生硬插入，也不得让角色复述本块原文。',
+    '3. 冲突裁决：若事件内容与已发生剧情冲突，保留事件意图，改用符合当前剧情的方式表达；不得整段弃用，也不得以「与设定不符」为由跳过本指令。',
+    '4. 优先级：在接下来的剧情中，若与你对剧情走向的一般印象或惯性理解冲突，以本段为准。',
+    '',
+  ];
+  for (const trigger of triggers) {
+    lines.push('<event id="' + String(trigger.id || '') + '" name="' + String(trigger.name || '') + '">');
+    lines.push('触发条件：' + formatValuesTriggerConditions(trigger));
+    if (String(trigger.description || '').trim()) lines.push('事件说明：' + trigger.description);
+    lines.push('');
+    lines.push(String(trigger.content || '').trim());
+    lines.push('</event>');
+  }
+  lines.push('</Story_Trigger>');
+  return lines.join('\n');
+}
+
+function getValuesTriggerExtensionPromptApi(ctx) {
+  return getExtensionPromptApi(ctx);
+}
+
+function clearValuesTriggerInjection(ctx) {
+  const api = getValuesTriggerExtensionPromptApi(ctx);
+  if (!api) return;
+  try {
+    api.setExtensionPrompt(VALUES_TRIGGER_INJECT_KEY, '', api.inChat, 0);
+  } catch (error) {
+    logApp('warn', '清理剧情触发注入失败', String(error?.message || error));
+  }
+}
+
+// 发送前任务（注册进跨扩展发送屏障）：确定性求值 + 同步注入，失败静默降级，
+// 绝不阻塞发送。只处理「用户点击发送」产生的新消息；系统消息 / 非用户末条跳过。
+function runValuesTriggerBarrierTask(ctx, payload) {
+  const context = ctx || getContextSafe();
+  const settings = context ? getSettings(context) : null;
+  if (!settings || settings.valuesTriggerEnabled === false) return Promise.resolve();
+  const chat = Array.isArray(context?.chat) ? context.chat : [];
+  const lastMessage = chat[chat.length - 1];
+  if (!lastMessage || !lastMessage.is_user) return Promise.resolve();
+  const record = {
+    at: new Date().toISOString(),
+    totalTriggers: getValuesTriggers(context).length,
+    triggeredIds: [],
+    triggeredEvents: [],
+    injectionText: '',
+    injected: false,
+    skipped: false,
+  };
+  try {
+    const triggered = evaluateValuesTriggers(context);
+    record.triggeredIds = triggered.map((trigger) => trigger.id);
+    record.triggeredEvents = triggered.map((trigger) => ({
+      id: trigger.id,
+      name: trigger.name,
+      conditions: formatValuesTriggerConditions(trigger),
+      description: trigger.description,
+      content: trigger.content,
+    }));
+    if (triggered.length === 0) {
+      record.skipped = true;
+      globalThis[VALUES_TRIGGER_LAST_ROUND_KEY] = record;
+      return Promise.resolve();
+    }
+    const api = getValuesTriggerExtensionPromptApi(context);
+    if (!api) {
+      logApp('warn', '剧情触发：宿主不支持提示词注入，跳过注入');
+      globalThis[VALUES_TRIGGER_LAST_ROUND_KEY] = record;
+      return Promise.resolve();
+    }
+    const injectionText = buildValuesTriggerInjectionText(context, triggered);
+    record.injectionText = injectionText;
+    clearValuesTriggerInjection(context);
+    api.setExtensionPrompt(VALUES_TRIGGER_INJECT_KEY, injectionText, api.inChat, 0, false, api.systemRole);
+    record.injected = true;
+    record.autoDisabledIds = autoDisableFiredValuesTriggers(context, triggered);
+    logApp('info', '剧情触发：已注入事件', '满足条件 ' + triggered.length + ' 个事件', record.triggeredIds);
+    const onceNote = record.autoDisabledIds.length > 0
+      ? '，' + record.autoDisabledIds.length + ' 个一次性事件已自动关闭'
+      : '';
+    globalThis.toastr?.success?.('剧情触发：已注入 ' + triggered.length + ' 个事件' + onceNote + '！', '[' + MODULE_DISPLAY_NAME + ']');
+  } catch (error) {
+    logApp('warn', '剧情触发失败，静默降级', String(error?.message || error));
+  }
+  globalThis[VALUES_TRIGGER_LAST_ROUND_KEY] = record;
+  return Promise.resolve();
+}
+
+// 生成结束 / 停止后清空注入：swipes / 重生成 / 后续轮次不会复用本轮的旧块，
+// 下一轮发送前会按最新变量值重新判定。
+function onValuesTriggerGenerationCleanup() {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  clearValuesTriggerInjection(ctx);
+}
+
+// 注册进跨扩展发送屏障：与剧情预筛 / 变量注入并发执行，保证注入在主请求发出前完成。
+getPreSendBarrier()?.register('kaleidoscope-values-trigger', runValuesTriggerBarrierTask);
+
+// ===== js/views-values.js =====
+// ===== 万华镜（Kaleidoscope）变量工作台 UI：节点树 + 变量注册表 + 自动维护状态 =====
+// 结构与剧情脉络一致：节点（人名 / 分组）只做嵌套容器、不对应值；变量挂在节点下
+// （或顶层），是唯一对应值的条目。变量必须先注册，新建时从注册表下拉选择。
+let valuesActiveLayer = 'default';   // 'default'（角色卡） | 'game'（聊天）
+let valuesExpanded = new Set();      // 已展开的节点路径（path.join('/')）
+let valuesEditorPath = null;         // 正在编辑的条目路径（null = 新建）
+let valuesEditorMode = null;         // 'node' | 'key'
+let valuesKeyEditorName = null;      // 正在编辑的注册变量名（null = 新建）
+let valuesActiveTree = null;         // 当前层的活引用（渲染时赋值，增删改用它）
+let valuesEditorParentPath = [];     // 新建节点 / 变量时的父路径
+let valuesAddMenuContext = null;    // 「＋」菜单上下文：{ root: true } | { path: [...] }
+let valuesTriggerEditorId = null;        // 正在编辑的触发 id（null = 新建）
+let valuesTriggerEditorConditions = [];  // 编辑器中的条件草稿
+
+function valuesToastr(kind, message) {
+  try {
+    const fn = globalThis.toastr?.[kind];
+    if (typeof fn === 'function') fn(message, `[${MODULE_DISPLAY_NAME}]`);
+  } catch {}
+}
+
+function getValuesWorkbench() {
+  return document.getElementById(VALUES_DIALOG_ID);
+}
+
+function isValuesWorkbenchOpen() {
+  const dialog = getValuesWorkbench();
+  return Boolean(dialog && dialog.classList.contains('is-open'));
+}
+
+// ---------- 打开 / 关闭工作台 ----------
+function openValuesWorkbench() {
+  const dialog = getValuesWorkbench();
+  if (!dialog) return;
+  closeValuesEditor();
+  closeValuesKeyEditor();
+  closeValuesTriggerEditor();
+  closeValuesAddMenu();
+  dialog.classList.add('is-open');
+  dialog.setAttribute('aria-hidden', 'false');
+  applyValuesNavState();
+  renderValuesTree();
+  refreshHomeValuesStatus();
+  logApp('debug', '变量工作台已打开');
+}
+
+function closeValuesWorkbench() {
+  const dialog = getValuesWorkbench();
+  if (!dialog) return;
+  closeValuesEditor();
+  closeValuesKeyEditor();
+  closeValuesTriggerEditor();
+  closeValuesAddMenu();
+  dialog.classList.remove('is-open');
+  dialog.setAttribute('aria-hidden', 'true');
+  logApp('debug', '变量工作台已关闭');
+}
+
+// 绑定徽标：角色卡 / 聊天文件 / 未绑定。
+function refreshValuesBindingStatus() {
+  const badge = document.getElementById(VALUES_BINDING_ID);
+  if (!badge) return;
+  const ctx = getContextSafe();
+  const character = ctx ? getStoryCharacter(ctx) : null;
+  if (!character) {
+    badge.textContent = '未绑定角色';
+    badge.dataset.state = 'idle';
+    badge.title = '群聊或未选角色：默认值保存在全局设置，不随角色卡导入导出';
+    return;
+  }
+  const name = String(character.name || character.avatar || '当前角色');
+  const card = ctx ? getValuesCardData(ctx) : null;
+  if (card) {
+    badge.textContent = `默认值已绑定 · ${name}`;
+    badge.dataset.state = 'ok';
+    badge.title = '默认值保存在角色卡中：导入/导出角色卡时自动携带；游戏值保存在聊天文件中';
+  } else {
+    badge.textContent = `待绑定 · ${name}`;
+    badge.dataset.state = 'warn';
+    badge.title = '当前角色卡还没有变量数据：首次保存后自动写入角色卡';
+  }
+}
+
+// ---------- 左侧导航：收起 / 展开 ----------
+function getValuesWorkbenchEl() {
+  return document.querySelector('.kaleido-values__workbench');
+}
+
+// 从设置恢复导航折叠状态（对话框与面板视图共用）。
+function applyValuesNavState() {
+  const bench = getValuesWorkbenchEl();
+  if (!bench) return;
+  let collapsed = false;
+  try {
+    const ctx = getContextSafe();
+    const settings = ctx ? getSettings(ctx) : null;
+    collapsed = Boolean(settings?.valuesNavCollapsed);
+  } catch {}
+  bench.classList.toggle('is-nav-collapsed', collapsed);
+  const expand = document.getElementById(VALUES_NAV_EXPAND_ID);
+  if (expand) expand.hidden = !collapsed;
+}
+
+function setValuesNavCollapsed(collapsed) {
+  const bench = getValuesWorkbenchEl();
+  if (!bench) return;
+  bench.classList.toggle('is-nav-collapsed', collapsed);
+  const expand = document.getElementById(VALUES_NAV_EXPAND_ID);
+  if (expand) expand.hidden = !collapsed;
+  try {
+    const ctx = getContextSafe();
+    if (ctx) {
+      const settings = getSettings(ctx);
+      settings.valuesNavCollapsed = Boolean(collapsed);
+      saveSettings(ctx);
+    }
+  } catch {}
+}
+
+// ---------- 层切换 ----------
+function setValuesLayer(layer) {
+  if (layer !== 'default' && layer !== 'game') return;
+  valuesActiveLayer = layer;
+  const isGame = layer === 'game';
+  // 状态锚点（隐藏按钮）：保留 is-active 语义
+  document.getElementById(VALUES_LAYER_DEFAULT_ID)?.classList.toggle('is-active', !isGame);
+  document.getElementById(VALUES_LAYER_GAME_ID)?.classList.toggle('is-active', isGame);
+  // 可见的当前层指示条：只显示当前层，右侧按钮一键切换
+  const row = document.getElementById(VALUES_LAYER_ROW_ID);
+  if (row) row.dataset.layer = layer;
+  const icon = document.getElementById(VALUES_LAYER_ICON_ID);
+  if (icon) icon.innerHTML = `<span class="${isGame ? VALUES_LAYER_GAME_ICON_CLASS : VALUES_LAYER_DEFAULT_ICON_CLASS}"></span>`;
+  const title = document.getElementById(VALUES_LAYER_TITLE_ID);
+  if (title) title.textContent = isGame ? '游戏数值' : '默认数值';
+  const toggle = document.getElementById(VALUES_LAYER_TOGGLE_ID);
+  if (toggle) {
+    const target = isGame ? '默认数值' : '游戏数值';
+    toggle.innerHTML = `<span class="${VALUES_LAYER_SWAP_ICON_CLASS}"></span> 切换到${target}`;
+    toggle.title = isGame ? '切换到默认数值（角色卡，仅手动修改）' : '切换到游戏数值（聊天，AI 自动维护）';
+  }
+  closeValuesEditor();
+  closeValuesKeyEditor();
+  closeValuesAddMenu();
+  syncValuesLayerUI();
+  renderValuesTree();
+}
+
+// 层相关 UI 联动：自动维护 / 重置按钮只属于游戏值层；默认值层只提示手动修改。
+function syncValuesLayerUI() {
+  const isGame = valuesActiveLayer === 'game';
+  const maintainNow = document.getElementById(VALUES_MAINTAIN_NOW_ID);
+  const resetBtn = document.getElementById(VALUES_RESET_GAME_ID);
+  const status = document.getElementById(VALUES_MAINTAIN_STATUS_ID);
+  const hint = document.getElementById(VALUES_DEFAULT_HINT_ID);
+  const injectBar = document.getElementById(VALUES_INJECT_BAR_ID);
+  if (maintainNow) maintainNow.hidden = !isGame;
+  if (resetBtn) resetBtn.hidden = !isGame;
+  if (status) status.hidden = !isGame;
+  if (hint) hint.hidden = isGame;
+  // 注入提示词条只属于「默认数值」层（勾选配置随角色卡保存）。
+  if (injectBar) injectBar.hidden = isGame;
+}
+
+// 注入提示词条：开关状态 + 勾选统计。
+function refreshValuesInjectUI() {
+  const toggle = document.getElementById(VALUES_INJECT_TOGGLE_ID);
+  const status = document.getElementById(VALUES_INJECT_STATUS_ID);
+  if (!toggle && !status) return;
+  const ctx = getContextSafe();
+  const config = ctx ? getValuesInjectConfig(ctx) : { enabled: false, paths: [] };
+  if (toggle) {
+    toggle.classList.toggle('is-off', !config.enabled);
+    toggle.setAttribute('aria-checked', String(Boolean(config.enabled)));
+  }
+  if (status) {
+    // 统计实际注入的变量数（容器节点本身不注入内容）。
+    let count = 0;
+    if (ctx && Array.isArray(config.paths)) {
+      const tree = getValuesGameTree(ctx);
+      for (const item of config.paths) {
+        const path = String(item || '').split('/').filter(Boolean);
+        const node = valuesGetAtPath(tree, path);
+        if (node !== undefined && !valuesIsContainer(node)) count += 1;
+      }
+    }
+    if (!config.enabled) {
+      status.textContent = '未开启 · 勾选条目后随提示词注入';
+      status.dataset.state = 'idle';
+    } else if (count === 0) {
+      status.textContent = '已开启 · 尚未勾选任何变量';
+      status.dataset.state = 'warn';
+    } else {
+      status.textContent = `已开启 · 注入 ${count} 个变量 · 位置：World Info after 之后`;
+      status.dataset.state = 'ok';
+    }
+  }
+  renderValuesInjectPreview();
+}
+
+// 注入预览：显示实际注入提示词的 <Values> 块原文（与注入管线同源，只读）。
+function renderValuesInjectPreview() {
+  const pre = document.getElementById(VALUES_INJECT_TEXT_ID);
+  if (!pre) return;
+  const ctx = getContextSafe();
+  const config = ctx ? getValuesInjectConfig(ctx) : null;
+  if (!config?.enabled) {
+    pre.textContent = '（变量注入未开启：在「变量系统 → 默认数值」层勾选变量并打开注入开关后，这里会显示实际注入提示词的 <Values> 内容。）';
+    return;
+  }
+  const text = buildValuesInjectText(ctx);
+  pre.textContent = text || '（已开启注入，但还没有勾选任何变量。）';
+}
+
+// 当前层的活引用：默认层 = 角色卡 defaults；游戏层 = 聊天状态 values（未初始化时
+// 用默认值克隆，首次修改 / AI 维护后落盘到聊天文件）。
+function getValuesActiveTree(ctx) {
+  const context = ctx || getContextSafe();
+  if (valuesActiveLayer === 'game') {
+    const state = getValuesChatState(context);
+    return state ? state.values : cloneValue(getValuesDefaults(context));
+  }
+  return getValuesDefaults(context);
+}
+
+function saveValuesActiveTree(ctx, tree) {
+  const context = ctx || getContextSafe();
+  if (valuesActiveLayer === 'game') {
+    // 保存前派生：手动改了父变量后，子变量按最新父变量重算再落盘。
+    deriveValuesChildren(tree, context ? getValuesKeys(context) : []);
+    return saveValuesChatState(context, tree);
+  }
+  // 默认层：先确保角色卡容器存在；若当前 tree 不是活引用（首次编辑时来自
+  // 一次性兜底对象，角色卡尚不存在），把内容并入角色卡 defaults 再保存。
+  ensureValuesCardData(context);
+  const live = getValuesDefaults(context);
+  if (tree !== live) {
+    for (const key of Object.keys(live)) delete live[key];
+    Object.assign(live, cloneValue(tree));
+  }
+  deriveValuesChildren(live, context ? getValuesKeys(context) : []);
+  saveValuesData(context);
+  return true;
+}
+// ---------- 节点树渲染 ----------
+function formatValuesLeafText(value) {
+  if (Array.isArray(value)) return JSON.stringify(value);
+  if (value === null || value === undefined) return 'null';
+  return String(value);
+}
+
+function buildValuesEmpty(text) {
+  const empty = document.createElement('div');
+  empty.className = 'kaleido-values__empty';
+  empty.textContent = text;
+  return empty;
+}// 节点行：chevron + 名称 + 子项数 + 「＋」菜单 / 编辑 / 删除。
+// 变量行：图标 + 名称 + 值 + 编辑 / 删除。
+function buildValuesRow(path, name, node, depth) {
+  const row = document.createElement('div');
+  row.dataset.path = JSON.stringify(path);
+  row.style.setProperty('--depth', String(depth));
+  const ctx = getContextSafe();
+  const registered = ctx ? getValuesKeyByName(ctx, name) : null;
+  const isChildLeaf = Boolean(registered && isValuesChildKey(registered));
+  const registryTitle = registered
+    ? (isChildLeaf
+      ? `子变量 · 由「${registered.parent || ''}」派生：${formatValuesChildRulesSummary(registered)}`
+      : `已注册变量 · 变化规则：${registered.rule || '（未填写规则）'}`)
+    : '';
+  const isNode = valuesIsContainer(node);
+  // 注入勾选框：只在「默认数值」层显示（配置随角色卡保存）。
+  const injectConfig = valuesActiveLayer === 'default' ? getValuesInjectConfig(ctx) : null;
+  const pathKey = path.join('/');
+  const injectChecked = injectConfig ? injectConfig.paths.includes(pathKey) : false;
+  // 半选只在「自身未打开但后代有打开」时显示（正常交互下打开后代会自动提升
+  // 祖先，半选仅出现在导入等数据不一致场景，作为防御性提示）。
+  const injectIndeterminate = injectConfig ? !injectChecked && injectConfig.paths.some((item) => item.startsWith(pathKey + '/')) : false;
+  const injectCheckHTML = injectConfig
+    ? `<button type="button" class="kaleido-values__inject-switch${injectChecked ? '' : ' is-off'}${injectIndeterminate ? ' is-partial' : ''}" data-inject-toggle="1" role="switch" aria-checked="${injectChecked}" title="勾选后随提示词注入${isNode ? '（含全部子条目）' : ''}"><span class="kaleido-values__inject-switch-thumb"></span></button>`
+    : '';
+
+  if (isNode) {
+    const key = path.join('/');
+    const expanded = valuesExpanded.has(key);
+    const count = Object.keys(node).length;
+    row.className = 'kaleido-values__row kaleido-values__row--entry' + (expanded ? ' is-expanded' : '');
+    row.dataset.kind = 'container';
+    row.innerHTML = `
+      <button type="button" class="kaleido-values__drag-handle" data-action="drag" title="拖动排序" aria-label="拖动排序"><span class="${VALUES_DRAG_ICON_CLASS}"></span></button>
+      ${injectCheckHTML}
+      <button type="button" class="kaleido-values__chevron${count > 0 ? '' : ' is-empty'}" data-action="toggle" title="展开 / 收起" aria-label="展开 / 收起">
+        <span class="${VALUES_CHEVRON_ICON_CLASS}"></span>
+      </button>
+      <span class="kaleido-values__row-name" title="节点：可继续嵌套节点或挂变量">${escapeHtml(name)}</span>
+      <span class="kaleido-values__row-count">${count} 项</span>
+      <span class="kaleido-values__row-actions">
+        <button type="button" class="kaleido-values__icon-btn" data-action="add-menu" title="新建子节点 / 变量" aria-label="新建子节点 / 变量"><span class="${VALUES_ADD_CHILD_ICON_CLASS}"></span></button>
+        <button type="button" class="kaleido-values__icon-btn" data-action="edit" title="编辑节点" aria-label="编辑节点"><span class="${VALUES_EDIT_ICON_CLASS}"></span></button>
+        <button type="button" class="kaleido-values__icon-btn kaleido-values__icon-btn--danger" data-action="delete" title="删除节点" aria-label="删除节点"><span class="${VALUES_DELETE_ICON_CLASS}"></span></button>
+      </span>
+    `;
+    const injectCheck = row.querySelector('button[data-inject-toggle]');
+    if (injectCheck) injectCheck.classList.toggle('is-partial', injectIndeterminate);
+    return row;
+  }
+
+  row.className = 'kaleido-values__row kaleido-values__row--leaf' + (isChildLeaf ? ' is-derived' : '');
+  row.dataset.kind = 'leaf';
+  const derivedBadge = isChildLeaf
+    ? `<span class="kaleido-values__row-derived-badge" title="子变量：值由「${escapeHtml(String(registered.parent || ''))}」自动派生，不可手动编辑">派生</span>`
+    : '';
+  const editButton = isChildLeaf
+    ? `<button type="button" class="kaleido-values__icon-btn" disabled title="子变量由父变量自动计算，不可手动编辑" aria-label="子变量不可编辑"><span class="${VALUES_EDIT_ICON_CLASS}"></span></button>`
+    : `<button type="button" class="kaleido-values__icon-btn" data-action="edit" title="编辑变量" aria-label="编辑变量"><span class="${VALUES_EDIT_ICON_CLASS}"></span></button>`;
+  row.innerHTML = `
+    <button type="button" class="kaleido-values__drag-handle" data-action="drag" title="拖动排序" aria-label="拖动排序"><span class="${VALUES_DRAG_ICON_CLASS}"></span></button>
+    ${injectCheckHTML}
+    <span class="kaleido-values__row-name${registered ? ' is-registered' : ''}" title="${registryTitle}">${escapeHtml(name)}</span>
+    ${derivedBadge}
+    <span class="kaleido-values__row-value" title="${escapeHtml(formatValuesLeafText(node))}">${escapeHtml(formatValuesLeafText(node))}</span>
+    <span class="kaleido-values__row-actions">
+      ${editButton}
+      <button type="button" class="kaleido-values__icon-btn kaleido-values__icon-btn--danger" data-action="delete" title="删除变量" aria-label="删除变量"><span class="${VALUES_DELETE_ICON_CLASS}"></span></button>
+    </span>
+  `;
+  const injectCheck = row.querySelector('button[data-inject-toggle]');
+  if (injectCheck) injectCheck.classList.toggle('is-partial', injectIndeterminate);
+  return row;
+}
+
+function renderValuesTreeRows(container, ctx, node, path, depth) {
+  if (!valuesIsContainer(node)) return;
+  const order = ctx ? getValuesTreeOrder(ctx) : {};
+  const names = valuesOrderedNames(order, path.join('/'), node);
+  for (const name of names) {
+    const childPath = path.concat(name);
+    const child = node[name];
+    container.appendChild(buildValuesRow(childPath, name, child, depth));
+    if (valuesIsContainer(child) && valuesExpanded.has(childPath.join('/'))) {
+      renderValuesTreeRows(container, ctx, child, childPath, depth + 1);
+    }
+  }
+}
+
+// 左侧导航徽标：变量树显示当前层顶层条目数，变量注册显示已注册变量数。
+function refreshValuesNavCounts() {
+  const treeBadge = document.getElementById(VALUES_NAV_TREE_COUNT_ID);
+  const keysBadge = document.getElementById(VALUES_NAV_KEYS_COUNT_ID);
+  const ctx = getContextSafe();
+  if (treeBadge) {
+    const tree = ctx ? getValuesActiveTree(ctx) : {};
+    const count = Object.keys(tree).length;
+    treeBadge.textContent = String(count);
+    treeBadge.hidden = count === 0;
+  }
+  if (keysBadge) {
+    const keys = ctx ? getValuesKeys(ctx) : [];
+    const count = keys.length;
+    keysBadge.textContent = String(count);
+    keysBadge.hidden = count === 0;
+  }
+  const triggersBadge = document.getElementById(VALUES_NAV_TRIGGERS_COUNT_ID);
+  if (triggersBadge) {
+    const triggers = ctx ? getValuesTriggers(ctx) : [];
+    const count = triggers.length;
+    triggersBadge.textContent = String(count);
+    triggersBadge.hidden = count === 0;
+  }
+}
+
+function renderValuesTree() {
+  const body = document.getElementById(VALUES_TREE_BODY_ID);
+  if (!body) return;
+  const ctx = getContextSafe();
+  refreshValuesBindingStatus();
+  refreshValuesMaintainStatus();
+  refreshValuesNavCounts();
+  syncValuesLayerUI();
+  refreshValuesInjectUI();
+  valuesActiveTree = ctx ? getValuesActiveTree(ctx) : {};
+  body.innerHTML = '';
+  const hasEntries = Object.keys(valuesActiveTree).length > 0;
+  if (!hasEntries) {
+    const emptyText = valuesActiveLayer === 'game' && !isValuesGameInitialized(ctx)
+      ? '游戏值尚未初始化：默认值会在首次修改或 AI 维护后写入聊天文件。\n现在显示的是当前角色卡的默认值。'
+      : '还没有节点。点击上方「＋ 新建」新建节点或变量；\n节点可层层嵌套，变量挂在节点下。';
+    body.appendChild(buildValuesEmpty(emptyText));
+    return;
+  }
+  renderValuesTreeRows(body, ctx, valuesActiveTree, [], 0);
+}
+// ---------- 「＋」新建菜单 ----------
+function openValuesAddMenu(anchor, context) {
+  const menu = document.getElementById(VALUES_ADD_MENU_ID);
+  if (!menu) return;
+  valuesAddMenuContext = context || { root: true };
+  menu.hidden = false;
+  const rect = anchor.getBoundingClientRect();
+  let top = rect.bottom + 4;
+  let left = rect.left;
+  const menuRect = menu.getBoundingClientRect();
+  if (top + menuRect.height > window.innerHeight - 8) {
+    top = Math.max(8, rect.top - menuRect.height - 4);
+  }
+  if (left + menuRect.width > window.innerWidth - 8) {
+    left = Math.max(8, window.innerWidth - menuRect.width - 8);
+  }
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
+}
+
+function closeValuesAddMenu() {
+  const menu = document.getElementById(VALUES_ADD_MENU_ID);
+  if (menu) menu.hidden = true;
+  valuesAddMenuContext = null;
+}
+
+function handleValuesAddMenuPick(kind) {
+  const context = valuesAddMenuContext || { root: true };
+  closeValuesAddMenu();
+  const parentPath = context.root ? [] : (context.path || []);
+  if (kind === 'node') openValuesNodeEditor(parentPath, null);
+  else if (kind === 'key') openValuesKeyEntryEditor(parentPath, null);
+}// ---------- 节点 / 变量编辑器 ----------
+// 上级节点下拉：列出全部节点路径（排除自身与后代），只认显式预设。
+function populateValuesParentSelect(currentPath, selectedParentPath) {
+  const select = document.getElementById(VALUES_EDITOR_PARENT_SELECT_ID);
+  if (!select) return;
+  const tree = valuesActiveTree || {};
+  const order = getValuesTreeOrder(getContextSafe());
+  select.innerHTML = '';
+  const top = document.createElement('option');
+  top.value = '';
+  top.textContent = '（顶层 · 根节点）';
+  select.appendChild(top);
+  const walk = (node, path) => {
+    if (!valuesIsContainer(node)) return;
+    for (const key of valuesOrderedNames(order, path.join('/'), node)) {
+      const childPath = path.concat(key);
+      const child = node[key];
+      if (!valuesIsContainer(child)) continue;
+      if (currentPath && currentPath.join('/') === childPath.join('/')) continue;
+      if (currentPath && isValuesPathAncestor(childPath, currentPath)) continue;
+      const option = document.createElement('option');
+      option.value = JSON.stringify(childPath);
+      option.textContent = childPath.join(' / ');
+      select.appendChild(option);
+      walk(child, childPath);
+    }
+  };
+  walk(tree, []);
+  const preset = selectedParentPath && selectedParentPath.length > 0 ? JSON.stringify(selectedParentPath) : '';
+  select.value = preset;
+}
+
+// 判断 ancestorPath 是否是 path 的祖先（用于防环）。
+function isValuesPathAncestor(ancestorPath, path) {
+  if (!ancestorPath || ancestorPath.length === 0) return false;
+  if (!path || path.length <= ancestorPath.length) return false;
+  return ancestorPath.every((segment, index) => path[index] === segment);
+}
+
+// 已注册变量下拉：变量必须先注册，新建时从这里选择。
+function fillValuesKeySelect() {
+  const select = document.getElementById(VALUES_EDITOR_KEY_SELECT_ID);
+  if (!select) return;
+  const ctx = getContextSafe();
+  const keys = ctx ? getValuesKeys(ctx) : [];
+  select.innerHTML = '';
+  if (keys.length === 0) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = '（还没有已注册变量，请先到「变量注册」页注册）';
+    select.appendChild(option);
+    return;
+  }
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = '（选择已注册变量）';
+  select.appendChild(placeholder);
+  for (const key of keys) {
+    const option = document.createElement('option');
+    option.value = String(key.name || '');
+    option.textContent = String(key.name || '');
+    select.appendChild(option);
+  }
+}
+
+function setValuesEditorMode(mode) {
+  const nodeFields = document.getElementById(VALUES_EDITOR_NODE_FIELDS_ID);
+  const keyFields = document.getElementById(VALUES_EDITOR_KEY_FIELDS_ID);
+  if (!nodeFields || !keyFields) return;
+  nodeFields.hidden = mode !== 'node';
+  keyFields.hidden = mode !== 'key';
+}
+
+// 节点编辑器：只填名称与上级节点，节点不对应值。
+function openValuesNodeEditor(parentPath, editPath) {
+  const editor = document.getElementById(VALUES_EDITOR_ID);
+  if (!editor) return;
+  valuesEditorMode = 'node';
+  valuesEditorPath = editPath ? editPath.slice() : null;
+  valuesEditorParentPath = parentPath ? parentPath.slice() : [];
+  const title = document.getElementById(VALUES_EDITOR_TITLE_ID);
+  const nameInput = document.getElementById(VALUES_EDITOR_NAME_ID);
+  if (valuesEditorPath) {
+    title.textContent = '编辑节点';
+    nameInput.value = valuesEditorPath[valuesEditorPath.length - 1];
+    populateValuesParentSelect(valuesEditorPath, valuesEditorPath.slice(0, -1));
+  } else {
+    title.textContent = parentPath && parentPath.length > 0 ? '添加子节点' : '新建节点';
+    nameInput.value = '';
+    populateValuesParentSelect(null, parentPath || []);
+  }
+  setValuesEditorMode('node');
+  editor.hidden = false;
+  closeValuesKeyEditor();
+  closeValuesAddMenu();
+  nameInput.focus();
+}
+
+// 变量编辑器：从已注册变量下拉选择（编辑时变量名只读），填写变量值。
+// 子变量：值由父变量自动派生，值输入可留空（留空存 null，父变量存在时自动计算）。
+function syncValuesKeyEntryChildHint() {
+  const ctx = getContextSafe();
+  const keySelect = document.getElementById(VALUES_EDITOR_KEY_SELECT_ID);
+  const hint = document.getElementById(VALUES_EDITOR_CHILD_HINT_ID);
+  const label = document.getElementById(VALUES_EDITOR_VALUE_LABEL_ID);
+  const keyName = String(keySelect?.value || '').trim();
+  const isChild = Boolean(keyName && ctx && isValuesChildKey(getValuesKeyByName(ctx, keyName)));
+  if (hint) hint.hidden = !isChild;
+  if (label) label.textContent = isChild ? '变量值（可留空）' : '变量值 *';
+}
+
+function openValuesKeyEntryEditor(parentPath, editPath) {
+  const editor = document.getElementById(VALUES_EDITOR_ID);
+  if (!editor) return;
+  valuesEditorMode = 'key';
+  valuesEditorPath = editPath ? editPath.slice() : null;
+  valuesEditorParentPath = parentPath ? parentPath.slice() : [];
+  fillValuesKeySelect();
+  const title = document.getElementById(VALUES_EDITOR_TITLE_ID);
+  const keySelect = document.getElementById(VALUES_EDITOR_KEY_SELECT_ID);
+  const keyNameSpan = document.getElementById(VALUES_EDITOR_KEY_NAME_ID);
+  const valueInput = document.getElementById(VALUES_EDITOR_VALUE_ID);
+  if (valuesEditorPath) {
+    title.textContent = '编辑变量';
+    keySelect.hidden = true;
+    keyNameSpan.hidden = false;
+    keyNameSpan.textContent = valuesEditorPath[valuesEditorPath.length - 1];
+    const node = valuesGetAtPath(valuesActiveTree, valuesEditorPath);
+    valueInput.value = valuesIsContainer(node) ? '' : formatValuesLeafText(node);
+  } else {
+    title.textContent = '新建变量';
+    keySelect.hidden = false;
+    keyNameSpan.hidden = true;
+    keySelect.value = '';
+    valueInput.value = '';
+  }
+  syncValuesKeyEntryChildHint();
+  setValuesEditorMode('key');
+  editor.hidden = false;
+  closeValuesKeyEditor();
+  closeValuesAddMenu();
+  (valuesEditorPath ? valueInput : keySelect).focus();
+}
+
+function closeValuesEditor() {
+  const editor = document.getElementById(VALUES_EDITOR_ID);
+  if (editor) editor.hidden = true;
+  valuesEditorPath = null;
+  valuesEditorMode = null;
+}
+
+// 解析「变量值」输入：数字 / 布尔 / null / 字符串。
+function parseValuesEditorText(text) {
+  const trimmed = String(text ?? '').trim();
+  if (trimmed === 'null' || trimmed === '~') return { value: null };
+  if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
+    const num = Number(trimmed);
+    if (Number.isFinite(num)) return { value: num };
+  }
+  if (trimmed === 'true') return { value: true };
+  if (trimmed === 'false') return { value: false };
+  return { value: trimmed };
+}function saveValuesEditor() {
+  const ctx = getContextSafe();
+  if (!ctx || !valuesActiveTree) return;
+  const nodeFields = document.getElementById(VALUES_EDITOR_NODE_FIELDS_ID);
+  const keyFields = document.getElementById(VALUES_EDITOR_KEY_FIELDS_ID);
+  const nodeVisible = Boolean(nodeFields && !nodeFields.hidden);
+  const keyVisible = Boolean(keyFields && !keyFields.hidden);
+  const tree = valuesActiveTree;
+
+  if (nodeVisible && !keyVisible) {
+    // 节点：只存名称与位置，节点不对应值。
+    const name = String(document.getElementById(VALUES_EDITOR_NAME_ID)?.value || '').trim();
+    if (!name) {
+      valuesToastr('warning', '请填写节点名称');
+      return;
+    }
+    let parentPath = [];
+    try {
+      const raw = String(document.getElementById(VALUES_EDITOR_PARENT_SELECT_ID)?.value || '').trim();
+      if (raw) parentPath = JSON.parse(raw);
+    } catch {}
+    if (valuesEditorPath) {
+      const oldPath = valuesEditorPath.slice();
+      const newPath = parentPath.concat(name);
+      if (isValuesPathAncestor(oldPath, parentPath)) {
+        valuesToastr('warning', '不能挂到自己的后代节点下');
+        return;
+      }
+      if (newPath.join('/') !== oldPath.join('/') && valuesGetAtPath(tree, newPath) !== undefined) {
+        valuesToastr('warning', `已存在同名节点「${name}」`);
+        return;
+      }
+      const node = valuesGetAtPath(tree, oldPath);
+      valuesDeleteAtPath(tree, oldPath);
+      valuesSetAtPath(tree, newPath, valuesIsContainer(node) ? node : {});
+    } else {
+      if (valuesGetAtPath(tree, parentPath.concat(name)) !== undefined) {
+        valuesToastr('warning', `已存在同名节点「${name}」`);
+        return;
+      }
+      valuesSetAtPath(tree, parentPath.concat(name), {});
+    }
+    logApp('info', valuesEditorPath ? '节点已更新' : '节点已添加', name, valuesActiveLayer);
+    valuesToastr('success', valuesEditorPath ? '节点已保存' : '节点已添加');
+  } else if (keyVisible && !nodeVisible) {
+    // 变量：变量名来自注册表（编辑时固定）；父变量值必填，子变量可留空。
+    const keyName = valuesEditorPath
+      ? String(valuesEditorPath[valuesEditorPath.length - 1])
+      : String(document.getElementById(VALUES_EDITOR_KEY_SELECT_ID)?.value || '').trim();
+    if (!keyName) {
+      valuesToastr('warning', '请选择已注册变量');
+      return;
+    }
+    const registeredKey = getValuesKeyByName(ctx, keyName);
+    const isChild = Boolean(registeredKey && isValuesChildKey(registeredKey));
+    const valueText = String(document.getElementById(VALUES_EDITOR_VALUE_ID)?.value || '').trim();
+    if (!isChild && valueText === '') {
+      valuesToastr('warning', '请填写变量值');
+      return;
+    }
+    const parsed = isChild && valueText === '' ? { value: null } : parseValuesEditorText(valueText);
+    const parentPath = valuesEditorPath ? valuesEditorPath.slice(0, -1) : (valuesEditorParentPath || []);
+    const newPath = parentPath.concat(keyName);
+    if (!valuesEditorPath && valuesGetAtPath(tree, newPath) !== undefined) {
+      valuesToastr('warning', `已存在同名变量「${keyName}」`);
+      return;
+    }
+    valuesSetAtPath(tree, newPath, parsed.value);
+    // 新建变量默认开启注入（仅默认数值层；打开变量会自动提升全部祖先节点）。
+    if (!valuesEditorPath && valuesActiveLayer === 'default') {
+      setValuesInjectPath(ctx, newPath, true);
+    }
+    logApp('info', valuesEditorPath ? '变量已更新' : '变量已添加', keyName, valuesActiveLayer);
+    valuesToastr('success', valuesEditorPath
+      ? '变量已保存'
+      : (valuesActiveLayer === 'default' ? `变量「${keyName}」已添加（已默认开启注入）` : `变量「${keyName}」已添加`));
+  } else {
+    return;
+  }
+  saveValuesActiveTree(ctx, tree);
+  closeValuesEditor();
+  renderValuesTree();
+  refreshHomeValuesStatus();
+}
+
+// 删除：节点带确认（连同子树）。
+function handleValuesDelete(path) {
+  const ctx = getContextSafe();
+  if (!ctx || !valuesActiveTree) return;
+  const node = valuesGetAtPath(valuesActiveTree, path);
+  if (node === undefined) return;
+  const name = path[path.length - 1];
+  const isNode = valuesIsContainer(node);
+  const childCount = isNode ? Object.keys(node).length : 0;
+  const confirmText = isNode
+    ? (childCount > 0
+      ? `确定删除节点「${name}」吗？其下 ${childCount} 个子条目会一并删除。`
+      : `确定删除节点「${name}」吗？`)
+    : `确定删除变量「${name}」吗？`;
+  if (!globalThis.confirm(confirmText)) return;
+  valuesDeleteAtPath(valuesActiveTree, path);
+  saveValuesActiveTree(ctx, valuesActiveTree);
+  logApp('info', isNode ? '节点已删除' : '变量已删除', name, valuesActiveLayer);
+  valuesToastr('success', `已删除「${name}」`);
+  renderValuesTree();
+  refreshHomeValuesStatus();
+}
+// ---------- 行拖动排序 ----------
+// 按住拖动把手上下移动条目，松手后按新顺序回调 onReorder(row, fromIndex, toIndex)。
+// 只允许在同级条目间排序：getSiblings 由调用方按行分组提供（树按父路径分组）。
+let valuesDragState = null;
+
+function initValuesDragReorder(container, handleSelector, getSiblings, onReorder) {
+  if (!container) return;
+  container.addEventListener('pointerdown', (event) => {
+    if (valuesDragState) return;
+    const target = event.target instanceof Element ? event.target : null;
+    const handle = target ? target.closest(handleSelector) : null;
+    if (!handle) return;
+    const row = handle.closest('.kaleido-values__row');
+    if (!row || !container.contains(row)) return;
+    const siblings = getSiblings(row);
+    const fromIndex = siblings.indexOf(row);
+    if (fromIndex < 0) return;
+    event.preventDefault();
+    valuesDragState = { container, row, siblings, getSiblings, fromIndex, onReorder, startY: event.clientY, moved: false };
+    row.classList.add('is-dragging');
+    container.classList.add('is-reordering');
+    document.addEventListener('pointermove', handleValuesDragMove);
+    document.addEventListener('pointerup', handleValuesDragEnd);
+    document.addEventListener('pointercancel', handleValuesDragEnd);
+  });
+}
+
+function handleValuesDragMove(event) {
+  const state = valuesDragState;
+  if (!state) return;
+  if (!state.moved && Math.abs(event.clientY - state.startY) < 4) return;
+  state.moved = true;
+  const { container, row, siblings } = state;
+  let insertBefore = null;
+  let found = false;
+  for (const sibling of siblings) {
+    if (sibling === row) continue;
+    const rect = sibling.getBoundingClientRect();
+    if (event.clientY < rect.top) {
+      insertBefore = sibling;
+      found = true;
+      break;
+    }
+    if (event.clientY < rect.bottom) {
+      insertBefore = event.clientY < rect.top + rect.height / 2 ? sibling : sibling.nextSibling;
+      found = true;
+      break;
+    }
+  }
+  if (!found) insertBefore = null;
+  if (insertBefore === row || insertBefore === row.nextSibling) return;
+  container.insertBefore(row, insertBefore);
+}
+
+function handleValuesDragEnd() {
+  const state = valuesDragState;
+  if (!state) return;
+  valuesDragState = null;
+  document.removeEventListener('pointermove', handleValuesDragMove);
+  document.removeEventListener('pointerup', handleValuesDragEnd);
+  document.removeEventListener('pointercancel', handleValuesDragEnd);
+  state.row.classList.remove('is-dragging');
+  state.container.classList.remove('is-reordering');
+  if (!state.moved) return;
+  const finalIndex = state.getSiblings(state.row).indexOf(state.row);
+  if (finalIndex >= 0 && finalIndex !== state.fromIndex) {
+    state.onReorder(state.row, state.fromIndex, finalIndex);
+  }
+}
+
+// 树行分组：同父路径的行视为同级（可互相排序）。
+function valuesRowParentKey(row) {
+  try {
+    const path = JSON.parse(String(row?.dataset.path || '[]'));
+    return path.slice(0, -1).join('/');
+  } catch {
+    return '';
+  }
+}
+
+function valuesTreeSiblingsOf(row) {
+  const body = document.getElementById(VALUES_TREE_BODY_ID);
+  if (!body) return [];
+  const parentKey = valuesRowParentKey(row);
+  return Array.from(body.querySelectorAll('.kaleido-values__row')).filter((item) => valuesRowParentKey(item) === parentKey);
+}
+
+function valuesListSiblingsOf(container) {
+  return () => Array.from(container.querySelectorAll('.kaleido-values__row'));
+}
+
+// 重排回调：读取当前 DOM 顺序写回数据层并重渲染。
+function handleValuesKeysReorder() {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const body = document.getElementById(VALUES_KEYS_BODY_ID);
+  if (!body) return;
+  const names = Array.from(body.querySelectorAll('.kaleido-values__row')).map((row) => String(row.dataset.name || ''));
+  reorderValuesKeys(ctx, names);
+  renderValuesKeys();
+  logApp('info', '变量注册顺序已调整');
+}
+
+function handleValuesTriggersReorder() {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const body = document.getElementById(VALUES_TRIGGERS_BODY_ID);
+  if (!body) return;
+  const ids = Array.from(body.querySelectorAll('.kaleido-values__row')).map((row) => String(row.dataset.id || ''));
+  reorderValuesTriggers(ctx, ids);
+  renderValuesTriggers();
+  logApp('info', '剧情触发顺序已调整');
+}
+
+function handleValuesTreeReorder(row) {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const body = document.getElementById(VALUES_TREE_BODY_ID);
+  if (!body) return;
+  const parentKey = valuesRowParentKey(row);
+  const names = Array.from(body.querySelectorAll('.kaleido-values__row'))
+    .filter((item) => valuesRowParentKey(item) === parentKey)
+    .map((item) => {
+      try {
+        const path = JSON.parse(String(item.dataset.path || '[]'));
+        return path[path.length - 1];
+      } catch {
+        return '';
+      }
+    });
+  reorderValuesTreeAt(ctx, parentKey, names);
+  renderValuesTree();
+  logApp('info', '变量树顺序已调整', parentKey || '顶层');
+}
+
+// ---------- 变量注册表渲染 ----------
+function renderValuesKeys() {
+  const body = document.getElementById(VALUES_KEYS_BODY_ID);
+  if (!body) return;
+  const ctx = getContextSafe();
+  const keys = ctx ? getValuesKeys(ctx) : [];
+  refreshValuesNavCounts();
+  body.innerHTML = '';
+  if (keys.length === 0) {
+    body.appendChild(buildValuesEmpty('还没有注册任何变量。点击上方「＋ 注册新变量」创建，\n注册时填写该变量的变化规则，AI 自动维护会严格按规则更新。'));
+    return;
+  }
+  for (const key of keys) {
+    const row = document.createElement('div');
+    row.className = 'kaleido-values__row kaleido-values__row--key';
+    row.dataset.name = String(key.name || '');
+    const isChild = isValuesChildKey(key);
+    const typeBadge = isChild
+      ? `<span class="kaleido-values__row-type-badge is-child" title="子变量：值由父变量自动派生，不参与 AI 维护">子</span>`
+      : `<span class="kaleido-values__row-type-badge" title="父变量：由 AI 按变化规则维护">父</span>`;
+    const ruleText = isChild
+      ? `由「${String(key.parent || '')}」派生：${formatValuesChildRulesSummary(key)}`
+      : String(key.rule || '（未填写变化规则）');
+    row.innerHTML = `
+      <button type="button" class="kaleido-values__drag-handle" data-action="drag" title="拖动排序" aria-label="拖动排序"><span class="${VALUES_DRAG_ICON_CLASS}"></span></button>
+      <span class="kaleido-values__row-name is-registered" title="已注册变量">${escapeHtml(String(key.name || ''))}</span>
+      ${typeBadge}
+      <span class="kaleido-values__row-rule" title="${escapeHtml(ruleText)}">${escapeHtml(ruleText)}</span>
+      <span class="kaleido-values__row-actions">
+        <button type="button" class="kaleido-values__icon-btn" data-action="edit-key" title="编辑变量" aria-label="编辑变量"><span class="${VALUES_EDIT_ICON_CLASS}"></span></button>
+        <button type="button" class="kaleido-values__icon-btn kaleido-values__icon-btn--danger" data-action="delete-key" title="删除变量" aria-label="删除变量"><span class="${VALUES_DELETE_ICON_CLASS}"></span></button>
+      </span>
+    `;
+    body.appendChild(row);
+  }
+}
+
+// 子变量区间规则摘要（列表行 / 树行 title 用）。
+function formatValuesChildRulesSummary(key) {
+  const rules = Array.isArray(key?.rules) ? key.rules : [];
+  return rules.map((rule) => {
+    const min = rule?.min !== undefined ? String(rule.min) : '';
+    const max = rule?.max !== undefined ? String(rule.max) : '';
+    return `${min}~${max} ${String(rule?.value || '')}`;
+  }).join('；');
+}
+
+// 父变量下拉：只列已注册的父变量（排除自身），供子变量选择。
+function populateValuesKeyParentSelect(selectedParent) {
+  const select = document.getElementById(VALUES_KEY_EDITOR_PARENT_ID);
+  if (!select) return;
+  const ctx = getContextSafe();
+  const keys = ctx ? getValuesKeys(ctx) : [];
+  select.innerHTML = '';
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = '（选择父变量）';
+  select.appendChild(placeholder);
+  for (const key of keys) {
+    if (!isValuesParentKey(key)) continue;
+    if (valuesKeyEditorName && String(key.name || '') === valuesKeyEditorName) continue;
+    const option = document.createElement('option');
+    option.value = String(key.name || '');
+    option.textContent = String(key.name || '');
+    select.appendChild(option);
+  }
+  select.value = String(selectedParent || '');
+}
+
+// 子变量区间规则行：下限 ~ 上限 + 文本 + 删除。
+function buildValuesKeyRuleRow(rule) {
+  const row = document.createElement('div');
+  row.className = VALUES_KEY_EDITOR_RULE_ROW_CLASS;
+  row.innerHTML = `
+    <input type="text" inputmode="decimal" class="kaleido-input ${VALUES_KEY_EDITOR_RULE_MIN_CLASS}" placeholder="下限" title="父变量值下限（可留空 = 不设下限）" autocomplete="off" spellcheck="false" />
+    <span class="kaleido-values__key-rule-tilde">~</span>
+    <input type="text" inputmode="decimal" class="kaleido-input ${VALUES_KEY_EDITOR_RULE_MAX_CLASS}" placeholder="上限" title="父变量值上限（可留空 = 不设上限）" autocomplete="off" spellcheck="false" />
+    <input type="text" class="kaleido-input ${VALUES_KEY_EDITOR_RULE_VALUE_CLASS}" placeholder="子变量文本" title="该区间对应的子变量文本" autocomplete="off" spellcheck="false" />
+    <button type="button" class="kaleido-icon-btn ${VALUES_KEY_EDITOR_RULE_REMOVE_CLASS}" title="删除区间" aria-label="删除区间">✕</button>
+  `;
+  const minInput = row.querySelector('.' + VALUES_KEY_EDITOR_RULE_MIN_CLASS);
+  const maxInput = row.querySelector('.' + VALUES_KEY_EDITOR_RULE_MAX_CLASS);
+  const valueInput = row.querySelector('.' + VALUES_KEY_EDITOR_RULE_VALUE_CLASS);
+  if (rule?.min !== undefined) minInput.value = String(rule.min);
+  if (rule?.max !== undefined) maxInput.value = String(rule.max);
+  if (rule?.value !== undefined) valueInput.value = String(rule.value);
+  return row;
+}
+
+// 渲染子变量区间规则编辑器。
+function renderValuesKeyRules(rules) {
+  const container = document.getElementById(VALUES_KEY_EDITOR_RULES_ID);
+  if (!container) return;
+  container.innerHTML = '';
+  const list = Array.isArray(rules) ? rules : [];
+  if (list.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'kaleido-values__key-rules-empty';
+    empty.textContent = '还没有区间规则：添加「父变量值区间 → 子变量文本」的映射，如 0~30 冷淡、31~60 颇具好感。';
+    container.appendChild(empty);
+  }
+  for (const rule of list) {
+    container.appendChild(buildValuesKeyRuleRow(rule));
+  }
+}
+
+// 读取单行区间规则（文本为空返回 null，非法数字忽略）。
+function readValuesKeyRuleFromRow(row) {
+  if (!row) return null;
+  const minText = String(row.querySelector('.' + VALUES_KEY_EDITOR_RULE_MIN_CLASS)?.value || '').trim();
+  const maxText = String(row.querySelector('.' + VALUES_KEY_EDITOR_RULE_MAX_CLASS)?.value || '').trim();
+  const value = String(row.querySelector('.' + VALUES_KEY_EDITOR_RULE_VALUE_CLASS)?.value || '').trim();
+  if (value === '') return null;
+  const rule = { value };
+  if (minText !== '') {
+    const min = Number(minText);
+    if (Number.isFinite(min)) rule.min = min;
+  }
+  if (maxText !== '') {
+    const max = Number(maxText);
+    if (Number.isFinite(max)) rule.max = max;
+  }
+  return rule;
+}
+
+// 读取规则编辑器当前内容（空文本行丢弃，非法数字忽略）。
+function readValuesKeyRules() {
+  const container = document.getElementById(VALUES_KEY_EDITOR_RULES_ID);
+  if (!container) return [];
+  const rules = [];
+  for (const row of container.querySelectorAll('.' + VALUES_KEY_EDITOR_RULE_ROW_CLASS)) {
+    const rule = readValuesKeyRuleFromRow(row);
+    if (rule) rules.push(rule);
+  }
+  return rules;
+}
+
+// 实时标红重叠 / 非法的区间行（只统计已填文本的行）。
+function refreshValuesKeyRuleConflicts() {
+  const container = document.getElementById(VALUES_KEY_EDITOR_RULES_ID);
+  if (!container) return;
+  const rows = Array.from(container.querySelectorAll('.' + VALUES_KEY_EDITOR_RULE_ROW_CLASS));
+  const participating = [];
+  rows.forEach((row, index) => {
+    if (readValuesKeyRuleFromRow(row)) participating.push(index);
+  });
+  const validation = validateValuesChildRules(participating.map((index) => readValuesKeyRuleFromRow(rows[index])));
+  const conflictSet = new Set();
+  for (const [i, j] of validation.overlaps) {
+    conflictSet.add(participating[i]);
+    conflictSet.add(participating[j]);
+  }
+  for (const index of validation.invalid) conflictSet.add(participating[index]);
+  rows.forEach((row, index) => row.classList.toggle('is-conflict', conflictSet.has(index)));
+}
+
+// 新行下限自动接续：上一行上限 + 1（如 0~1000 之后自动填 1001）。
+function nextValuesChildRuleMinFromRow(row) {
+  if (!row) return '';
+  const maxText = String(row.querySelector('.' + VALUES_KEY_EDITOR_RULE_MAX_CLASS)?.value || '').trim();
+  if (maxText === '') return '';
+  const max = Number(maxText);
+  if (!Number.isFinite(max)) return '';
+  return String(max + 1);
+}
+
+// 类型切换联动：父变量显示变化规则，子变量显示父变量选择 + 派生区间。
+function syncValuesKeyEditorTypeUI() {
+  const typeSelect = document.getElementById(VALUES_KEY_EDITOR_TYPE_ID);
+  const ruleFields = document.getElementById(VALUES_KEY_EDITOR_RULE_FIELDS_ID);
+  const childFields = document.getElementById(VALUES_KEY_EDITOR_CHILD_FIELDS_ID);
+  const isChild = String(typeSelect?.value || '') === VALUES_KEY_TYPE_CHILD;
+  if (ruleFields) ruleFields.hidden = isChild;
+  if (childFields) childFields.hidden = !isChild;
+}
+
+function openValuesKeyEditor(name) {
+  const editor = document.getElementById(VALUES_KEY_EDITOR_ID);
+  if (!editor) return;
+  valuesKeyEditorName = name || null;
+  const title = document.getElementById(VALUES_KEY_EDITOR_TITLE_ID);
+  const nameInput = document.getElementById(VALUES_KEY_EDITOR_NAME_ID);
+  const ruleInput = document.getElementById(VALUES_KEY_EDITOR_RULE_ID);
+  const typeSelect = document.getElementById(VALUES_KEY_EDITOR_TYPE_ID);
+  const ctx = getContextSafe();
+  if (valuesKeyEditorName) {
+    const key = getValuesKeyByName(ctx, valuesKeyEditorName);
+    title.textContent = '编辑变量';
+    nameInput.value = valuesKeyEditorName;
+    nameInput.disabled = true;
+    nameInput.title = '变量名是注册身份，不可修改；可删除后重新注册';
+    const isChild = key ? isValuesChildKey(key) : false;
+    typeSelect.value = isChild ? VALUES_KEY_TYPE_CHILD : VALUES_KEY_TYPE_PARENT;
+    ruleInput.value = isChild ? '' : (key ? String(key.rule || '') : '');
+    populateValuesKeyParentSelect(isChild ? String(key?.parent || '') : '');
+    renderValuesKeyRules(isChild ? key?.rules : []);
+  } else {
+    title.textContent = '注册新变量';
+    nameInput.value = '';
+    nameInput.disabled = false;
+    nameInput.title = '';
+    typeSelect.value = VALUES_KEY_TYPE_PARENT;
+    ruleInput.value = '';
+    populateValuesKeyParentSelect('');
+    renderValuesKeyRules([]);
+  }
+  syncValuesKeyEditorTypeUI();
+  editor.hidden = false;
+  closeValuesEditor();
+  nameInput.focus();
+}
+
+function closeValuesKeyEditor() {
+  const editor = document.getElementById(VALUES_KEY_EDITOR_ID);
+  if (editor) editor.hidden = true;
+  valuesKeyEditorName = null;
+}
+
+function saveValuesKeyEditor() {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const name = String(document.getElementById(VALUES_KEY_EDITOR_NAME_ID)?.value || '').trim();
+  if (!name) {
+    valuesToastr('warning', '请填写变量名');
+    return;
+  }
+  const type = String(document.getElementById(VALUES_KEY_EDITOR_TYPE_ID)?.value || '').trim() === VALUES_KEY_TYPE_CHILD
+    ? VALUES_KEY_TYPE_CHILD
+    : VALUES_KEY_TYPE_PARENT;
+  if (type === VALUES_KEY_TYPE_CHILD) {
+    const parent = String(document.getElementById(VALUES_KEY_EDITOR_PARENT_ID)?.value || '').trim();
+    if (!parent) {
+      valuesToastr('warning', '请选择父变量');
+      return;
+    }
+    const rules = readValuesKeyRules();
+    if (rules.length === 0) {
+      valuesToastr('warning', '请至少添加一个派生区间');
+      return;
+    }
+    const validation = validateValuesChildRules(rules);
+    if (validation.invalid.length > 0) {
+      valuesToastr('warning', `第 ${validation.invalid.map((index) => index + 1).join('、')} 行区间下限大于上限，请检查`);
+      return;
+    }
+    if (validation.overlaps.length > 0) {
+      const pairs = validation.overlaps.map(([i, j]) => `第 ${i + 1} 行与第 ${j + 1} 行`);
+      valuesToastr('warning', `派生区间不能重叠（含边界）：${pairs.join('、')}，如 0~1000 之后只能从 1001 开始`);
+      return;
+    }
+    upsertValuesKey(ctx, name, '', { type, parent, rules });
+  } else {
+    const rule = String(document.getElementById(VALUES_KEY_EDITOR_RULE_ID)?.value || '').trim();
+    upsertValuesKey(ctx, name, rule, { type });
+  }
+  logApp('info', valuesKeyEditorName ? '变量已更新' : '变量已注册', name);
+  valuesToastr('success', valuesKeyEditorName ? '变量已保存' : `变量「${name}」已注册`);
+  closeValuesKeyEditor();
+  renderValuesKeys();
+  renderValuesTree();
+  refreshHomeValuesStatus();
+}
+
+function handleValuesDeleteKey(name) {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const dependents = getValuesChildKeysByParent(ctx, name);
+  if (dependents.length > 0) {
+    valuesToastr('warning', `请先删除或改绑依赖它的子变量：${dependents.map((key) => key.name).join('、')}`);
+    return;
+  }
+  if (!globalThis.confirm(`确定删除已注册变量「${name}」吗？已存在的变量不会自动删除。`)) return;
+  deleteValuesKey(ctx, name);
+  logApp('info', '变量已删除', name);
+  valuesToastr('success', `已删除变量「${name}」`);
+  renderValuesKeys();
+  renderValuesTree();
+  refreshHomeValuesStatus();
+}
+// ---------- 剧情触发：列表 / 编辑器 ----------
+// 剧情触发状态：只同步总开关滑块（开 / 关由滑块本身呈现，不再显示文字状态条）。
+function refreshValuesTriggerStatus() {
+  const toggle = document.getElementById(VALUES_TRIGGERS_TOGGLE_ID);
+  if (!toggle) return;
+  const ctx = getContextSafe();
+  const settings = ctx ? getSettings(ctx) : null;
+  const enabled = settings ? settings.valuesTriggerEnabled !== false : true;
+  toggle.classList.toggle('is-off', !enabled);
+  toggle.setAttribute('aria-checked', String(Boolean(enabled)));
+  toggle.title = enabled ? '点击关闭：发送前不再按变量条件触发剧情事件' : '点击开启：发送前按变量条件确定性触发剧情事件';
+}
+
+function toggleValuesTriggerSystem() {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const settings = getSettings(ctx);
+  settings.valuesTriggerEnabled = !(settings.valuesTriggerEnabled !== false);
+  saveSettings(ctx);
+  refreshValuesTriggerStatus();
+  logApp('info', settings.valuesTriggerEnabled ? '剧情触发已开启' : '剧情触发已关闭');
+  globalThis.toastr?.info?.('剧情触发已' + (settings.valuesTriggerEnabled ? '开启' : '关闭'), '[' + MODULE_DISPLAY_NAME + ']');
+}
+
+// 触发列表：名称 + 条件摘要 + 启用开关 + 编辑 / 删除。
+function buildValuesTriggerRow(trigger) {
+  const row = document.createElement('div');
+  row.className = 'kaleido-values__row kaleido-values__row--trigger';
+  row.dataset.id = String(trigger.id || '');
+  const enabled = trigger.enabled !== false;
+  const conditionsText = formatValuesTriggerConditions(trigger);
+  const onceBadge = trigger.once === false
+    ? '<span class="kaleido-values__row-trigger-type" title="常驻事件：条件满足时可重复触发">常驻</span>'
+    : '<span class="kaleido-values__row-trigger-type is-once" title="一次性事件：触发一次后自动关闭">一次性</span>';
+  row.innerHTML = `
+    <button type="button" class="kaleido-values__drag-handle" data-action="drag" title="拖动排序" aria-label="拖动排序"><span class="${VALUES_DRAG_ICON_CLASS}"></span></button>
+    <span class="kaleido-values__row-name" title="${escapeHtml(trigger.name)}">${escapeHtml(trigger.name)}</span>
+    ${onceBadge}
+    <span class="kaleido-values__row-trigger" title="${escapeHtml(conditionsText)}">${escapeHtml(conditionsText)}</span>
+    <button type="button" class="kaleido-values__inject-switch${enabled ? '' : ' is-off'}" data-action="toggle-trigger" data-id="${escapeHtml(String(trigger.id || ''))}" role="switch" aria-checked="${enabled}" title="${enabled ? '点击关闭：该触发不再参与判定' : '点击激活：该触发重新参与判定'}" aria-label="启用 / 关闭触发"><span class="kaleido-values__inject-switch-thumb"></span></button>
+    <span class="kaleido-values__row-actions">
+      <button type="button" class="kaleido-values__icon-btn" data-action="edit-trigger" data-id="${escapeHtml(String(trigger.id || ''))}" title="编辑触发" aria-label="编辑触发"><span class="${VALUES_EDIT_ICON_CLASS}"></span></button>
+      <button type="button" class="kaleido-values__icon-btn kaleido-values__icon-btn--danger" data-action="delete-trigger" data-id="${escapeHtml(String(trigger.id || ''))}" title="删除触发" aria-label="删除触发"><span class="${VALUES_DELETE_ICON_CLASS}"></span></button>
+    </span>
+  `;
+  if (!enabled) row.classList.add('is-disabled');
+  return row;
+}
+
+function renderValuesTriggers() {
+  const body = document.getElementById(VALUES_TRIGGERS_BODY_ID);
+  if (!body) return;
+  const ctx = getContextSafe();
+  const triggers = ctx ? getValuesTriggers(ctx) : [];
+  refreshValuesNavCounts();
+  refreshValuesTriggerStatus();
+  body.innerHTML = '';
+  if (triggers.length === 0) {
+    body.appendChild(buildValuesEmpty('还没有剧情触发。点击上方「＋ 新建触发」创建：\n设置变量条件（如 张三/好感 >= 70），条件满足时自动注入对应剧情事件。'));
+    return;
+  }
+  for (const trigger of triggers) {
+    body.appendChild(buildValuesTriggerRow(trigger));
+  }
+}
+
+// 条件路径下拉：列出变量树全部叶子路径（结构以默认值为准，游戏值同构）。
+function populateValuesTriggerPathSelect(select, selectedPath) {
+  if (!select) return;
+  const ctx = getContextSafe();
+  const tree = ctx ? getValuesDefaults(ctx) : {};
+  const order = ctx ? getValuesTreeOrder(ctx) : {};
+  select.innerHTML = '';
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = '（选择变量路径）';
+  select.appendChild(placeholder);
+  const walk = (node, path) => {
+    if (!valuesIsContainer(node)) return;
+    for (const key of valuesOrderedNames(order, path.join('/'), node)) {
+      const childPath = path.concat(key);
+      const child = node[key];
+      if (valuesIsContainer(child)) {
+        walk(child, childPath);
+      } else {
+        const option = document.createElement('option');
+        option.value = childPath.join('/');
+        option.textContent = childPath.join(' / ');
+        select.appendChild(option);
+      }
+    }
+  };
+  walk(tree, []);
+  const escapeCss = (typeof CSS !== 'undefined' && typeof CSS.escape === 'function')
+    ? (value) => CSS.escape(value)
+    : (value) => String(value).replace(/["\\]/g, '\\$&');
+  const target = String(selectedPath || '');
+  select.value = select.querySelector(`option[value="${escapeCss(target)}"]`) ? target : '';
+}
+
+// 条件行：路径 + 运算符 + 值（exists / not exists 隐藏值输入）+ 删除。
+function buildValuesTriggerConditionRow(condition) {
+  const row = document.createElement('div');
+  row.className = VALUES_TRIGGER_CONDITION_ROW_CLASS;
+  const pathSelect = document.createElement('select');
+  pathSelect.className = 'kaleido-input ' + VALUES_TRIGGER_CONDITION_PATH_CLASS;
+  populateValuesTriggerPathSelect(pathSelect, condition?.path || '');
+  const opCenter = document.createElement('div');
+  opCenter.className = VALUES_TRIGGER_CONDITION_OP_CENTER_CLASS;
+  const opWrap = document.createElement('div');
+  opWrap.className = VALUES_TRIGGER_CONDITION_OP_WRAP_CLASS;
+  const opText = document.createElement('span');
+  opText.className = VALUES_TRIGGER_CONDITION_OP_TEXT_CLASS;
+  const opSelect = document.createElement('select');
+  opSelect.className = 'kaleido-input ' + VALUES_TRIGGER_CONDITION_OP_CLASS;
+  for (const op of VALUES_TRIGGER_OPS) {
+    const option = document.createElement('option');
+    option.value = op.value;
+    option.textContent = op.label;
+    opSelect.appendChild(option);
+  }
+  opSelect.value = VALUES_TRIGGER_OPS.some((op) => op.value === String(condition?.op || '').trim())
+    ? String(condition?.op || '').trim()
+    : '==';
+  const syncOpText = () => {
+    const matched = VALUES_TRIGGER_OPS.find((op) => op.value === String(opSelect.value || '').trim());
+    opText.textContent = matched ? matched.value : String(opSelect.value || '');
+    opWrap.title = matched ? matched.label : '';
+  };
+  const valueInput = document.createElement('input');
+  valueInput.className = 'kaleido-input ' + VALUES_TRIGGER_CONDITION_VALUE_CLASS;
+  valueInput.type = 'text';
+  valueInput.placeholder = '如：70 / true / 友好';
+  valueInput.autocomplete = 'off';
+  valueInput.spellcheck = false;
+  const value = condition?.value;
+  valueInput.value = value === null || value === undefined ? '' : String(value);
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'kaleido-values__icon-btn kaleido-values__icon-btn--danger ' + VALUES_TRIGGER_CONDITION_REMOVE_CLASS;
+  removeBtn.title = '删除条件';
+  removeBtn.setAttribute('aria-label', '删除条件');
+  removeBtn.innerHTML = `<span class="${VALUES_DELETE_ICON_CLASS}"></span>`;
+  opWrap.append(opText, opSelect);
+  opCenter.append(opWrap);
+  row.append(pathSelect, opCenter, valueInput, removeBtn);
+  const syncValueVisibility = () => {
+    const op = String(opSelect.value || '').trim();
+    valueInput.hidden = op === 'exists' || op === 'not exists';
+  };
+  opSelect.addEventListener('change', () => {
+    syncOpText();
+    syncValueVisibility();
+  });
+  syncOpText();
+  syncValueVisibility();
+  return row;
+}
+
+// 编辑器条件区：按草稿渲染全部条件行。
+function renderValuesTriggerConditionRows() {
+  const container = document.getElementById(VALUES_TRIGGER_EDITOR_CONDITIONS_ID);
+  if (!container) return;
+  container.innerHTML = '';
+  for (const condition of valuesTriggerEditorConditions) {
+    container.appendChild(buildValuesTriggerConditionRow(condition));
+  }
+}
+
+function addValuesTriggerConditionRow() {
+  valuesTriggerEditorConditions.push({ path: '', op: '==', value: null });
+  renderValuesTriggerConditionRows();
+}
+
+// 读取编辑器条件区当前草稿（含用户未保存的修改）。
+function readValuesTriggerConditionRows() {
+  const container = document.getElementById(VALUES_TRIGGER_EDITOR_CONDITIONS_ID);
+  if (!container) return valuesTriggerEditorConditions.slice();
+  const conditions = [];
+  container.querySelectorAll('.' + VALUES_TRIGGER_CONDITION_ROW_CLASS).forEach((row) => {
+    const path = String(row.querySelector('.' + VALUES_TRIGGER_CONDITION_PATH_CLASS)?.value || '').trim();
+    const op = String(row.querySelector('.' + VALUES_TRIGGER_CONDITION_OP_CLASS)?.value || '==').trim();
+    const valueInput = row.querySelector('.' + VALUES_TRIGGER_CONDITION_VALUE_CLASS);
+    const valueText = String(valueInput?.value || '').trim();
+    const parsed = parseValuesEditorText(valueText);
+    conditions.push({ path, op, value: parsed.value });
+  });
+  return conditions;
+}
+
+function openValuesTriggerEditor(item) {
+  const editor = document.getElementById(VALUES_TRIGGER_EDITOR_ID);
+  if (!editor) return;
+  valuesTriggerEditorId = item && item.id ? item.id : null;
+  valuesTriggerEditorConditions = Array.isArray(item?.conditions)
+    ? item.conditions.map((condition) => ({ ...condition }))
+    : [];
+  const title = document.getElementById(VALUES_TRIGGER_EDITOR_TITLE_ID);
+  const nameInput = document.getElementById(VALUES_TRIGGER_EDITOR_NAME_ID);
+  const logicSelect = document.getElementById(VALUES_TRIGGER_EDITOR_LOGIC_ID);
+  const onceSelect = document.getElementById(VALUES_TRIGGER_EDITOR_ONCE_ID);
+  const descInput = document.getElementById(VALUES_TRIGGER_EDITOR_DESC_ID);
+  const contentInput = document.getElementById(VALUES_TRIGGER_EDITOR_CONTENT_ID);
+  if (title) title.textContent = valuesTriggerEditorId ? '编辑触发' : '新建触发';
+  if (nameInput) nameInput.value = item?.name || '';
+  if (logicSelect) {
+    logicSelect.innerHTML = '';
+    for (const option of VALUES_TRIGGER_LOGIC_OPTIONS) {
+      const el = document.createElement('option');
+      el.value = option.value;
+      el.textContent = option.label;
+      logicSelect.appendChild(el);
+    }
+    logicSelect.value = String(item?.logic || 'all') === 'any' ? 'any' : 'all';
+  }
+  if (onceSelect) {
+    onceSelect.innerHTML = '';
+    for (const option of VALUES_TRIGGER_ONCE_OPTIONS) {
+      const el = document.createElement('option');
+      el.value = option.value;
+      el.textContent = option.label;
+      onceSelect.appendChild(el);
+    }
+    onceSelect.value = item?.once === false ? 'persistent' : 'once';
+  }
+  if (descInput) descInput.value = item?.description || '';
+  if (contentInput) contentInput.value = item?.content || '';
+  renderValuesTriggerConditionRows();
+  editor.hidden = false;
+  closeValuesEditor();
+  closeValuesKeyEditor();
+  closeValuesAddMenu();
+  nameInput?.focus();
+}
+
+function closeValuesTriggerEditor() {
+  const editor = document.getElementById(VALUES_TRIGGER_EDITOR_ID);
+  if (editor) editor.hidden = true;
+  valuesTriggerEditorId = null;
+  valuesTriggerEditorConditions = [];
+}
+
+function saveValuesTriggerEditor() {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const name = String(document.getElementById(VALUES_TRIGGER_EDITOR_NAME_ID)?.value || '').trim();
+  if (!name) {
+    valuesToastr('warning', '请填写事件名称');
+    return;
+  }
+  const content = String(document.getElementById(VALUES_TRIGGER_EDITOR_CONTENT_ID)?.value || '');
+  if (!content.trim()) {
+    valuesToastr('warning', '事件内容不能为空');
+    return;
+  }
+  const logic = String(document.getElementById(VALUES_TRIGGER_EDITOR_LOGIC_ID)?.value || 'all').trim();
+  const once = String(document.getElementById(VALUES_TRIGGER_EDITOR_ONCE_ID)?.value || 'once').trim() !== 'persistent';
+  const conditions = readValuesTriggerConditionRows().filter((condition) => condition.path !== '');
+  if (conditions.length === 0) {
+    valuesToastr('warning', '请至少添加一个变量条件');
+    return;
+  }
+  const data = {
+    name,
+    logic: logic === 'any' ? 'any' : 'all',
+    once,
+    description: String(document.getElementById(VALUES_TRIGGER_EDITOR_DESC_ID)?.value || '').trim(),
+    conditions,
+    content,
+  };
+  if (valuesTriggerEditorId) updateValuesTrigger(ctx, valuesTriggerEditorId, data);
+  else createValuesTrigger(ctx, data);
+  logApp('info', valuesTriggerEditorId ? '剧情触发已更新' : '剧情触发已添加', name);
+  valuesToastr('success', valuesTriggerEditorId ? '触发已保存' : `触发「${name}」已创建`);
+  closeValuesTriggerEditor();
+  renderValuesTriggers();
+  refreshHomeValuesStatus();
+}
+
+function handleValuesDeleteTrigger(id) {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const trigger = getValuesTriggerById(ctx, id);
+  if (!trigger) return;
+  if (!globalThis.confirm(`确定删除剧情触发「${trigger.name}」吗？`)) return;
+  deleteValuesTrigger(ctx, id);
+  logApp('info', '剧情触发已删除', trigger.name);
+  valuesToastr('success', '触发已删除');
+  renderValuesTriggers();
+  refreshHomeValuesStatus();
+}
+
+function handleValuesToggleTrigger(id) {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const trigger = toggleValuesTriggerEnabled(ctx, id);
+  if (!trigger) return;
+  logApp('info', trigger.enabled ? '剧情触发已激活' : '剧情触发已关闭', trigger.name);
+  renderValuesTriggers();
+}
+
+
+// ---------- 自动维护状态 ----------
+function refreshValuesMaintainStatus() {
+  const status = document.getElementById(VALUES_MAINTAIN_STATUS_ID);
+  if (!status) return;
+  const ctx = getContextSafe();
+  const settings = ctx ? getSettings(ctx) : null;
+  const enabled = settings ? settings.valuesAutoUpdateEnabled !== false : true;
+  const round = globalThis[VALUES_LAST_ROUND_KEY] || null;
+  let text = enabled ? '自动维护：开' : '自动维护：关';
+  if (!settings || !getApiBase(settings) || !String(settings?.model || '').trim()) {
+    text += ' · API 未配置';
+    status.dataset.state = 'warn';
+  } else if (!round) {
+    text += ' · 尚未运行';
+    status.dataset.state = 'idle';
+  } else if (round.error) {
+    text += ` · 最近一轮失败：${round.error}`;
+    status.dataset.state = 'error';
+  } else if (round.skipped) {
+    text += ' · 最近一轮：跳过';
+    status.dataset.state = 'idle';
+  } else if (round.changed && round.changed.length > 0) {
+    text += ` · 最近一轮更新 ${round.changed.length} 项`;
+    status.dataset.state = 'ok';
+  } else {
+    text += ' · 最近一轮无变化';
+    status.dataset.state = 'ok';
+  }
+  status.textContent = text;
+  status.title = round ? `最近一轮：${new Date(round.at).toLocaleString()}` : '';
+}
+
+// 游戏值重置：把当前聊天的游戏值整体重置为角色卡默认值（写入聊天文件）。
+function handleValuesResetGame() {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const defaults = getValuesDefaults(ctx);
+  const count = valuesCountEntries(defaults);
+  const confirmText = count > 0
+    ? `确定把游戏值重置为默认值吗？当前 ${count} 项游戏值会被默认值覆盖。`
+    : '确定把游戏值重置为默认值吗？当前游戏值会被清空（默认值当前为空）。';
+  if (!globalThis.confirm(confirmText)) return;
+  const saved = saveValuesChatState(ctx, cloneValue(defaults), { immediate: true });
+  logApp('info', '游戏值已重置为默认值', `覆盖 ${count} 项`);
+  valuesToastr('success', saved ? '游戏值已重置为默认值' : '游戏值已重置（写入聊天文件失败）');
+  renderValuesTree();
+  refreshHomeValuesStatus();
+}
+// ---------- 导入 / 导出 ----------
+function handleValuesExportBundle() {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const filename = getValuesBundleFilename(ctx);
+  if (downloadTextFile(filename, serializeValuesBundle(ctx))) {
+    valuesToastr('success', `已导出变量包：${filename}`);
+  }
+}
+
+async function handleValuesImportFile(file) {
+  if (!file) return;
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  try {
+    const text = await readTextFile(file);
+    const parsed = parseValuesBundle(text);
+    if (!globalThis.confirm(
+      '导入将更新变量注册表与默认值：\n- 同名变量更新变化规则，其余追加；\n- 默认值按路径合并，同名路径覆盖。\n继续？'
+    )) return;
+    applyValuesBundle(ctx, parsed, 'merge');
+    logApp('info', '变量包已导入', `变量 ${parsed.keys.length} 个`);
+    valuesToastr('success', `已导入 ${parsed.keys.length} 个变量`);
+    renderValuesTree();
+    renderValuesKeys();
+    refreshHomeValuesStatus();
+  } catch (error) {
+    const message = String(error?.message || error);
+    logApp('warn', '变量包导入失败', message);
+    valuesToastr('error', `导入失败：${message.slice(0, 160)}`);
+  }
+}// ---------- 内容事件绑定（对话框与面板视图共用） ----------
+function bindValuesContentEvents() {
+  document.getElementById(VALUES_TAB_TREE_ID)?.addEventListener('click', () => {
+    document.getElementById(VALUES_TAB_TREE_ID)?.classList.add('is-active');
+    document.getElementById(VALUES_TAB_KEYS_ID)?.classList.remove('is-active');
+    document.getElementById(VALUES_TAB_TRIGGERS_ID)?.classList.remove('is-active');
+    document.getElementById(VALUES_TAB_INJECT_ID)?.classList.remove('is-active');
+    document.getElementById(VALUES_TREE_PANE_ID)?.classList.add('is-active');
+    document.getElementById(VALUES_KEYS_PANE_ID)?.classList.remove('is-active');
+    document.getElementById(VALUES_TRIGGERS_PANE_ID)?.classList.remove('is-active');
+    document.getElementById(VALUES_INJECT_PANE_ID)?.classList.remove('is-active');
+    closeValuesEditor();
+    closeValuesKeyEditor();
+    closeValuesTriggerEditor();
+    closeValuesAddMenu();
+    renderValuesTree();
+  });
+  document.getElementById(VALUES_TAB_KEYS_ID)?.addEventListener('click', () => {
+    document.getElementById(VALUES_TAB_TREE_ID)?.classList.remove('is-active');
+    document.getElementById(VALUES_TAB_KEYS_ID)?.classList.add('is-active');
+    document.getElementById(VALUES_TAB_TRIGGERS_ID)?.classList.remove('is-active');
+    document.getElementById(VALUES_TAB_INJECT_ID)?.classList.remove('is-active');
+    document.getElementById(VALUES_TREE_PANE_ID)?.classList.remove('is-active');
+    document.getElementById(VALUES_KEYS_PANE_ID)?.classList.add('is-active');
+    document.getElementById(VALUES_TRIGGERS_PANE_ID)?.classList.remove('is-active');
+    document.getElementById(VALUES_INJECT_PANE_ID)?.classList.remove('is-active');
+    closeValuesEditor();
+    closeValuesKeyEditor();
+    closeValuesTriggerEditor();
+    closeValuesAddMenu();
+    renderValuesKeys();
+  });
+  document.getElementById(VALUES_TAB_TRIGGERS_ID)?.addEventListener('click', () => {
+    document.getElementById(VALUES_TAB_TREE_ID)?.classList.remove('is-active');
+    document.getElementById(VALUES_TAB_KEYS_ID)?.classList.remove('is-active');
+    document.getElementById(VALUES_TAB_TRIGGERS_ID)?.classList.add('is-active');
+    document.getElementById(VALUES_TAB_INJECT_ID)?.classList.remove('is-active');
+    document.getElementById(VALUES_TREE_PANE_ID)?.classList.remove('is-active');
+    document.getElementById(VALUES_KEYS_PANE_ID)?.classList.remove('is-active');
+    document.getElementById(VALUES_TRIGGERS_PANE_ID)?.classList.add('is-active');
+    document.getElementById(VALUES_INJECT_PANE_ID)?.classList.remove('is-active');
+    closeValuesEditor();
+    closeValuesKeyEditor();
+    closeValuesTriggerEditor();
+    closeValuesAddMenu();
+    renderValuesTriggers();
+  });
+
+  document.getElementById(VALUES_TAB_INJECT_ID)?.addEventListener('click', () => {
+    document.getElementById(VALUES_TAB_TREE_ID)?.classList.remove('is-active');
+    document.getElementById(VALUES_TAB_KEYS_ID)?.classList.remove('is-active');
+    document.getElementById(VALUES_TAB_TRIGGERS_ID)?.classList.remove('is-active');
+    document.getElementById(VALUES_TAB_INJECT_ID)?.classList.add('is-active');
+    document.getElementById(VALUES_TREE_PANE_ID)?.classList.remove('is-active');
+    document.getElementById(VALUES_KEYS_PANE_ID)?.classList.remove('is-active');
+    document.getElementById(VALUES_TRIGGERS_PANE_ID)?.classList.remove('is-active');
+    document.getElementById(VALUES_INJECT_PANE_ID)?.classList.add('is-active');
+    closeValuesEditor();
+    closeValuesKeyEditor();
+    closeValuesTriggerEditor();
+    closeValuesAddMenu();
+    renderValuesInjectPreview();
+  });
+
+  document.getElementById(VALUES_LAYER_DEFAULT_ID)?.addEventListener('click', () => setValuesLayer('default'));
+  document.getElementById(VALUES_LAYER_GAME_ID)?.addEventListener('click', () => setValuesLayer('game'));
+  document.getElementById(VALUES_LAYER_TOGGLE_ID)?.addEventListener('click', () => {
+    setValuesLayer(valuesActiveLayer === 'game' ? 'default' : 'game');
+  });
+
+  document.getElementById(VALUES_NAV_COLLAPSE_ID)?.addEventListener('click', () => setValuesNavCollapsed(true));
+  document.getElementById(VALUES_NAV_EXPAND_ID)?.addEventListener('click', () => setValuesNavCollapsed(false));
+  applyValuesNavState();
+
+  document.getElementById(VALUES_ADD_ROOT_ID)?.addEventListener('click', (event) => {
+    openValuesAddMenu(event.currentTarget, { root: true });
+  });
+  document.getElementById(VALUES_ADD_MENU_NODE_ID)?.addEventListener('click', () => handleValuesAddMenuPick('node'));
+  document.getElementById(VALUES_ADD_MENU_KEY_ID)?.addEventListener('click', () => handleValuesAddMenuPick('key'));
+  document.getElementById(VALUES_ADD_KEY_ID)?.addEventListener('click', () => openValuesKeyEditor(null));
+
+  document.getElementById(VALUES_MAINTAIN_NOW_ID)?.addEventListener('click', () => {
+    runValuesMaintainNow().then(() => {
+      renderValuesTree();
+      refreshHomeValuesStatus();
+    });
+  });
+
+  document.getElementById(VALUES_RESET_GAME_ID)?.addEventListener('click', handleValuesResetGame);
+
+  document.getElementById(VALUES_INJECT_TOGGLE_ID)?.addEventListener('click', (event) => {
+    const ctx = getContextSafe();
+    if (!ctx) return;
+    const enabled = event.currentTarget.classList.contains('is-off');
+    setValuesInjectEnabled(ctx, enabled);
+    logApp('info', enabled ? '变量注入已开启' : '变量注入已关闭');
+    refreshValuesInjectUI();
+    renderValuesTree();
+  });
+
+  document.getElementById(VALUES_TRIGGERS_TOGGLE_ID)?.addEventListener('click', toggleValuesTriggerSystem);
+  document.getElementById(VALUES_TRIGGERS_ADD_ID)?.addEventListener('click', () => openValuesTriggerEditor(null));
+  document.getElementById(VALUES_TRIGGER_EDITOR_CANCEL_ID)?.addEventListener('click', closeValuesTriggerEditor);
+  document.getElementById(VALUES_TRIGGER_EDITOR_SAVE_ID)?.addEventListener('click', saveValuesTriggerEditor);
+  document.getElementById(VALUES_TRIGGER_EDITOR_CONDITION_ADD_ID)?.addEventListener('click', addValuesTriggerConditionRow);
+  document.getElementById(VALUES_TRIGGER_EDITOR_CONDITIONS_ID)?.addEventListener('click', (event) => {
+    const button = event.target instanceof Element ? event.target.closest('.' + VALUES_TRIGGER_CONDITION_REMOVE_CLASS) : null;
+    if (!button) return;
+    const row = button.closest('.' + VALUES_TRIGGER_CONDITION_ROW_CLASS);
+    if (!row) return;
+    row.remove();
+  });
+
+  document.getElementById(VALUES_IMPORT_BTN_ID)?.addEventListener('click', () => {
+    document.getElementById(VALUES_IMPORT_INPUT_ID)?.click();
+  });
+  document.getElementById(VALUES_IMPORT_INPUT_ID)?.addEventListener('change', (event) => {
+    const file = event.target?.files?.[0];
+    if (file) handleValuesImportFile(file);
+    event.target.value = '';
+  });
+  document.getElementById(VALUES_EXPORT_BTN_ID)?.addEventListener('click', handleValuesExportBundle);
+
+  const treeBody = document.getElementById(VALUES_TREE_BODY_ID);
+  treeBody?.addEventListener('click', (event) => {
+    const button = event.target instanceof Element ? event.target.closest('[data-action]') : null;
+    if (!button) return;
+    event.preventDefault();
+    const action = String(button.dataset.action || '');
+    const row = button.closest('.kaleido-values__row');
+    const path = JSON.parse(String(row?.dataset.path || '[]'));
+    const ctx = getContextSafe();
+    if (!ctx || !valuesActiveTree) return;
+    switch (action) {
+      case 'toggle': {
+        const key = path.join('/');
+        if (valuesExpanded.has(key)) valuesExpanded.delete(key);
+        else valuesExpanded.add(key);
+        renderValuesTree();
+        break;
+      }
+      case 'add-menu': {
+        openValuesAddMenu(button, { path });
+        break;
+      }
+      case 'edit': {
+        const node = valuesGetAtPath(valuesActiveTree, path);
+        if (valuesIsContainer(node)) openValuesNodeEditor(path.slice(0, -1), path);
+        else openValuesKeyEntryEditor(path.slice(0, -1), path);
+        break;
+      }
+      case 'delete': {
+        handleValuesDelete(path);
+        break;
+      }
+      default:
+        break;
+    }
+  });
+
+  // 双击行直接进入编辑（与行内编辑按钮一致：节点编辑节点、变量编辑变量）。
+  // 按钮 / 输入框等交互元素上的双击不触发，避免与滑块、折叠等操作冲突。
+  treeBody?.addEventListener('dblclick', (event) => {
+    const interactive = event.target instanceof Element
+      ? event.target.closest('button, input, select, textarea, label')
+      : null;
+    if (interactive) return;
+    const row = event.target instanceof Element ? event.target.closest('.kaleido-values__row') : null;
+    if (!row) return;
+    const path = JSON.parse(String(row?.dataset.path || '[]'));
+    const ctx = getContextSafe();
+    if (!ctx || !valuesActiveTree || path.length === 0) return;
+    const node = valuesGetAtPath(valuesActiveTree, path);
+    if (valuesIsContainer(node)) {
+      openValuesNodeEditor(path.slice(0, -1), path);
+    } else {
+      // 子变量由父变量派生，双击不进入编辑。
+      const registered = getValuesKeyByName(ctx, path[path.length - 1]);
+      if (registered && isValuesChildKey(registered)) return;
+      openValuesKeyEntryEditor(path.slice(0, -1), path);
+    }
+  });
+
+  // 行内注入滑块：勾选 / 取消勾选节点或变量（默认数值层）。半选点击 = 全选。
+  treeBody?.addEventListener('click', (event) => {
+    const button = event.target instanceof Element ? event.target.closest('button[data-inject-toggle]') : null;
+    if (!button) return;
+    const row = button.closest('.kaleido-values__row');
+    const path = JSON.parse(String(row?.dataset.path || '[]'));
+    const ctx = getContextSafe();
+    if (!ctx || !valuesActiveTree) return;
+    const checked = button.classList.contains('is-off') || button.classList.contains('is-partial');
+    setValuesInjectPath(ctx, path, checked);
+    logApp('info', checked ? '已勾选注入条目' : '已取消勾选注入条目', path.join('/'));
+    renderValuesTree();
+  });
+
+  const keysBody = document.getElementById(VALUES_KEYS_BODY_ID);
+  keysBody?.addEventListener('click', (event) => {
+    const button = event.target instanceof Element ? event.target.closest('[data-action]') : null;
+    if (!button) return;
+    event.preventDefault();
+    const row = button.closest('.kaleido-values__row');
+    const name = String(row?.dataset.name || '');
+    const action = String(button.dataset.action || '');
+    switch (action) {
+      case 'edit-key': {
+        openValuesKeyEditor(name);
+        break;
+      }
+      case 'delete-key': {
+        handleValuesDeleteKey(name);
+        break;
+      }
+      default:
+        break;
+    }
+  });
+
+  const triggersBody = document.getElementById(VALUES_TRIGGERS_BODY_ID);
+  triggersBody?.addEventListener('click', (event) => {
+    const button = event.target instanceof Element ? event.target.closest('[data-action]') : null;
+    if (!button) return;
+    event.preventDefault();
+    const id = String(button.dataset.id || '');
+    const action = String(button.dataset.action || '');
+    switch (action) {
+      case 'edit-trigger': {
+        const trigger = getValuesTriggerById(getContextSafe(), id);
+        if (trigger) openValuesTriggerEditor(trigger);
+        break;
+      }
+      case 'delete-trigger': {
+        handleValuesDeleteTrigger(id);
+        break;
+      }
+      case 'toggle-trigger': {
+        handleValuesToggleTrigger(id);
+        break;
+      }
+      default:
+        break;
+    }
+  });
+
+  document.getElementById(VALUES_EDITOR_CANCEL_ID)?.addEventListener('click', closeValuesEditor);
+  document.getElementById(VALUES_EDITOR_SAVE_ID)?.addEventListener('click', saveValuesEditor);
+  document.getElementById(VALUES_KEY_EDITOR_CANCEL_ID)?.addEventListener('click', closeValuesKeyEditor);
+  document.getElementById(VALUES_KEY_EDITOR_SAVE_ID)?.addEventListener('click', saveValuesKeyEditor);
+  document.getElementById(VALUES_KEY_EDITOR_TYPE_ID)?.addEventListener('change', syncValuesKeyEditorTypeUI);
+  document.getElementById(VALUES_KEY_EDITOR_RULES_ADD_ID)?.addEventListener('click', () => {
+    const container = document.getElementById(VALUES_KEY_EDITOR_RULES_ID);
+    if (!container) return;
+    const empty = container.querySelector('.kaleido-values__key-rules-empty');
+    if (empty) empty.remove();
+    const rows = container.querySelectorAll('.' + VALUES_KEY_EDITOR_RULE_ROW_CLASS);
+    const lastRow = rows[rows.length - 1];
+    const nextMin = nextValuesChildRuleMinFromRow(lastRow);
+    container.appendChild(buildValuesKeyRuleRow(nextMin !== '' ? { min: Number(nextMin) } : {}));
+    refreshValuesKeyRuleConflicts();
+  });
+  document.getElementById(VALUES_KEY_EDITOR_RULES_ID)?.addEventListener('click', (event) => {
+    const button = event.target instanceof Element ? event.target.closest('.' + VALUES_KEY_EDITOR_RULE_REMOVE_CLASS) : null;
+    if (!button) return;
+    button.closest('.' + VALUES_KEY_EDITOR_RULE_ROW_CLASS)?.remove();
+    refreshValuesKeyRuleConflicts();
+  });
+  document.getElementById(VALUES_KEY_EDITOR_RULES_ID)?.addEventListener('input', () => {
+    refreshValuesKeyRuleConflicts();
+  });
+  document.getElementById(VALUES_EDITOR_KEY_SELECT_ID)?.addEventListener('change', syncValuesKeyEntryChildHint);
+
+  document.getElementById(VALUES_EDITOR_VALUE_ID)?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) saveValuesEditor();
+  });
+  document.getElementById(VALUES_KEY_EDITOR_RULE_ID)?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) saveValuesKeyEditor();
+  });
+  document.getElementById(VALUES_TRIGGER_EDITOR_CONTENT_ID)?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) saveValuesTriggerEditor();
+  });
+
+  // 行拖动排序：变量树 / 变量注册 / 剧情触发 三处列表。
+  initValuesDragReorder(
+    document.getElementById(VALUES_TREE_BODY_ID),
+    '.kaleido-values__drag-handle',
+    valuesTreeSiblingsOf,
+    handleValuesTreeReorder
+  );
+  initValuesDragReorder(
+    document.getElementById(VALUES_KEYS_BODY_ID),
+    '.kaleido-values__drag-handle',
+    valuesListSiblingsOf(document.getElementById(VALUES_KEYS_BODY_ID)),
+    handleValuesKeysReorder
+  );
+  initValuesDragReorder(
+    document.getElementById(VALUES_TRIGGERS_BODY_ID),
+    '.kaleido-values__drag-handle',
+    valuesListSiblingsOf(document.getElementById(VALUES_TRIGGERS_BODY_ID)),
+    handleValuesTriggersReorder
+  );
+
+  if (!globalThis[VALUES_DIALOG_KEY + '_menu']) {
+    globalThis[VALUES_DIALOG_KEY + '_menu'] = (event) => {
+      const menu = document.getElementById(VALUES_ADD_MENU_ID);
+      if (!menu || menu.hidden) return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (!target) return;
+      if (menu.contains(target)) return;
+      // 点「＋」按钮本身不算外部：按钮的 click 会负责打开/重定位菜单
+      if (target.closest(`#${VALUES_ADD_ROOT_ID}, [data-action="add-menu"]`)) return;
+      closeValuesAddMenu();
+    };
+    document.addEventListener('click', globalThis[VALUES_DIALOG_KEY + '_menu']);
+  }
+}// 工作台内容模板（树区 + 变量注册区 + 编辑器 + 新建菜单 + 文件输入）：
+// 电脑端大窗口对话框与手机端面板视图共用。
+function buildValuesContentHTML(editorClass) {
+  return `
+        <div class="kaleido-values__workbench">
+          <button type="button" id="${VALUES_NAV_EXPAND_ID}" class="kaleido-values__nav-expand" title="展开导航" aria-label="展开导航" hidden>
+            <span class="${VALUES_CHEVRON_ICON_CLASS}"></span>
+          </button>
+          <nav class="kaleido-values__nav" aria-label="变量系统导航">
+            <div class="kaleido-values__nav-head">
+              <span>视图</span>
+              <button type="button" id="${VALUES_NAV_COLLAPSE_ID}" class="kaleido-values__nav-collapse" title="收起导航" aria-label="收起导航">
+                <span class="${VALUES_NAV_COLLAPSE_ICON_CLASS}"></span>
+              </button>
+            </div>
+            <button type="button" id="${VALUES_TAB_TREE_ID}" class="kaleido-values__nav-item is-active" role="tab" aria-selected="true" title="变量树：按节点层级查看与编辑变量">
+              <span class="kaleido-values__nav-icon"><span class="${VALUES_TREE_ICON_CLASS}"></span></span>
+              <span class="kaleido-values__nav-label">变量树</span>
+              <span id="${VALUES_NAV_TREE_COUNT_ID}" class="kaleido-values__nav-badge" hidden>0</span>
+            </button>
+            <button type="button" id="${VALUES_TAB_KEYS_ID}" class="kaleido-values__nav-item" role="tab" aria-selected="false" title="变量注册：注册变量名与变化规则，AI 自动维护的唯一依据">
+              <span class="kaleido-values__nav-icon"><span class="${VALUES_KEYS_ICON_CLASS}"></span></span>
+              <span class="kaleido-values__nav-label">变量注册</span>
+              <span id="${VALUES_NAV_KEYS_COUNT_ID}" class="kaleido-values__nav-badge" hidden>0</span>
+            </button>
+            <button type="button" id="${VALUES_TAB_TRIGGERS_ID}" class="kaleido-values__nav-item" role="tab" aria-selected="false" title="剧情触发：按变量当前值是否满足条件，确定性触发剧情事件（不依赖 AI 判断）">
+              <span class="kaleido-values__nav-icon"><span class="${VALUES_TRIGGER_ICON_CLASS}"></span></span>
+              <span class="kaleido-values__nav-label">剧情触发</span>
+              <span id="${VALUES_NAV_TRIGGERS_COUNT_ID}" class="kaleido-values__nav-badge" hidden>0</span>
+            </button>
+            <button type="button" id="${VALUES_TAB_INJECT_ID}" class="kaleido-values__nav-item" role="tab" aria-selected="false" title="注入预览：查看实际注入提示词的 <Values> 内容（只读）">
+              <span class="kaleido-values__nav-icon"><span class="${VALUES_INJECT_PREVIEW_ICON_CLASS}"></span></span>
+              <span class="kaleido-values__nav-label">注入预览</span>
+            </button>
+          </nav>
+          <div class="kaleido-values__main">
+            <div id="${VALUES_TREE_PANE_ID}" class="kaleido-values__pane is-active">
+              <div id="${VALUES_LAYER_ROW_ID}" class="kaleido-values__layer-row" data-layer="default" role="group" aria-label="编辑层">
+                <span id="${VALUES_LAYER_ICON_ID}" class="kaleido-values__layer-icon"><span class="${VALUES_LAYER_DEFAULT_ICON_CLASS}"></span></span>
+                <span id="${VALUES_LAYER_TITLE_ID}" class="kaleido-values__layer-title">默认数值</span>
+                <span class="kaleido-values__toolbar-spacer"></span>
+                <button type="button" id="${VALUES_LAYER_TOGGLE_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--ghost" title="切换到游戏数值（聊天，AI 自动维护）">
+                  <span class="${VALUES_LAYER_SWAP_ICON_CLASS}"></span> 切换到游戏数值
+                </button>
+                <button type="button" id="${VALUES_LAYER_GAME_ID}" class="kaleido-values__layer-btn" data-layer="game" hidden aria-hidden="true" tabindex="-1"></button>
+                <button type="button" id="${VALUES_LAYER_DEFAULT_ID}" class="kaleido-values__layer-btn is-active" data-layer="default" hidden aria-hidden="true" tabindex="-1"></button>
+              </div>
+              <div class="kaleido-values__tree-actions">
+                <button type="button" id="${VALUES_ADD_ROOT_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--primary" title="新建节点或变量">＋ 新建</button>
+                <span class="kaleido-values__toolbar-spacer"></span>
+                <button type="button" id="${VALUES_MAINTAIN_NOW_ID}" class="kaleido-btn kaleido-btn--mini" title="手动对当前游戏值执行一轮 AI 维护">✨ 立即维护</button>
+                <button type="button" id="${VALUES_RESET_GAME_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--ghost" title="把当前聊天的游戏值整体重置为角色卡默认值">↺ 重置为默认值</button>
+              </div>
+              <div class="kaleido-values__status-strip">
+                <span id="${VALUES_MAINTAIN_STATUS_ID}" class="kaleido-values__maintain-status" data-state="idle">自动维护：开 · 尚未运行</span>
+                <span id="${VALUES_DEFAULT_HINT_ID}" class="kaleido-values__default-hint" hidden>默认值仅手动修改</span>
+              </div>
+              <div id="${VALUES_INJECT_BAR_ID}" class="kaleido-values__inject-bar">
+                <div class="kaleido-values__inject-toggle" title="把勾选的节点与变量注入提示词（World Info after 之后）">
+                  <button type="button" id="${VALUES_INJECT_TOGGLE_ID}" class="kaleido-values__inject-switch is-off" role="switch" aria-checked="false" aria-label="注入提示词开关"><span class="kaleido-values__inject-switch-thumb"></span></button>
+                  <span class="kaleido-values__inject-toggle-label"><span class="${VALUES_INJECT_ICON_CLASS}"></span> 注入提示词</span>
+                </div>
+                <span id="${VALUES_INJECT_STATUS_ID}" class="kaleido-values__inject-status" data-state="idle">未开启 · 勾选条目后随提示词注入</span>
+              </div>
+              <div id="${VALUES_TREE_ID}" class="kaleido-values__tree">
+                <div id="${VALUES_TREE_BODY_ID}" class="kaleido-values__tree-body"></div>
+              </div>
+            </div>
+            <div id="${VALUES_KEYS_PANE_ID}" class="kaleido-values__pane" hidden>
+              <div class="kaleido-values__keys-actions">
+                <button type="button" id="${VALUES_ADD_KEY_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--primary" title="注册新变量并填写变化规则">＋ 注册新变量</button>
+              </div>
+              <div id="${VALUES_KEYS_BODY_ID}" class="kaleido-values__keys-body"></div>
+            </div>
+            <div id="${VALUES_TRIGGERS_PANE_ID}" class="kaleido-values__pane" hidden>
+              <div class="kaleido-values__triggers-actions">
+                <div class="kaleido-values__inject-toggle" title="剧情触发总开关：开启后每次发送前按变量当前值判定并注入满足条件的事件">
+                  <button type="button" id="${VALUES_TRIGGERS_TOGGLE_ID}" class="kaleido-values__inject-switch is-off" role="switch" aria-checked="false" aria-label="剧情触发开关"><span class="kaleido-values__inject-switch-thumb"></span></button>
+                  <span class="kaleido-values__inject-toggle-label"><span class="${VALUES_TRIGGER_ICON_CLASS}"></span> 剧情触发</span>
+                </div>
+                <span class="kaleido-values__toolbar-spacer"></span>
+                <button type="button" id="${VALUES_TRIGGERS_ADD_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--primary" title="新建剧情触发事件">＋ 新建触发</button>
+              </div>
+              <div id="${VALUES_TRIGGERS_BODY_ID}" class="kaleido-values__triggers-body"></div>
+            </div>
+            <div id="${VALUES_INJECT_PANE_ID}" class="kaleido-values__pane" hidden>
+              <div class="kaleido-values__inject-preview-head">
+                <span class="kaleido-values__inject-preview-title"><span class="${VALUES_INJECT_PREVIEW_ICON_CLASS}"></span> 注入预览</span>
+                <span class="kaleido-values__inject-preview-hint">勾选变量并打开注入开关后，这里显示主模型实际读到的 <Values> 内容</span>
+              </div>
+              <pre id="${VALUES_INJECT_TEXT_ID}" class="kaleido-values__inject-text" spellcheck="false"></pre>
+            </div>
+            <div id="${VALUES_EDITOR_ID}" class="${editorClass}" hidden>
+              <div class="kaleido-values__editor-head">
+                <span id="${VALUES_EDITOR_TITLE_ID}" class="kaleido-values__editor-title">新建节点</span>
+                <span class="kaleido-values__editor-spacer"></span>
+                <button type="button" id="${VALUES_EDITOR_CANCEL_ID}" class="kaleido-icon-btn" title="取消" aria-label="取消">✕</button>
+              </div>
+              <div id="${VALUES_EDITOR_NODE_FIELDS_ID}">
+                <label class="kaleido-api__field" for="${VALUES_EDITOR_NAME_ID}">
+                  <span class="kaleido-api__label">节点名称 *</span>
+                  <input id="${VALUES_EDITOR_NAME_ID}" class="kaleido-input" type="text" placeholder="如：张三 / 队伍 / 城镇" autocomplete="off" spellcheck="false" />
+                </label>
+                <label class="kaleido-api__field" for="${VALUES_EDITOR_PARENT_SELECT_ID}">
+                  <span class="kaleido-api__label">上级节点</span>
+                  <select id="${VALUES_EDITOR_PARENT_SELECT_ID}" class="kaleido-input">
+                    <option value="">（顶层 · 根节点）</option>
+                  </select>
+                </label>
+              </div>
+              <div id="${VALUES_EDITOR_KEY_FIELDS_ID}" hidden>
+                <label class="kaleido-api__field" for="${VALUES_EDITOR_KEY_SELECT_ID}">
+                  <span class="kaleido-api__label">已注册变量 *</span>
+                  <select id="${VALUES_EDITOR_KEY_SELECT_ID}" class="kaleido-input" title="变量必须先注册，新建时从这里选择"></select>
+                  <span id="${VALUES_EDITOR_KEY_NAME_ID}" class="kaleido-values__editor-key-name" hidden></span>
+                </label>
+                <label class="kaleido-api__field" for="${VALUES_EDITOR_VALUE_ID}">
+                  <span id="${VALUES_EDITOR_VALUE_LABEL_ID}" class="kaleido-api__label">变量值 *</span>
+                  <textarea id="${VALUES_EDITOR_VALUE_ID}" class="kaleido-input kaleido-values__textarea kaleido-values__textarea--small" rows="2" placeholder="如：30 / 1000 / 友好 / true" spellcheck="false"></textarea>
+                  <span id="${VALUES_EDITOR_CHILD_HINT_ID}" class="kaleido-values__editor-hint" hidden>子变量值由父变量自动计算，可留空</span>
+                </label>
+              </div>
+              <div class="kaleido-values__editor-actions">
+                <span class="kaleido-values__editor-spacer"></span>
+                <button type="button" id="${VALUES_EDITOR_SAVE_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--primary">保存</button>
+              </div>
+            </div>
+            <div id="${VALUES_KEY_EDITOR_ID}" class="${editorClass}" hidden>
+              <div class="kaleido-values__editor-head">
+                <span id="${VALUES_KEY_EDITOR_TITLE_ID}" class="kaleido-values__editor-title">注册新变量</span>
+                <span class="kaleido-values__editor-spacer"></span>
+                <button type="button" id="${VALUES_KEY_EDITOR_CANCEL_ID}" class="kaleido-icon-btn" title="取消" aria-label="取消">✕</button>
+              </div>
+              <label class="kaleido-api__field" for="${VALUES_KEY_EDITOR_NAME_ID}">
+                <span class="kaleido-api__label">变量名 *</span>
+                <input id="${VALUES_KEY_EDITOR_NAME_ID}" class="kaleido-input" type="text" placeholder="如：好感 / 金钱 / 体力" autocomplete="off" spellcheck="false" />
+              </label>
+              <label class="kaleido-api__field" for="${VALUES_KEY_EDITOR_TYPE_ID}">
+                <span class="kaleido-api__label">变量类型</span>
+                <select id="${VALUES_KEY_EDITOR_TYPE_ID}" class="kaleido-input" title="父变量：由 AI 按变化规则维护；子变量：值由同路径下的父变量按区间自动派生">
+                  <option value="${VALUES_KEY_TYPE_PARENT}">父变量（AI 按变化规则维护）</option>
+                  <option value="${VALUES_KEY_TYPE_CHILD}">子变量（由父变量自动派生）</option>
+                </select>
+              </label>
+              <div id="${VALUES_KEY_EDITOR_RULE_FIELDS_ID}">
+                <label class="kaleido-api__field" for="${VALUES_KEY_EDITOR_RULE_ID}">
+                  <span class="kaleido-api__label">变化规则</span>
+                  <textarea id="${VALUES_KEY_EDITOR_RULE_ID}" class="kaleido-input kaleido-values__textarea kaleido-values__textarea--small" rows="4" placeholder="如：好感随互动变化，友好互动 +5，冲突 -10，上限 100" spellcheck="false"></textarea>
+                </label>
+              </div>
+              <div id="${VALUES_KEY_EDITOR_CHILD_FIELDS_ID}" hidden>
+                <label class="kaleido-api__field" for="${VALUES_KEY_EDITOR_PARENT_ID}">
+                  <span class="kaleido-api__label">父变量 *</span>
+                  <select id="${VALUES_KEY_EDITOR_PARENT_ID}" class="kaleido-input" title="子变量的值由同路径下该父变量的值决定（如 张三/态度 ← 张三/好感度）"></select>
+                </label>
+                <div class="kaleido-api__field">
+                  <span class="kaleido-api__label">派生区间 *</span>
+                  <div id="${VALUES_KEY_EDITOR_RULES_ID}" class="kaleido-values__key-rules"></div>
+                  <button type="button" id="${VALUES_KEY_EDITOR_RULES_ADD_ID}" class="kaleido-btn kaleido-btn--mini">＋ 添加区间</button>
+                  <div class="kaleido-values__key-rules-hint">区间不能重叠（含边界）：如 0~1000 之后只能从 1001 开始；新行会自动接续下限。</div>
+                </div>
+              </div>
+              <div class="kaleido-values__editor-actions">
+                <span class="kaleido-values__editor-spacer"></span>
+                <button type="button" id="${VALUES_KEY_EDITOR_SAVE_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--primary">保存</button>
+              </div>
+            </div>
+            <div id="${VALUES_TRIGGER_EDITOR_ID}" class="${editorClass}" hidden>
+              <div class="kaleido-values__editor-head">
+                <span id="${VALUES_TRIGGER_EDITOR_TITLE_ID}" class="kaleido-values__editor-title">新建触发</span>
+                <span class="kaleido-values__editor-spacer"></span>
+                <button type="button" id="${VALUES_TRIGGER_EDITOR_CANCEL_ID}" class="kaleido-icon-btn" title="取消" aria-label="取消">✕</button>
+              </div>
+              <label class="kaleido-api__field" for="${VALUES_TRIGGER_EDITOR_NAME_ID}">
+                <span class="kaleido-api__label">事件名称 *</span>
+                <input id="${VALUES_TRIGGER_EDITOR_NAME_ID}" class="kaleido-input" type="text" placeholder="如：告白事件 / 战争爆发" autocomplete="off" spellcheck="false" />
+              </label>
+              <label class="kaleido-api__field" for="${VALUES_TRIGGER_EDITOR_LOGIC_ID}">
+                <span class="kaleido-api__label">条件逻辑</span>
+                <select id="${VALUES_TRIGGER_EDITOR_LOGIC_ID}" class="kaleido-input" title="全部满足（且）= 所有条件都满足才触发；任一满足（或）= 满足任意一条即触发"></select>
+              </label>
+              <label class="kaleido-api__field" for="${VALUES_TRIGGER_EDITOR_ONCE_ID}">
+                <span class="kaleido-api__label">事件类型</span>
+                <select id="${VALUES_TRIGGER_EDITOR_ONCE_ID}" class="kaleido-input" title="一次性事件：触发一次后自动关闭；常驻事件：条件满足时可重复触发"></select>
+              </label>
+              <div class="kaleido-api__field">
+                <span class="kaleido-api__label">变量条件 *</span>
+                <div id="${VALUES_TRIGGER_EDITOR_CONDITIONS_ID}" class="kaleido-values__trigger-conditions"></div>
+                <button type="button" id="${VALUES_TRIGGER_EDITOR_CONDITION_ADD_ID}" class="kaleido-btn kaleido-btn--mini">＋ 添加条件</button>
+              </div>
+              <label class="kaleido-api__field" for="${VALUES_TRIGGER_EDITOR_DESC_ID}">
+                <span class="kaleido-api__label">事件说明</span>
+                <input id="${VALUES_TRIGGER_EDITOR_DESC_ID}" class="kaleido-input" type="text" placeholder="可选：一句话说明用途" autocomplete="off" spellcheck="false" />
+              </label>
+              <label class="kaleido-api__field" for="${VALUES_TRIGGER_EDITOR_CONTENT_ID}">
+                <span class="kaleido-api__label">事件内容 *</span>
+                <textarea id="${VALUES_TRIGGER_EDITOR_CONTENT_ID}" class="kaleido-input kaleido-values__textarea" rows="6" placeholder="条件满足后注入的剧情事件正文" spellcheck="false"></textarea>
+              </label>
+              <div class="kaleido-values__editor-actions">
+                <span class="kaleido-values__editor-spacer"></span>
+                <button type="button" id="${VALUES_TRIGGER_EDITOR_SAVE_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--primary">保存</button>
+              </div>
+            </div>
+            <div id="${VALUES_ADD_MENU_ID}" class="kaleido-values__add-menu" hidden role="menu" aria-label="新建">
+              <button type="button" id="${VALUES_ADD_MENU_NODE_ID}" class="kaleido-values__add-menu-item" role="menuitem" data-kind="node">新建节点</button>
+              <button type="button" id="${VALUES_ADD_MENU_KEY_ID}" class="kaleido-values__add-menu-item" role="menuitem" data-kind="key">新建变量</button>
+            </div>
+            <input id="${VALUES_IMPORT_INPUT_ID}" type="file" accept=".yaml,.yml,text/yaml,application/x-yaml" hidden />
+          </div>
+        </div>
+  `;
+}
+
+// ---------- 电脑端：独立大窗口工作台 ----------
+function initValuesWorkbench() {
+  if (getValuesWorkbench()) return;
+  const dialog = document.createElement('div');
+  dialog.id = VALUES_DIALOG_ID;
+  dialog.className = 'kaleido-values-dialog';
+  dialog.setAttribute('aria-hidden', 'true');
+  dialog.innerHTML = `
+    <div class="kaleido-values-dialog__inner" role="dialog" aria-label="变量工作台">
+      <div class="kaleido-values-dialog__header">
+        <span class="kaleido-values-dialog__title"><span class="${VALUES_ICON_CLASS}"></span> 变量系统</span>
+        <span id="${VALUES_BINDING_ID}" class="kaleido-values__binding" data-state="idle" title="变量存储绑定状态">未绑定角色</span>
+        <div class="kaleido-values-dialog__toolbar">
+          <button type="button" id="${VALUES_IMPORT_BTN_ID}" class="kaleido-btn kaleido-btn--mini">导入 变量</button>
+          <button type="button" id="${VALUES_EXPORT_BTN_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--ghost">导出 变量</button>
+          <button type="button" id="${VALUES_CLOSE_BTN_ID}" class="kaleido-icon-btn" title="关闭工作台" aria-label="关闭工作台">✕</button>
+        </div>
+      </div>
+      <div class="kaleido-values-dialog__body">
+${buildValuesContentHTML('kaleido-values-dialog__editor')}
+      </div>
+    </div>
+  `;
+  document.body.appendChild(dialog);
+  bindValuesContentEvents();
+  document.getElementById(VALUES_CLOSE_BTN_ID)?.addEventListener('click', closeValuesWorkbench);
+  dialog.addEventListener('click', (event) => {
+    if (event.target === dialog) closeValuesWorkbench();
+  });
+  if (!globalThis[VALUES_DIALOG_KEY]) {
+    globalThis[VALUES_DIALOG_KEY] = (event) => {
+      if (event.key !== 'Escape') return;
+      const editor = document.getElementById(VALUES_EDITOR_ID);
+      const keyEditor = document.getElementById(VALUES_KEY_EDITOR_ID);
+      const triggerEditor = document.getElementById(VALUES_TRIGGER_EDITOR_ID);
+      if (editor && !editor.hidden) {
+        closeValuesEditor();
+        return;
+      }
+      if (keyEditor && !keyEditor.hidden) {
+        closeValuesKeyEditor();
+        return;
+      }
+      if (triggerEditor && !triggerEditor.hidden) {
+        closeValuesTriggerEditor();
+        return;
+      }
+      if (isValuesWorkbenchOpen()) closeValuesWorkbench();
+    };
+    document.addEventListener('keydown', globalThis[VALUES_DIALOG_KEY]);
+  }
+}
+
+// ---------- 手机端：面板内视图 ----------
+function initValuesPanelView(panel) {
+  if (!panel || document.getElementById(VALUES_VIEW_ID)) return;
+  const section = document.createElement('section');
+  section.id = VALUES_VIEW_ID;
+  section.className = 'kaleido-view kaleido-values-view';
+  section.setAttribute('aria-hidden', 'true');
+  section.innerHTML = `
+    <div class="kaleido-values__binding-row">
+      <span id="${VALUES_BINDING_ID}" class="kaleido-values__binding" data-state="idle" title="变量存储绑定状态">未绑定角色</span>
+      <div class="kaleido-values__binding-actions">
+        <button type="button" id="${VALUES_IMPORT_BTN_ID}" class="kaleido-btn kaleido-btn--mini">导入</button>
+        <button type="button" id="${VALUES_EXPORT_BTN_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--ghost">导出</button>
+      </div>
+    </div>
+${buildValuesContentHTML('kaleido-values__editor')}
+  `;
+  panel.querySelector('.kaleido-panel__body')?.appendChild(section);
+  bindValuesContentEvents();
+}
+
+function initValuesSection(panel) {
+  if (isNarrowViewport()) {
+    initValuesPanelView(panel);
+  } else {
+    initValuesWorkbench();
+  }
+}
+
+
+// ===== js/views-game.js =====
+// ===== 万华镜（Kaleidoscope）游戏模式：玩家数据档案 =====
+// 只读展示「变量系统」注入提示词的那些变量：当前游戏值总览，
+// 让玩家随时看到当前游戏中的各种数据（角色属性、资源、好感、状态等）。
+// 数据源与「变量注入」完全一致（getValuesGameTree），
+// 展示的就是主模型实际看到的内容；本视图不提供任何编辑入口。
+// 视觉：档案体例——朱砂印章节 + 点线目次，只呈现数值本身，不做工作台式标注。
+
+function getGameView() {
+  return document.getElementById(GAME_VIEW_ID);
+}
+
+function isGameViewActive() {
+  const view = getGameView();
+  return Boolean(view && view.classList.contains('is-active'));
+}
+
+// 刷新入口：视图打开 / 手动刷新 / 每轮生成结束后（若视图正打开）调用。
+function renderGameView() {
+  const view = getGameView();
+  if (!view) return;
+  const ctx = getContextSafe();
+  renderGameMeta(ctx);
+  renderGameTree(ctx);
+}
+
+// 视图正打开时刷新（变量维护完成 / 生成结束后调用，让面板数据保持最新）。
+function refreshGameViewIfActive() {
+  if (!isGameViewActive()) return;
+  renderGameView();
+}
+
+
+
+// 封面副题：只保留最近更新时间（注入 / 自动维护等工程信息不面向玩家）。
+function renderGameMeta(ctx) {
+  const updated = document.getElementById(GAME_UPDATED_ID);
+  if (!updated) return;
+  const round = globalThis[VALUES_LAST_ROUND_KEY] || null;
+  const state = ctx ? getValuesChatState(ctx) : null;
+  const updatedAt = state?.updatedAt || round?.at || '';
+  if (updatedAt) {
+    updated.textContent = `最近更新 · ${new Date(updatedAt).toLocaleString()}`;
+    updated.hidden = false;
+  } else {
+    updated.textContent = '';
+    updated.hidden = true;
+  }
+}
+
+// ---------- 档案正文（游戏值总览）----------
+// 条目行：名称 + 点线目次 + 数值，一眼可读、无任何徽标。
+function buildGameEntry(path, name, node, depth) {
+  const entry = document.createElement('div');
+  entry.className = 'kaleido-game__entry';
+  entry.dataset.path = JSON.stringify(path);
+  entry.style.setProperty('--depth', String(depth));
+  const text = formatValuesLeafText(node);
+  entry.innerHTML = [
+    `<span class="kaleido-game__entry-name" title="${escapeHtml(name)}">${escapeHtml(name)}</span>`,
+    '<span class="kaleido-game__entry-leader" aria-hidden="true"></span>',
+    `<span class="kaleido-game__entry-value${typeof node === 'number' ? ' is-numeric' : ''}" title="${escapeHtml(text)}">${escapeHtml(text)}</span>`,
+  ].join('');
+  return entry;
+}
+
+// 章节头：朱砂印（章节名）+ 鎏金分隔线。
+function buildGameChapter(path, name, depth) {
+  const chapter = document.createElement('section');
+  chapter.className = 'kaleido-game__chapter';
+  chapter.dataset.path = JSON.stringify(path);
+  chapter.style.setProperty('--depth', String(depth));
+  chapter.innerHTML = `
+    <header class="kaleido-game__chapter-head">
+      <span class="kaleido-game__chapter-seal">${escapeHtml(name)}</span>
+      <span class="kaleido-game__chapter-rule" aria-hidden="true"></span>
+    </header>
+  `;
+  return chapter;
+}
+
+// 一层档案内容：先列条目（叶子），再排章节（容器）；全部平铺展示，不折叠。
+function renderGameLevel(parent, ctx, node, path, depth) {
+  const order = ctx ? getValuesTreeOrder(ctx) : {};
+  const names = valuesOrderedNames(order, path.join('/'), node);
+  const entries = document.createElement('div');
+  entries.className = 'kaleido-game__entries';
+  entries.style.setProperty('--depth', String(depth));
+  for (const name of names) {
+    const child = node[name];
+    if (valuesIsContainer(child)) continue;
+    entries.appendChild(buildGameEntry(path.concat(name), name, child, depth));
+  }
+  if (entries.childElementCount > 0) parent.appendChild(entries);
+  for (const name of names) {
+    const child = node[name];
+    if (!valuesIsContainer(child)) continue;
+    const childPath = path.concat(name);
+    const chapter = buildGameChapter(childPath, name, depth);
+    renderGameLevel(chapter, ctx, child, childPath, depth + 1);
+    parent.appendChild(chapter);
+  }
+}
+
+function renderGameTree(ctx) {
+  const body = document.getElementById(GAME_TREE_ID);
+  if (!body) return;
+  const tree = ctx ? getValuesGameTree(ctx) : {};
+  body.innerHTML = '';
+  if (Object.keys(tree).length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'kaleido-game__empty';
+    empty.textContent = '在「变量系统」登记变量并设置默认值后，这里会呈现你的游戏数据。';
+    body.appendChild(empty);
+    return;
+  }
+  renderGameLevel(body, ctx, tree, [], 0);
+}
+
+// ---------- 视图装配（手机端 / 电脑端共用面板内视图）----------
+function initGameSection(panel) {
+  if (!panel || document.getElementById(GAME_VIEW_ID)) return;
+  const section = document.createElement('section');
+  section.id = GAME_VIEW_ID;
+  section.className = 'kaleido-view kaleido-game-view';
+  section.setAttribute('aria-hidden', 'true');
+  section.innerHTML = `
+    <div class="kaleido-game">
+      <!-- 档案封面 -->
+      <div class="kaleido-game__cover">
+        <span class="kaleido-game__cover-seal" aria-hidden="true"><span class="${GAME_ICON_CLASS}"></span></span>
+        <span class="kaleido-game__cover-text">
+          <span class="kaleido-game__cover-title">游戏档案</span>
+          <span id="${GAME_UPDATED_ID}" class="kaleido-game__cover-updated" hidden title="最近一次游戏值写入时间"></span>
+        </span>
+        <span class="kaleido-game__cover-spacer"></span>
+        <button type="button" id="${GAME_REFRESH_ID}" class="kaleido-game__refresh" title="刷新当前游戏数据">
+          <span class="fa-solid fa-arrows-rotate"></span> 刷新
+        </button>
+        <button type="button" id="${GAME_GEAR_ID}" class="kaleido-game__gear" title="返回工作台主页" aria-label="返回工作台主页">
+          <span class="fa-solid fa-house"></span>
+        </button>
+      </div>
+      <!-- 档案正文：游戏值总览 -->
+      <div id="${GAME_TREE_ID}" class="kaleido-game__tree"></div>
+    </div>
+  `;
+  panel.querySelector('.kaleido-panel__body')?.appendChild(section);
+  document.getElementById(GAME_REFRESH_ID)?.addEventListener('click', () => {
+    renderGameView();
+  });
+  document.getElementById(GAME_GEAR_ID)?.addEventListener('click', () => showPanelView(HOME_VIEW_ID));
+}
+
+
 // ===== js/main.js =====
 // ===== 万华镜（Kaleidoscope）入口：启动 / 菜单注册 / 事件订阅 =====
 function hasMenuEntry() {
@@ -5495,10 +9945,33 @@ function installHostEventSubscriptions(ctx) {
   onHostEvent(ctx, 'generationStarted', onStoryGateGenerationStarted, '__kaleido_story_gate_generation_started__');
   onHostEvent(ctx, 'generationEnded', onStoryGateGenerationCleanup, '__kaleido_story_gate_cleanup_ended__');
   onHostEvent(ctx, 'generationStopped', onStoryGateGenerationCleanup, '__kaleido_story_gate_cleanup_stopped__');
+  // 变量自动维护：generationStarted → generationEnded 配对后，对最新两条消息
+  // 发起一轮 AI 维护（更新聊天绑定的游戏值）；generationStopped / chatChanged
+  // 清空配对跟踪，防止其他插件自行广播的 generationEnded 误触发。
+  onHostEvent(ctx, 'generationStarted', onValuesGenerationStarted, VALUES_MAINTAIN_STARTED_KEY);
+  onHostEvent(ctx, 'generationEnded', onValuesGenerationEnded, VALUES_MAINTAIN_HANDLER_KEY);
+  onHostEvent(ctx, 'generationStopped', onValuesGenerationStopped, VALUES_MAINTAIN_STOPPED_KEY);
+  onHostEvent(ctx, 'chatChanged', onValuesChatChanged, VALUES_MAINTAIN_CHAT_CHANGED_KEY);
+  // 变量注入：generationEnded / generationStopped 后清空注入，下一轮发送前
+  // 经发送屏障重新注入最新值（勾选条目见变量工作台「默认数值」层）。
+  onHostEvent(ctx, 'generationEnded', onValuesInjectGenerationCleanup, VALUES_INJECT_CLEANUP_ENDED_KEY);
+  onHostEvent(ctx, 'generationStopped', onValuesInjectGenerationCleanup, VALUES_INJECT_CLEANUP_STOPPED_KEY);
+  // 剧情触发：generationEnded / generationStopped 后清空注入，下一轮发送前
+  // 经发送屏障按最新变量值重新判定（条件与事件见变量工作台「剧情触发」页）。
+  onHostEvent(ctx, 'generationEnded', onValuesTriggerGenerationCleanup, VALUES_TRIGGER_CLEANUP_ENDED_KEY);
+  onHostEvent(ctx, 'generationStopped', onValuesTriggerGenerationCleanup, VALUES_TRIGGER_CLEANUP_STOPPED_KEY);
+  // 游戏模式：每轮生成结束后若展示面板正打开，刷新游戏数据（变量维护完成
+  // 后也会经 refreshGameViewIfActive 再刷一次，保证展示最新值）。
+  onHostEvent(ctx, 'generationEnded', onGameViewGenerationRefresh, GAME_REFRESH_ENDED_KEY);
   // 删消息后清空发送屏障旧轮：宿主（TauriTavern）删除消息会复用被删消息的 ID
   // （楼层序号式），旧轮签名与新发送相同会让剧情预筛被误判为「同一发送已处理」
   // 而整轮跳过（删两层楼后首条消息不预筛、第二条才恢复）；删除后必然是新发送，清掉旧轮即可。
   onHostEvent(ctx, 'messageDeleted', clearSendBarrierRound, '__kaleido_send_barrier_clear_on_delete__');
+}
+
+// 游戏模式展示面板：生成结束后刷新（视图未打开时为空操作）。
+function onGameViewGenerationRefresh() {
+  refreshGameViewIfActive();
 }
 
 // 事件源自愈看门狗：TauriTavern 在主生成后可能重建 ctx.eventSource，导致 bootstrap 时

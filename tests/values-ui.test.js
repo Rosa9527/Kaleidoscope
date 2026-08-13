@@ -1,0 +1,787 @@
+// 万华镜变量工作台 UI 交互测试（jsdom）：工作台创建 / 键注册 / 节点与键 / 层切换。
+'use strict';
+const { JSDOM } = require('jsdom');
+const { readSources, loadInContext, createRunner, makeContext, makeCharacter } = require('./harness');
+
+const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
+  url: 'http://localhost/',
+  pretendToBeVisual: true,
+});
+
+const toasts = [];
+const confirms = [];
+const quietConsole = {
+  log() {}, info() {}, debug() {},
+  warn(...args) { console.warn(...args); },
+  error(...args) { console.error(...args); },
+};
+
+const hostCtx = makeContext();
+hostCtx.chatMetadata = {};
+hostCtx.saveChat = () => {};
+const sandbox = {
+  console: quietConsole,
+  document: dom.window.document,
+  window: dom.window,
+  Element: dom.window.Element,
+  MouseEvent: dom.window.MouseEvent,
+  KeyboardEvent: dom.window.KeyboardEvent,
+  Event: dom.window.Event,
+  localStorage: dom.window.localStorage,
+  Blob: dom.window.Blob,
+  FileReader: dom.window.FileReader,
+  setTimeout, clearTimeout, setInterval, clearInterval,
+  URL: Object.assign(globalThis.URL, {
+    createObjectURL: () => 'blob:mock',
+    revokeObjectURL: () => {},
+  }),
+  confirm: (message) => { confirms.push(String(message)); return true; },
+  toastr: {
+    success: (msg) => toasts.push(['success', msg]),
+    info: (msg) => toasts.push(['info', msg]),
+    warning: (msg) => toasts.push(['warning', msg]),
+    error: (msg) => toasts.push(['error', msg]),
+  },
+  Luker: { getContext: () => hostCtx },
+};
+
+const ui = loadInContext(sandbox, readSources());
+const runner = createRunner();
+const assert = (condition, message) => { if (!condition) throw new Error(message || '断言失败'); };
+const $ = (id) => dom.window.document.getElementById(id);
+
+function click(el) {
+  el.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, cancelable: true }));
+}
+
+async function flush() {
+  await new Promise((resolve) => setTimeout(resolve, 10));
+}
+
+function setValue(id, value) {
+  const el = $(id);
+  assert(el, `缺少输入框 ${id}`);
+  el.value = value;
+}
+
+function treeRows() {
+  return Array.from($('kaleido-values-tree-body').querySelectorAll('.kaleido-values__row'));
+}
+
+function rowNames() {
+  return treeRows().map((row) => row.querySelector('.kaleido-values__row-name')?.textContent || '');
+}
+
+function rowByName(name) {
+  const row = treeRows().find((r) => (r.querySelector('.kaleido-values__row-name')?.textContent || '') === name);
+  assert(row, `未找到行：${name}`);
+  return row;
+}
+
+function rowByPath(path) {
+  const key = path.join('/');
+  const row = treeRows().find((r) => JSON.parse(r.dataset.path || '[]').join('/') === key);
+  assert(row, `未找到路径行：${key}`);
+  return row;
+}
+
+function actionButton(row, action) {
+  const btn = row.querySelector(`[data-action="${action}"]`);
+  assert(btn, `未找到操作按钮 ${action}`);
+  return btn;
+}
+
+// 打开顶部「＋ 新建」菜单并选择指定项（node | key）。
+function pickAddMenu(kind) {
+  click($('kaleido-values-add-root'));
+  const menu = $('kaleido-values-add-menu');
+  assert(!menu.hidden, '应打开新建菜单');
+  const item = kind === 'node' ? $('kaleido-values-add-menu-node') : $('kaleido-values-add-menu-key');
+  click(item);
+}
+
+// ---------- 初始化 ----------
+runner.test('initValuesSection 创建工作台对话框', () => {
+  ui.initValuesSection();
+  const dialog = $('kaleido-values-dialog');
+  assert(dialog, '应创建对话框');
+  assert(!dialog.classList.contains('is-open'), '初始应关闭');
+  assert($('kaleido-values-add-root'), '应有新建按钮');
+  assert($('kaleido-values-add-menu'), '应有新建菜单');
+  assert($('kaleido-values-add-menu-node'), '菜单应有新建节点');
+  assert($('kaleido-values-add-menu-key'), '菜单应有新建键');
+  assert($('kaleido-values-add-key'), '应有注册新键按钮');
+  assert($('kaleido-values-import-btn'), '应有导入按钮');
+  assert($('kaleido-values-export-btn'), '应有导出按钮');
+  assert($('kaleido-values-layer-default'), '应有默认值层按钮');
+  assert($('kaleido-values-layer-game'), '应有游戏值层按钮');
+  assert($('kaleido-values-reset-game'), '应有重置为默认值按钮');
+  assert($('kaleido-values-default-hint'), '应有默认值手动提示');
+});
+
+// ---------- 键注册 ----------
+runner.test('键注册：填写名称与规则后保存', () => {
+  click($('kaleido-values-add-key'));
+  assert(!$('kaleido-values-key-editor').hidden, '应打开键编辑器');
+  setValue('kaleido-values-key-editor-name', '好感');
+  setValue('kaleido-values-key-editor-rule', '友好互动 +5，冲突 -10，上限 100');
+  click($('kaleido-values-key-editor-save'));
+  const keys = ui.getValuesKeys(hostCtx);
+  assert(keys.length === 1 && keys[0].name === '好感', '应注册 1 个键');
+  assert(keys[0].rule.includes('友好互动'), '应保存变化规则');
+  const rows = Array.from($('kaleido-values-keys-body').querySelectorAll('.kaleido-values__row'));
+  assert(rows.length === 1, '键列表应显示 1 行');
+});
+
+// ---------- 键注册：子变量 ----------
+runner.test('键注册：子变量类型 + 父变量 + 派生区间', () => {
+  // 先注册父变量
+  click($('kaleido-values-add-key'));
+  setValue('kaleido-values-key-editor-name', '好感度');
+  setValue('kaleido-values-key-editor-rule', '友好互动 +5');
+  click($('kaleido-values-key-editor-save'));
+  // 注册子变量
+  click($('kaleido-values-add-key'));
+  setValue('kaleido-values-key-editor-name', '态度');
+  const typeSelect = $('kaleido-values-key-editor-type');
+  typeSelect.value = 'child';
+  typeSelect.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+  assert($('kaleido-values-key-editor-rule-fields').hidden, '子变量应隐藏变化规则');
+  assert(!$('kaleido-values-key-editor-child-fields').hidden, '子变量应显示派生区间');
+  const parentSelect = $('kaleido-values-key-editor-parent');
+  const parentOptions = Array.from(parentSelect.options).map((option) => option.value);
+  assert(parentOptions.includes('好感度'), '父变量下拉应含好感度');
+  assert(!parentOptions.includes('态度'), '父变量下拉不应含子变量');
+  parentSelect.value = '好感度';
+  click($('kaleido-values-key-editor-rules-add'));
+  click($('kaleido-values-key-editor-rules-add'));
+  const rows = $('kaleido-values-key-editor-rules').querySelectorAll('.kaleido-values__key-rule-row');
+  assert(rows.length === 2, '应有 2 行区间');
+  rows[0].querySelector('.kaleido-values__key-rule-min').value = '0';
+  rows[0].querySelector('.kaleido-values__key-rule-max').value = '30';
+  rows[0].querySelector('.kaleido-values__key-rule-value').value = '冷淡';
+  rows[1].querySelector('.kaleido-values__key-rule-min').value = '31';
+  rows[1].querySelector('.kaleido-values__key-rule-max').value = '100';
+  rows[1].querySelector('.kaleido-values__key-rule-value').value = '颇具好感';
+  click($('kaleido-values-key-editor-save'));
+  const key = ui.getValuesKeyByName(hostCtx, '态度');
+  assert(ui.isValuesChildKey(key), '态度应为子变量');
+  assert(key.parent === '好感度', '父变量应保存');
+  assert(key.rules.length === 2, '应有 2 条区间规则');
+  assert(key.rules[0].value === '冷淡' && key.rules[0].min === 0 && key.rules[0].max === 30, '首条区间应保存');
+  // 键列表应显示类型徽标
+  const listRows = Array.from($('kaleido-values-keys-body').querySelectorAll('.kaleido-values__row'));
+  const attitudeRow = listRows.find((r) => r.dataset.name === '态度');
+  assert(attitudeRow && attitudeRow.querySelector('.kaleido-values__row-type-badge.is-child'), '子变量行应显示「子」徽标');
+});
+
+// ---------- 键注册：派生区间重叠校验 ----------
+runner.test('键注册：派生区间重叠时阻止保存并标红', () => {
+  click($('kaleido-values-add-key'));
+  setValue('kaleido-values-key-editor-name', '态度2');
+  const typeSelect = $('kaleido-values-key-editor-type');
+  typeSelect.value = 'child';
+  typeSelect.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+  $('kaleido-values-key-editor-parent').value = '好感度';
+  click($('kaleido-values-key-editor-rules-add'));
+  click($('kaleido-values-key-editor-rules-add'));
+  const rows = $('kaleido-values-key-editor-rules').querySelectorAll('.kaleido-values__key-rule-row');
+  rows[0].querySelector('.kaleido-values__key-rule-min').value = '0';
+  rows[0].querySelector('.kaleido-values__key-rule-max').value = '1000';
+  rows[0].querySelector('.kaleido-values__key-rule-value').value = '冷淡';
+  rows[1].querySelector('.kaleido-values__key-rule-min').value = '1000';
+  rows[1].querySelector('.kaleido-values__key-rule-max').value = '2000';
+  rows[1].querySelector('.kaleido-values__key-rule-value').value = '友好';
+  rows[1].querySelector('.kaleido-values__key-rule-value').dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+  assert(rows[0].classList.contains('is-conflict') && rows[1].classList.contains('is-conflict'), '重叠行应标红');
+  click($('kaleido-values-key-editor-save'));
+  assert(!ui.getValuesKeyByName(hostCtx, '态度2'), '重叠区间不应保存');
+  assert(toasts.some((t) => t[0] === 'warning' && t[1].includes('重叠')), '应提示区间重叠');
+  // 改成 1001~2000 后可保存
+  rows[1].querySelector('.kaleido-values__key-rule-min').value = '1001';
+  rows[1].querySelector('.kaleido-values__key-rule-min').dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+  click($('kaleido-values-key-editor-save'));
+  const key = ui.getValuesKeyByName(hostCtx, '态度2');
+  assert(key && key.rules.length === 2, '修正后应保存');
+  assert(key.rules[1].min === 1001, '第二行下限应为 1001');
+});
+
+// ---------- 键注册：新行自动接续下限 ----------
+runner.test('键注册：添加区间自动接续下限（上一行上限 + 1）', () => {
+  click($('kaleido-values-add-key'));
+  setValue('kaleido-values-key-editor-name', '态度3');
+  const typeSelect = $('kaleido-values-key-editor-type');
+  typeSelect.value = 'child';
+  typeSelect.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+  $('kaleido-values-key-editor-parent').value = '好感度';
+  click($('kaleido-values-key-editor-rules-add'));
+  const row0 = $('kaleido-values-key-editor-rules').querySelector('.kaleido-values__key-rule-row');
+  row0.querySelector('.kaleido-values__key-rule-max').value = '1000';
+  row0.querySelector('.kaleido-values__key-rule-value').value = '冷淡';
+  click($('kaleido-values-key-editor-rules-add'));
+  const rows = $('kaleido-values-key-editor-rules').querySelectorAll('.kaleido-values__key-rule-row');
+  assert(rows[1].querySelector('.kaleido-values__key-rule-min').value === '1001', '新行下限应自动接续为 1001');
+  click($('kaleido-values-key-editor-cancel'));
+});
+
+// ---------- 树行：子变量派生 ----------
+runner.test('树行：子变量显示派生徽标、不可编辑、值自动计算', () => {
+  const defaults = ui.getValuesDefaults(hostCtx);
+  defaults['好感度'] = 40;
+  defaults['态度'] = '未知';
+  ui.saveValuesData(hostCtx);
+  ui.renderValuesTree();
+  const attitudeRow = rowByName('态度');
+  assert(attitudeRow.classList.contains('is-derived'), '子变量行应有 is-derived 类');
+  assert(attitudeRow.querySelector('.kaleido-values__row-derived-badge'), '应显示派生徽标');
+  assert(!attitudeRow.querySelector('button[data-action="edit"]'), '子变量行不应有编辑按钮');
+  assert(attitudeRow.querySelector('.kaleido-values__row-value').textContent === '颇具好感', '树行应显示派生后的值');
+});
+
+// ---------- 新建变量：子变量值可留空 ----------
+runner.test('新建变量：选择子变量时值可留空并显示提示', () => {
+  pickAddMenu('key');
+  const select = $('kaleido-values-editor-key-select');
+  select.value = '态度';
+  select.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+  assert(!$('kaleido-values-editor-child-hint').hidden, '应显示子变量提示');
+  assert($('kaleido-values-editor-value-label').textContent.includes('可留空'), '标签应提示可留空');
+  click($('kaleido-values-editor-cancel'));
+});
+
+// ---------- 删除父变量：依赖保护 ----------
+runner.test('删除父变量：有依赖子变量时阻止并提示', () => {
+  const before = ui.getValuesKeys(hostCtx).length;
+  const row = Array.from($('kaleido-values-keys-body').querySelectorAll('.kaleido-values__row'))
+    .find((r) => r.dataset.name === '好感度');
+  assert(row, '应找到好感度行');
+  click(row.querySelector('button[data-action="delete-key"]'));
+  assert(ui.getValuesKeys(hostCtx).length === before, '不应删除父变量');
+  assert(toasts.some((t) => t[0] === 'warning' && t[1].includes('态度')), '应提示依赖子变量');
+});
+
+// ---------- 新建键（顶层） ----------
+runner.test('新建键：菜单 → 下拉选择已注册键 + 键值', () => {
+  pickAddMenu('key');
+  assert(!$('kaleido-values-editor').hidden, '应打开键编辑器');
+  assert(!$('kaleido-values-editor-key-fields').hidden, '应显示键字段');
+  assert($('kaleido-values-editor-node-fields').hidden, '不应显示节点字段');
+  const select = $('kaleido-values-editor-key-select');
+  const selectValues = Array.from(select.options).map((option) => option.value);
+  assert(selectValues.includes('好感'), '下拉应含已注册键 好感');
+  select.value = '好感';
+  setValue('kaleido-values-editor-value', '30');
+  click($('kaleido-values-editor-save'));
+  const defaults = ui.getValuesDefaults(hostCtx);
+  assert(defaults['好感'] === 30, '默认值应保存 好感=30');
+  assert(rowNames().includes('好感'), '树应显示 好感 键行');
+  const injectConfig = ui.getValuesInjectConfig(hostCtx);
+  assert(injectConfig.paths.includes('好感'), '新建变量应默认开启注入');
+});// ---------- 新建节点 + 节点下挂键 ----------
+runner.test('新建节点：张三 → 节点下新建键', () => {
+  pickAddMenu('node');
+  assert(!$('kaleido-values-editor').hidden, '应打开节点编辑器');
+  assert(!$('kaleido-values-editor-node-fields').hidden, '应显示节点字段');
+  assert($('kaleido-values-editor-key-fields').hidden, '不应显示键字段');
+  setValue('kaleido-values-editor-name', '张三');
+  click($('kaleido-values-editor-save'));
+  const defaults = ui.getValuesDefaults(hostCtx);
+  assert(defaults['张三'] && typeof defaults['张三'] === 'object', '张三应为节点（容器）');
+  const zhangRow = rowByName('张三');
+  assert(zhangRow.dataset.kind === 'container', '张三行应为节点行');
+  // 张三下新建键
+  click(actionButton(zhangRow, 'add-menu'));
+  assert(!$('kaleido-values-add-menu').hidden, '节点行应打开新建菜单');
+  click($('kaleido-values-add-menu-key'));
+  const select = $('kaleido-values-editor-key-select');
+  select.value = '好感';
+  setValue('kaleido-values-editor-value', '30');
+  click($('kaleido-values-editor-save'));
+  assert(defaults['张三']['好感'] === 30, '张三→好感 应保存为 30');
+  const injectConfig = ui.getValuesInjectConfig(hostCtx);
+  assert(injectConfig.paths.includes('张三/好感'), '节点下新建变量应默认开启注入');
+  assert(injectConfig.paths.includes('张三'), '打开下级应自动提升上级');
+  // 展开张三
+  click(actionButton(rowByName('张三'), 'toggle'));
+  assert(rowNames().includes('好感'), '展开后应显示子键');
+});
+
+// ---------- 编辑键：键名只读 ----------
+runner.test('编辑键：键名只读，只改键值', () => {
+  const topKeyRow = rowByName('好感');
+  click(actionButton(topKeyRow, 'edit'));
+  assert(!$('kaleido-values-editor').hidden, '应打开键编辑器');
+  assert($('kaleido-values-editor-key-select').hidden, '编辑键时下拉应隐藏');
+  assert(!$('kaleido-values-editor-key-name').hidden, '编辑键时应显示键名');
+  assert($('kaleido-values-editor-key-name').textContent === '好感', '键名应显示为 好感');
+  setValue('kaleido-values-editor-value', '50');
+  click($('kaleido-values-editor-save'));
+  const defaults = ui.getValuesDefaults(hostCtx);
+  assert(defaults['好感'] === 50, '键值应更新为 50');
+});
+
+// ---------- 双击行进入编辑 ----------
+runner.test('双击行：变量进入变量编辑，节点进入节点编辑', () => {
+  const defaults = ui.getValuesDefaults(hostCtx);
+  defaults['张三'] = { '好感': 20 };
+  ui.saveValuesData(hostCtx);
+  // 双击变量行 → 变量编辑器
+  const keyRow = rowByName('好感');
+  keyRow.dispatchEvent(new dom.window.MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+  assert(!$('kaleido-values-editor').hidden, '双击变量应打开编辑器');
+  assert($('kaleido-values-editor-title').textContent === '编辑变量', '标题应为 编辑变量');
+  click($('kaleido-values-editor-cancel'));
+  // 双击节点行 → 节点编辑器
+  const nodeRow = rowByName('张三');
+  nodeRow.dispatchEvent(new dom.window.MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+  assert(!$('kaleido-values-editor').hidden, '双击节点应打开编辑器');
+  assert($('kaleido-values-editor-title').textContent === '编辑节点', '标题应为 编辑节点');
+  click($('kaleido-values-editor-cancel'));
+  // 双击按钮区域 → 不触发
+  const editBtn = actionButton(rowByName('好感'), 'edit');
+  editBtn.dispatchEvent(new dom.window.MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+  assert($('kaleido-values-editor').hidden, '双击按钮不应打开编辑器');
+});
+
+// ---------- 游戏值层 ----------
+runner.test('游戏值层：注册金钱后新建键写入 chatMetadata', () => {
+  // 先注册「金钱」
+  click($('kaleido-values-tab-keys'));
+  click($('kaleido-values-add-key'));
+  setValue('kaleido-values-key-editor-name', '金钱');
+  setValue('kaleido-values-key-editor-rule', '获得 +N，消费 -N');
+  click($('kaleido-values-key-editor-save'));
+  // 切到游戏值层新建键
+  click($('kaleido-values-tab-tree'));
+  click($('kaleido-values-layer-game'));
+  assert($('kaleido-values-layer-game').classList.contains('is-active'), '游戏值层应激活');
+  pickAddMenu('key');
+  const select = $('kaleido-values-editor-key-select');
+  select.value = '金钱';
+  setValue('kaleido-values-editor-value', '1000');
+  click($('kaleido-values-editor-save'));
+  const state = hostCtx.chatMetadata.kaleidoscope_values;
+  assert(state && state.values['金钱'] === 1000, '游戏值应写入 chatMetadata');
+  assert(ui.isValuesGameInitialized(hostCtx) === true, '游戏值应标记为已初始化');
+});
+
+// ---------- 删除 ----------
+runner.test('删除条目：确认后从当前层移除', () => {
+  click($('kaleido-values-layer-game'));
+  const moneyRow = rowByName('金钱');
+  click(actionButton(moneyRow, 'delete'));
+  assert(hostCtx.chatMetadata.kaleidoscope_values.values['金钱'] === undefined, '游戏值层应删除金钱');
+  click($('kaleido-values-layer-default'));
+  const zhangRow = rowByName('张三');
+  click(actionButton(zhangRow, 'delete'));
+  assert(ui.getValuesDefaults(hostCtx)['张三'] === undefined, '默认值层应删除张三');
+  assert(confirms.length > 0, '删除应弹确认');
+});
+
+// ---------- 空树新建节点 ----------
+runner.test('新建节点：空树时立即显示节点（不显示空状态）', () => {
+  const defaults = ui.getValuesDefaults(hostCtx);
+  for (const key of Object.keys(defaults)) delete defaults[key];
+  ui.saveValuesData(hostCtx);
+  click($('kaleido-values-layer-default'));
+  pickAddMenu('node');
+  setValue('kaleido-values-editor-name', '张三');
+  click($('kaleido-values-editor-save'));
+  assert(rowNames().includes('张三'), '空树新建节点应显示节点行');
+  assert(!$('kaleido-values-tree-body').querySelector('.kaleido-values__empty'), '不应显示空状态');
+});
+
+// ---------- 层联动：维护 / 重置只属于游戏值层 ----------
+runner.test('层联动：默认值层隐藏维护与重置，游戏值层显示', () => {
+  click($('kaleido-values-layer-default'));
+  assert($('kaleido-values-maintain-now').hidden, '默认值层应隐藏立即维护');
+  assert($('kaleido-values-reset-game').hidden, '默认值层应隐藏重置按钮');
+  assert($('kaleido-values-maintain-status').hidden, '默认值层应隐藏维护状态');
+  assert(!$('kaleido-values-default-hint').hidden, '默认值层应显示手动修改提示');
+  click($('kaleido-values-layer-game'));
+  assert(!$('kaleido-values-maintain-now').hidden, '游戏值层应显示立即维护');
+  assert(!$('kaleido-values-reset-game').hidden, '游戏值层应显示重置按钮');
+  assert(!$('kaleido-values-maintain-status').hidden, '游戏值层应显示维护状态');
+  assert($('kaleido-values-default-hint').hidden, '游戏值层应隐藏手动修改提示');
+});
+
+// ---------- 游戏值重置为默认值 ----------
+runner.test('游戏值重置：点击重置按钮恢复为默认值并写入聊天文件', () => {
+  const defaults = ui.getValuesDefaults(hostCtx);
+  defaults['好感'] = 30;
+  ui.saveValuesData(hostCtx);
+  hostCtx.chatMetadata.kaleidoscope_values = {
+    version: 1,
+    values: { '好感': 50 },
+    updatedAt: new Date().toISOString(),
+    lastSignature: 'old-sig',
+  };
+  click($('kaleido-values-layer-game'));
+  const before = confirms.length;
+  click($('kaleido-values-reset-game'));
+  assert(confirms.length === before + 1, '重置应弹确认');
+  const state = hostCtx.chatMetadata.kaleidoscope_values;
+  assert(state.values['好感'] === 30, '游戏值应重置为默认值 30');
+  assert(state.lastSignature === '', '重置后应清空 lastSignature');
+  assert(rowNames().includes('好感'), '树应显示重置后的键');
+});
+
+// ---------- 样式回归：维护状态在默认值层必须真正隐藏 ----------
+runner.test('维护状态 hidden 覆盖规则（回归：display 不能压过 hidden）', () => {
+  const fs = require('fs');
+  const css = fs.readFileSync(require('path').join(__dirname, '..', 'style.css'), 'utf8');
+  const rule = /.kaleido-values__maintain-status\[hidden\][^{]*\{[^}]*display:\s*none/;
+  assert(rule.test(css), '维护状态应有 [hidden] 覆盖规则');
+});
+
+// ---------- 层切换按钮：单行指示 + 一键切换 ----------
+runner.test('层切换按钮：只显示当前层，点击按钮切换', () => {
+  const title = $('kaleido-values-layer-title');
+  const toggle = $('kaleido-values-layer-toggle');
+  assert(title, '应有当前层标题');
+  assert(toggle, '应有切换按钮');
+  const before = title.textContent;
+  const target = before === '游戏数值' ? '默认数值' : '游戏数值';
+  click(toggle);
+  assert(title.textContent === target, `点击后应显示 ${target}`);
+  assert(toggle.textContent.includes(`切换到${before}`), '切换按钮应指向另一层');
+  assert($('kaleido-values-layer-row').dataset.layer === (target === '游戏数值' ? 'game' : 'default'), '指示条应更新层标记');
+  click(toggle);
+  assert(title.textContent === before, '再点应回到原层');
+});
+
+// ---------- 注入提示词（默认数值层） ----------
+function injectCheck(row) {
+  const button = row.querySelector('button[data-inject-toggle]');
+  assert(button, '行内应有注入滑块');
+  return button;
+}
+
+function toggleInject(row) {
+  click(injectCheck(row));
+}
+
+runner.test('注入条：默认层显示，游戏值层隐藏', () => {
+  click($('kaleido-values-layer-default'));
+  assert(!$('kaleido-values-inject-bar').hidden, '默认值层应显示注入条');
+  assert($('kaleido-values-inject-toggle'), '应有注入开关');
+  assert($('kaleido-values-inject-status'), '应有注入状态');
+  click($('kaleido-values-layer-game'));
+  assert($('kaleido-values-inject-bar').hidden, '游戏值层应隐藏注入条');
+  click($('kaleido-values-layer-default'));
+});
+
+runner.test('注入开关：滑块点击后写入配置并更新状态', () => {
+  click($('kaleido-values-layer-default'));
+  const toggle = $('kaleido-values-inject-toggle');
+  assert(toggle.classList.contains('is-off'), '初始应为关闭态');
+  assert(toggle.getAttribute('aria-checked') === 'false', 'aria-checked 初始应为 false');
+  click(toggle);
+  assert(ui.getValuesInjectConfig(hostCtx).enabled === true, '开关应写入配置');
+  assert(!toggle.classList.contains('is-off'), '滑块应显示开启态');
+  assert(toggle.getAttribute('aria-checked') === 'true', 'aria-checked 应为 true');
+  assert($('kaleido-values-inject-status').textContent.includes('已开启'), '状态应显示已开启');
+  click(toggle);
+  assert(ui.getValuesInjectConfig(hostCtx).enabled === false, '关闭应写入配置');
+  assert(toggle.classList.contains('is-off'), '滑块应回到关闭态');
+});
+
+runner.test('注入预览：标签页展示实际注入的 <Values> 内容', () => {
+  const tab = $('kaleido-values-tab-inject');
+  assert(tab, '应有注入预览标签');
+  const pane = $('kaleido-values-inject-pane');
+  assert(pane, '应有注入预览面板');
+  const preview = $('kaleido-values-inject-text');
+  assert(preview, '应有注入预览文本区');
+  assert(!pane.classList.contains('is-active'), '初始不应激活注入预览面板');
+
+  // 注入关闭：提示未开启
+  click(tab);
+  assert(tab.classList.contains('is-active'), '点击后注入预览标签应激活');
+  assert(pane.classList.contains('is-active'), '点击后注入预览面板应激活');
+  assert(preview.textContent.includes('未开启'), '注入关闭时预览应提示未开启');
+
+  // 注册变量 + 写入游戏值 + 勾选 + 开启注入
+  ui.upsertValuesKey(hostCtx, '好感', '友好互动 +5，冲突 -10，上限 100');
+  ui.saveValuesChatState(hostCtx, { 好感: 40, 张三: { 状态: '清醒' } }, { immediate: true });
+  ui.setValuesInjectEnabled(hostCtx, true);
+  ui.setValuesInjectPath(hostCtx, '好感', true);
+  ui.setValuesInjectPath(hostCtx, '张三', true);
+  ui.setValuesInjectPath(hostCtx, '张三/状态', true);
+  ui.renderValuesTree();
+
+  assert(preview.textContent.includes('<Values>'), '预览应包含 <Values> 块');
+  assert(preview.textContent.includes('好感: 40'), '预览应包含 好感: 40');
+  assert(preview.textContent.includes('状态: 清醒'), '预览应包含 张三/状态');
+  assert(!preview.textContent.includes('金币'), '预览不应包含未勾选变量');
+
+  // 切回变量树：注入预览面板应取消激活
+  click($('kaleido-values-tab-tree'));
+  assert(!pane.classList.contains('is-active'), '切回变量树后注入预览面板应取消激活');
+});
+
+runner.test('行内滑块：打开下级自动提升上级，关闭上级级联关闭后代', () => {
+  const defaults = ui.getValuesDefaults(hostCtx);
+  defaults['张三'] = { '好感': 30, '金钱': 1000 };
+  ui.saveValuesData(hostCtx);
+  // 清空注入配置：前面测试新建变量已默认开启注入，避免干扰本测试的开关断言。
+  ui.saveValuesInjectConfig(hostCtx, { enabled: false, paths: [] });
+  click($('kaleido-values-layer-default'));
+  // 展开张三节点
+  let zhangRow = rowByName('张三');
+  if (!zhangRow.classList.contains('is-expanded')) {
+    click(zhangRow.querySelector('[data-action="toggle"]'));
+    zhangRow = rowByName('张三');
+  }
+  // 打开变量「张三/好感」→ 上级「张三」自动提升打开
+  toggleInject(rowByPath(['张三', '好感']));
+  let config = ui.getValuesInjectConfig(hostCtx);
+  assert(config.paths.includes('张三/好感'), '应打开好感');
+  assert(config.paths.includes('张三'), '打开下级应自动提升上级');
+  // 上级打开后，下级选择性打开：再打开「张三/金钱」
+  toggleInject(rowByPath(['张三', '金钱']));
+  config = ui.getValuesInjectConfig(hostCtx);
+  assert(config.paths.includes('张三/金钱'), '应打开金钱');
+  assert(config.paths.includes('张三'), '上级保持打开');
+  // 关闭上级「张三」→ 全部后代级联关闭
+  toggleInject(rowByName('张三'));
+  config = ui.getValuesInjectConfig(hostCtx);
+  assert(!config.paths.includes('张三'), '节点应关闭');
+  assert(!config.paths.includes('张三/好感'), '好感应级联关闭');
+  assert(!config.paths.includes('张三/金钱'), '金钱应级联关闭');
+});
+
+runner.test('行内滑块状态：数据不一致时节点显示半选（防御）', () => {
+  const defaults = ui.getValuesDefaults(hostCtx);
+  defaults['张三'] = { '好感': 30 };
+  ui.saveValuesData(hostCtx);
+  // 直接写入不一致配置：后代打开但祖先未打开（正常交互不会出现）
+  const config = ui.getValuesInjectConfig(hostCtx);
+  config.paths = ['张三/好感'];
+  ui.saveValuesInjectConfig(hostCtx, config);
+  click($('kaleido-values-layer-default'));
+  const zhangCheck = injectCheck(rowByName('张三'));
+  assert(zhangCheck.classList.contains('is-partial'), '节点应显示半选');
+  assert(zhangCheck.classList.contains('is-off'), '节点自身不应打开');
+  // 半选点击 → 打开节点（后代保留）
+  toggleInject(rowByName('张三'));
+  const config2 = ui.getValuesInjectConfig(hostCtx);
+  assert(config2.paths.includes('张三'), '半选点击应打开节点');
+  assert(config2.paths.includes('张三/好感'), '后代应保留');
+});
+
+// ---------- 剧情触发 ----------
+function triggerRows() {
+  return Array.from($('kaleido-values-triggers-body').querySelectorAll('.kaleido-values__row--trigger'));
+}
+
+function openTriggersTab() {
+  click($('kaleido-values-tab-triggers'));
+  assert($('kaleido-values-triggers-pane').classList.contains('is-active'), '应显示剧情触发面板');
+  assert(!$('kaleido-values-tree-pane').classList.contains('is-active'), '变量树面板应隐藏');
+  assert(!$('kaleido-values-keys-pane').classList.contains('is-active'), '变量注册面板应隐藏');
+}
+
+runner.test('剧情触发：标签页与总开关', () => {
+  openTriggersTab();
+  assert($('kaleido-values-triggers-toggle'), '应有总开关');
+
+  assert($('kaleido-values-triggers-add'), '应有新建按钮');
+  const toggle = $('kaleido-values-triggers-toggle');
+  assert(!toggle.classList.contains('is-off'), '默认应开启');
+  click(toggle);
+  assert(hostCtx.extensionSettings.Kaleidoscope.valuesTriggerEnabled === false, '点击应写入设置');
+  assert(toggle.classList.contains('is-off'), '滑块应显示关闭态');
+  click(toggle);
+  assert(hostCtx.extensionSettings.Kaleidoscope.valuesTriggerEnabled === true, '再点应恢复');
+});
+
+runner.test('剧情触发：新建触发（名称 / 逻辑 / 条件 / 正文）', () => {
+  const defaults = ui.getValuesDefaults(hostCtx);
+  defaults['张三'] = { '好感': 30, '是否已知真相': false };
+  ui.saveValuesData(hostCtx);
+  openTriggersTab();
+  click($('kaleido-values-triggers-add'));
+  assert(!$('kaleido-values-trigger-editor').hidden, '应打开触发编辑器');
+  setValue('kaleido-values-trigger-editor-name', '告白事件');
+  const logic = $('kaleido-values-trigger-editor-logic');
+  logic.value = 'all';
+  const onceSelect = $('kaleido-values-trigger-editor-once');
+  assert(onceSelect, '应有事件类型选择');
+  assert(onceSelect.value === 'once', '默认应为一次性事件');
+  // 添加两条条件
+  click($('kaleido-values-trigger-editor-condition-add'));
+  click($('kaleido-values-trigger-editor-condition-add'));
+  const rows = Array.from($('kaleido-values-trigger-editor-conditions').querySelectorAll('.kaleido-values__trigger-condition'));
+  assert(rows.length === 2, '应有 2 个条件行');
+  const pathSelects = rows.map((row) => row.querySelector('.kaleido-values__trigger-condition-path'));
+  const opSelects = rows.map((row) => row.querySelector('.kaleido-values__trigger-condition-op'));
+  const valueInputs = rows.map((row) => row.querySelector('.kaleido-values__trigger-condition-value'));
+  // 路径下拉应包含变量树叶子路径
+  const pathOptions = Array.from(pathSelects[0].options).map((option) => option.value);
+  assert(pathOptions.includes('张三/好感'), '路径下拉应包含 张三/好感');
+  assert(pathOptions.includes('张三/是否已知真相'), '路径下拉应包含 张三/是否已知真相');
+  pathSelects[0].value = '张三/好感';
+  opSelects[0].value = '>=';
+  valueInputs[0].value = '70';
+  pathSelects[1].value = '张三/是否已知真相';
+  opSelects[1].value = '==';
+  valueInputs[1].value = 'true';
+  setValue('kaleido-values-trigger-editor-content', '张三向你表白了。');
+  click($('kaleido-values-trigger-editor-save'));
+  const triggers = ui.getValuesTriggers(hostCtx);
+  assert(triggers.length === 1, '应创建 1 个触发');
+  assert(triggers[0].name === '告白事件' && triggers[0].logic === 'all', '名称与逻辑应正确');
+  assert(triggers[0].once === true, '默认应保存为一次性事件');
+  assert(triggers[0].conditions.length === 2, '应有 2 个条件');
+  assert(triggers[0].conditions[0].path === '张三/好感' && triggers[0].conditions[0].op === '>=' && triggers[0].conditions[0].value === 70, '条件 1 应正确');
+  assert(triggers[0].conditions[1].value === true, '布尔值应解析为布尔');
+  assert(triggers[0].content.includes('张三向你表白了。'), '正文应保存');
+  // 列表行显示条件摘要
+  const listRows = triggerRows();
+  assert(listRows.length === 1, '列表应有 1 行');
+  assert(listRows[0].querySelector('.kaleido-values__row-trigger').textContent.includes('张三/好感 >= 70'), '应显示条件摘要');
+  assert(listRows[0].querySelector('.kaleido-values__row-trigger-type').textContent === '一次性', '应显示一次性徽标');
+  // 编辑为常驻事件
+  click(listRows[0].querySelector('[data-action="edit-trigger"]'));
+  const onceSelect2 = $('kaleido-values-trigger-editor-once');
+  assert(onceSelect2.value === 'once', '编辑时回显一次性');
+  onceSelect2.value = 'persistent';
+  click($('kaleido-values-trigger-editor-save'));
+  assert(ui.getValuesTriggers(hostCtx)[0].once === false, '常驻事件应保存 once=false');
+  assert(triggerRows()[0].querySelector('.kaleido-values__row-trigger-type').textContent === '常驻', '应显示常驻徽标');
+});
+
+runner.test('剧情触发：启停滑块与删除', () => {
+  const triggers = ui.getValuesTriggers(hostCtx);
+  assert(triggers.length === 1, '前置：应有 1 个触发');
+  openTriggersTab();
+  let row = triggerRows()[0];
+  click(row.querySelector('[data-action="toggle-trigger"]'));
+  assert(ui.getValuesTriggerById(hostCtx, triggers[0].id).enabled === false, '点击应停用');
+  row = triggerRows()[0];
+  assert(row.classList.contains('is-disabled'), '行应显示停用态');
+  click(row.querySelector('[data-action="toggle-trigger"]'));
+  assert(ui.getValuesTriggerById(hostCtx, triggers[0].id).enabled === true, '再点应激活');
+  row = triggerRows()[0];
+  click(row.querySelector('[data-action="delete-trigger"]'));
+  assert(ui.getValuesTriggers(hostCtx).length === 0, '删除后应为空');
+  assert(triggerRows().length === 0, '列表应清空');
+});
+
+// ---------- 左侧导航收起 / 展开 ----------
+runner.test('导航栏：收起后隐藏并显示展开按钮，点击展开恢复', () => {
+  const bench = dom.window.document.querySelector('.kaleido-values__workbench');
+  assert(bench, '应有工作台');
+  assert(!bench.classList.contains('is-nav-collapsed'), '初始应展开');
+  assert($('kaleido-values-nav-expand').hidden, '展开时展开按钮应隐藏');
+  click($('kaleido-values-nav-collapse'));
+  assert(bench.classList.contains('is-nav-collapsed'), '点击收起后应折叠');
+  assert(!$('kaleido-values-nav-expand').hidden, '折叠后应显示展开按钮');
+  assert(hostCtx.extensionSettings.Kaleidoscope.valuesNavCollapsed === true, '折叠状态应写入设置');
+  click($('kaleido-values-nav-expand'));
+  assert(!bench.classList.contains('is-nav-collapsed'), '点击展开后应恢复');
+  assert($('kaleido-values-nav-expand').hidden, '展开后展开按钮应隐藏');
+  assert(hostCtx.extensionSettings.Kaleidoscope.valuesNavCollapsed === false, '展开状态应写入设置');
+});
+
+// ---------- 拖动排序 ----------
+function stubRowRects(rows, height = 30) {
+  rows.forEach((row, index) => {
+    row.getBoundingClientRect = () => ({
+      top: index * height,
+      bottom: (index + 1) * height,
+      height,
+      left: 0,
+      right: 200,
+      width: 200,
+      x: 0,
+      y: index * height,
+      toJSON() {},
+    });
+  });
+}
+
+function pointerEvent(type, clientY) {
+  return new dom.window.PointerEvent(type, { bubbles: true, cancelable: true, clientY });
+}
+
+function dragRowByHandle(handle, fromY, toY) {
+  handle.dispatchEvent(pointerEvent('pointerdown', fromY));
+  dom.window.document.dispatchEvent(pointerEvent('pointermove', toY));
+  dom.window.document.dispatchEvent(pointerEvent('pointerup', toY));
+}
+
+runner.test('键列表：拖动把手改变注册顺序并持久化', () => {
+  // 清掉旧键，注册 3 个新键
+  for (const key of ui.getValuesKeys(hostCtx).slice()) ui.deleteValuesKey(hostCtx, key.name);
+  for (const name of ['好感', '金钱', '体力']) {
+    click($('kaleido-values-add-key'));
+    setValue('kaleido-values-key-editor-name', name);
+    setValue('kaleido-values-key-editor-rule', '规则');
+    click($('kaleido-values-key-editor-save'));
+  }
+  click($('kaleido-values-tab-keys'));
+  const body = $('kaleido-values-keys-body');
+  const rows = () => Array.from(body.querySelectorAll('.kaleido-values__row'));
+  assert(rows().map((r) => r.dataset.name).join(',') === '好感,金钱,体力', '初始顺序应为注册顺序');
+  stubRowRects(rows());
+  const handle = rows()[0].querySelector('.kaleido-values__drag-handle');
+  assert(handle, '键行应有拖动把手');
+  dragRowByHandle(handle, 15, 75);
+  assert(rows().map((r) => r.dataset.name).join(',') === '金钱,体力,好感', '拖动后 DOM 顺序应变化');
+  const names = ui.getValuesKeys(hostCtx).map((key) => key.name);
+  assert(names.join(',') === '金钱,体力,好感', '数据层顺序应同步');
+});
+
+runner.test('变量树：同级条目拖动排序并保持', () => {
+  click($('kaleido-values-tab-tree'));
+  click($('kaleido-values-layer-default'));
+  const defaults = ui.getValuesDefaults(hostCtx);
+  for (const key of Object.keys(defaults)) delete defaults[key];
+  defaults['张三'] = { '好感': 30 };
+  defaults['李四'] = { '金钱': 100 };
+  defaults['王五'] = 1;
+  ui.saveValuesData(hostCtx);
+  ui.renderValuesTree();
+  // 收起此前测试展开的节点，只看顶层条目
+  const zhangRow = rowByName('张三');
+  if (zhangRow.classList.contains('is-expanded')) click(actionButton(zhangRow, 'toggle'));
+  assert(rowNames().join(',') === '张三,李四,王五', '初始按名称排序');
+  stubRowRects(treeRows());
+  const handle = rowByName('张三').querySelector('.kaleido-values__drag-handle');
+  assert(handle, '树行应有拖动把手');
+  dragRowByHandle(handle, 15, 75);
+  assert(rowNames().join(',') === '李四,王五,张三', '拖动后顺序应变化');
+  const order = ui.getValuesTreeOrder(hostCtx);
+  assert(order[''].join(',') === '李四,王五,张三', '顺序表应保存');
+  ui.renderValuesTree();
+  assert(rowNames().join(',') === '李四,王五,张三', '重渲染后顺序应保持');
+});
+
+runner.test('剧情触发：拖动把手改变触发顺序', () => {
+  click($('kaleido-values-tab-triggers'));
+  for (const trigger of ui.getValuesTriggers(hostCtx).slice()) ui.deleteValuesTrigger(hostCtx, trigger.id);
+  for (const name of ['事件A', '事件B', '事件C']) {
+    click($('kaleido-values-triggers-add'));
+    setValue('kaleido-values-trigger-editor-name', name);
+    setValue('kaleido-values-trigger-editor-content', '触发内容');
+    click($('kaleido-values-trigger-editor-condition-add'));
+    const condRow = $('kaleido-values-trigger-editor-conditions').querySelector('.kaleido-values__trigger-condition');
+    condRow.querySelector('.kaleido-values__trigger-condition-path').value = '张三/好感';
+    click($('kaleido-values-trigger-editor-save'));
+  }
+  const body = $('kaleido-values-triggers-body');
+  const rows = () => Array.from(body.querySelectorAll('.kaleido-values__row'));
+  assert(rows().length === 3, '应有 3 个触发');
+  stubRowRects(rows());
+  const handle = rows()[0].querySelector('.kaleido-values__drag-handle');
+  assert(handle, '触发行应有拖动把手');
+  dragRowByHandle(handle, 15, 75);
+  const domIds = rows().map((r) => r.dataset.id).join(',');
+  const dataIds = ui.getValuesTriggers(hostCtx).map((t) => t.id).join(',');
+  assert(domIds === dataIds, '数据层顺序应与 DOM 一致');
+  assert(rows()[2].querySelector('.kaleido-values__row-name').textContent === '事件A', '事件A 应拖到末尾');
+});
+
+runner.run();

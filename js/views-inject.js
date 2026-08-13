@@ -7,6 +7,41 @@ function getStoryGateLastRound() {
   return globalThis[STORY_GATE_LAST_ROUND_KEY] || null;
 }
 
+function getValuesTriggerLastRound() {
+  return globalThis[VALUES_TRIGGER_LAST_ROUND_KEY] || null;
+}
+
+// 剧情触发摘要：本轮结果 + 统计 + 触发事件名单。
+function buildValuesTriggerSummary(round) {
+  const wrap = document.createElement('div');
+  wrap.className = 'kaleido-inject__summary';
+  const outcome = document.createElement('span');
+  outcome.className = 'kaleido-inject__summary-outcome';
+  if (round.injected) {
+    const autoDisabled = Array.isArray(round.autoDisabledIds) ? round.autoDisabledIds.length : 0;
+    outcome.textContent = '已注入 ' + round.triggeredIds.length + ' 个事件'
+      + (autoDisabled > 0 ? '，' + autoDisabled + ' 个一次性事件已自动关闭' : '');
+    outcome.dataset.state = 'ok';
+  } else if (round.skipped) {
+    outcome.textContent = '本轮无事件满足条件';
+    outcome.dataset.state = 'idle';
+  } else {
+    outcome.textContent = '未注入';
+    outcome.dataset.state = 'warn';
+  }
+  const stats = document.createElement('span');
+  stats.className = 'kaleido-inject__summary-stats';
+  stats.textContent = '候选 ' + round.totalTriggers + ' 个触发 · 满足 ' + round.triggeredIds.length + ' 个';
+  wrap.append(outcome, stats);
+  if (Array.isArray(round.triggeredEvents) && round.triggeredEvents.length > 0) {
+    const names = document.createElement('span');
+    names.className = 'kaleido-inject__summary-names';
+    names.textContent = '触发：' + round.triggeredEvents.map((event) => event.name || event.id).join('、');
+    wrap.appendChild(names);
+  }
+  return wrap;
+}
+
 // 摘要：本轮结果 + 统计 + 触发事件名单。
 function buildInjectSummary(round) {
   const wrap = document.createElement('div');
@@ -53,10 +88,11 @@ function buildInjectEventCard(event) {
   id.textContent = event.id || '';
   head.append(name, id);
   card.appendChild(head);
-  if (String(event.trigger || '').trim()) {
+  const triggerText = String(event.trigger || event.conditions || '').trim();
+  if (triggerText) {
     const trigger = document.createElement('p');
     trigger.className = 'kaleido-inject__event-line';
-    trigger.textContent = '触发条件：' + event.trigger;
+    trigger.textContent = '触发条件：' + triggerText;
     card.appendChild(trigger);
   }
   if (String(event.description || '').trim()) {
@@ -117,6 +153,39 @@ function renderInjectView() {
   injectHead.hidden = !hasInjection;
   injectText.hidden = !hasInjection;
   injectText.textContent = round.injectionText || '';
+  renderValuesTriggerSection();
+}
+
+// 剧情触发段：摘要 → 触发事件 → 注入提示词原文。
+function renderValuesTriggerSection() {
+  const head = document.querySelector('.kaleido-inject__trigger-head');
+  const summary = document.getElementById(INJECT_TRIGGER_SUMMARY_ID);
+  const events = document.getElementById(INJECT_TRIGGER_EVENTS_ID);
+  const text = document.getElementById(INJECT_TRIGGER_TEXT_ID);
+  if (!head || !summary || !events || !text) return;
+  const round = getValuesTriggerLastRound();
+  if (!round) {
+    head.hidden = true;
+    summary.hidden = true;
+    events.hidden = true;
+    text.hidden = true;
+    return;
+  }
+  head.hidden = false;
+  summary.hidden = false;
+  summary.textContent = '';
+  summary.appendChild(buildValuesTriggerSummary(round));
+  const hasEvents = Array.isArray(round.triggeredEvents) && round.triggeredEvents.length > 0;
+  events.hidden = !hasEvents;
+  events.textContent = '';
+  if (hasEvents) {
+    for (const event of round.triggeredEvents) {
+      events.appendChild(buildInjectEventCard(event));
+    }
+  }
+  const hasInjection = Boolean(String(round.injectionText || '').trim());
+  text.hidden = !hasInjection;
+  text.textContent = round.injectionText || '';
 }
 
 // 复制注入提示词原文：优先 Clipboard API，回退隐藏 textarea + execCommand。

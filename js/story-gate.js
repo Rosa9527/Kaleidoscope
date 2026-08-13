@@ -181,17 +181,7 @@ function buildStoryGateInjectionText(ctx, events) {
 // extension_prompt_types: NONE=-1, IN_PROMPT=0, IN_CHAT=1, BEFORE_PROMPT=2
 // extension_prompt_roles: SYSTEM=0, USER=1, ASSISTANT=2
 function getStoryGateExtensionPromptApi(ctx) {
-  const context = ctx || getContextSafe();
-  if (!context) return null;
-  const setExtensionPrompt = typeof context.setExtensionPrompt === 'function'
-    ? context.setExtensionPrompt
-    : (typeof globalThis.setExtensionPrompt === 'function' ? globalThis.setExtensionPrompt : null);
-  if (typeof setExtensionPrompt !== 'function') return null;
-  const types = context.extension_prompt_types || globalThis.extension_prompt_types || null;
-  const roles = context.extension_prompt_roles || globalThis.extension_prompt_roles || null;
-  const inChat = (types && Number.isFinite(types.IN_CHAT)) ? types.IN_CHAT : 1;
-  const systemRole = (roles && Number.isFinite(roles.SYSTEM)) ? roles.SYSTEM : 0;
-  return { setExtensionPrompt, inChat, systemRole };
+  return getExtensionPromptApi(ctx);
 }
 
 function clearStoryGateInjection(ctx) {

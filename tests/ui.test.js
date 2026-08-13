@@ -183,17 +183,21 @@ runner.test('编辑器右上角 ✕ 可关闭编辑器', () => {
 runner.test('工作台对话框继承主题变量（回归：编辑器不再透明）', () => {
   const fs = require('fs');
   const css = fs.readFileSync(require('path').join(__dirname, '..', 'style.css'), 'utf8');
-  // .kaleido-story-dialog 必须加入 --k-* 变量作用域，否则编辑器 background: var(--k-paper)
-  // 解析失败变成透明，底层树文字会透出来
-  const varScope = /([^{}]*.kaleido-story-dialog[^{}]*)\{([^}]*)\}/g;
-  let defined = false;
-  let m;
-  while ((m = varScope.exec(css)) !== null) {
-    if (m[2].includes('--k-paper:')) { defined = true; break; }
+  // 所有使用 var(--k-*) 的对话框都必须加入变量作用域，否则 background 解析失败
+  // 变成透明，底层树文字会透出来
+  for (const scope of ['.kaleido-story-dialog', '.kaleido-values-dialog']) {
+    const varScope = new RegExp(`([^{}]*${scope.replace('.', '\\.')}[^{}]*)\\{([^}]*)\\}`, 'g');
+    let defined = false;
+    let m;
+    while ((m = varScope.exec(css)) !== null) {
+      if (m[2].includes('--k-paper:')) { defined = true; break; }
+    }
+    assert(defined, `${scope} 应定义 --k-paper 主题变量`);
   }
-  assert(defined, '工作台对话框应定义 --k-paper 主题变量');
   const editorRule = /.kaleido-story-dialog__editor[^{]*\{[^}]*background:\s*var\(--k-paper\)/;
   assert(editorRule.test(css), '编辑器背景应使用主题变量');
+  const menuItemRule = /.kaleido-values__add-menu-item[^{]*\{[^}]*color:\s*var\(--k-ink\)/;
+  assert(menuItemRule.test(css), '变量系统新建菜单文字应与剧情脉络菜单一致（墨色）');
 });
 
 runner.test('样式表含 hidden 覆盖规则（回归：display 不能压过 hidden）', () => {
@@ -535,7 +539,8 @@ runner.test('createPanel 创建预设模版视图与首页入口', () => {
   ui.createPanel();
   assert($('kaleido-preset-view'), '应创建预设模版视图');
   assert($('kaleido-home-preset-card'), '首页应有预设模版卡片');
-  assert($('kaleido-home-log-button'), '首页标语旁应有系统日志小图标');
+  assert($('kaleido-home-game-button'), '首页标语旁应有游戏模式小图标');
+  assert($('kaleido-home-log-card'), '首页应有系统日志卡片');
   assert($('kaleido-preset-tabs'), '预设视图应有标签页');
   assert($('kaleido-preset-text'), '预设视图应有编辑区');
   assert($('kaleido-preset-save'), '预设视图应有保存按钮');
@@ -555,8 +560,20 @@ runner.test('面板打开时始终以内联 left/top 定位（与 SoulLink 一�
   assert(!dialog.classList.contains('is-api-mode'), '不应再添加移动端尺寸模式');
 });
 
-runner.test('首页标语旁日志小图标打开系统日志视图', () => {
-  click($('kaleido-home-log-button'));
+runner.test('打开面板默认进入游戏模式主页', () => {
+  ui.openPanel();
+  assert($('kaleido-game-view').classList.contains('is-active'), '打开面板应默认进入游戏模式');
+  assert($('kaleido-home-view').classList.contains('is-active') === false, '工作台首页不应默认激活');
+});
+
+runner.test('首页标语旁游戏小图标打开游戏模式视图', () => {
+  click($('kaleido-home-game-button'));
+  assert($('kaleido-game-view').classList.contains('is-active'), '游戏模式视图应激活');
+  assert($('kaleido-home-view').classList.contains('is-active') === false, '工作台首页应隐藏');
+});
+
+runner.test('首页系统日志卡片打开系统日志视图', () => {
+  click($('kaleido-home-log-card'));
   assert($('kaleido-log-view').classList.contains('is-active'), '日志视图应激活');
   assert($('kaleido-home-view').classList.contains('is-active') === false, '首页应隐藏');
 });

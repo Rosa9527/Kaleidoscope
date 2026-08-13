@@ -265,7 +265,7 @@ function openPanel() {
   const panel = getPanel();
   if (!panel) return;
   logApp('debug', '面板已打开');
-  showPanelView(HOME_VIEW_ID);
+  showPanelView(GAME_VIEW_ID);
   refreshHomeStatuses();
   panel.classList.add('is-open');
   panel.setAttribute('aria-hidden', 'false');
@@ -305,7 +305,7 @@ function showPanelView(viewId) {
     if (wideMode) dialog.classList.add(wideMode);
   }
   const back = document.getElementById(PANEL_BACK_ID);
-  if (back) back.style.visibility = viewId === HOME_VIEW_ID ? 'hidden' : 'visible';
+  if (back) back.style.visibility = (viewId === HOME_VIEW_ID || viewId === GAME_VIEW_ID) ? 'hidden' : 'visible';
   const title = document.getElementById(PANEL_TITLE_ID);
   if (title) title.textContent = PANEL_VIEW_TITLES[viewId] || MODULE_DISPLAY_NAME;
   if (viewId === LOG_VIEW_ID) {
@@ -319,6 +319,13 @@ function showPanelView(viewId) {
     renderStoryTree();
     refreshHomeStoryStatus();
   }
+  if (viewId === VALUES_VIEW_ID) {
+    renderValuesTree();
+    refreshHomeValuesStatus();
+  }
+  if (viewId === GAME_VIEW_ID) {
+    renderGameView();
+  }
   ensurePanelPosition(panel);
 }
 
@@ -330,9 +337,14 @@ function initPanelViews(panel) {
     if (isNarrowViewport()) showPanelView(STORY_VIEW_ID);
     else openStoryWorkbench();
   });
-  document.getElementById(HOME_LOG_BUTTON_ID)?.addEventListener('click', () => showPanelView(LOG_VIEW_ID));
+  document.getElementById(HOME_GAME_BUTTON_ID)?.addEventListener('click', () => showPanelView(GAME_VIEW_ID));
   document.getElementById(HOME_PRESET_CARD_ID)?.addEventListener('click', () => showPanelView(PRESET_VIEW_ID));
   document.getElementById(HOME_INJECT_CARD_ID)?.addEventListener('click', () => showPanelView(INJECT_VIEW_ID));
+  document.getElementById(HOME_VALUES_CARD_ID)?.addEventListener('click', () => {
+    if (isNarrowViewport()) showPanelView(VALUES_VIEW_ID);
+    else openValuesWorkbench();
+  });
+  document.getElementById(HOME_LOG_CARD_ID)?.addEventListener('click', () => showPanelView(LOG_VIEW_ID));
   document.getElementById(INJECT_COPY_ID)?.addEventListener('click', copyInjectInjectionText);
   panel.dataset.viewsReady = 'true';
 }
@@ -357,41 +369,54 @@ function createPanel() {
         <section id="${HOME_VIEW_ID}" class="kaleido-view is-active" aria-hidden="false">
           <div class="kaleido-home__hero">
             <p class="kaleido-home__slogan"><span class="kaleido-home__slogan-first" aria-hidden="true">镜</span>中万象，皆是文章</p>
-            <button type="button" id="${HOME_LOG_BUTTON_ID}" class="kaleido-home__log-btn" title="系统日志：后台运行记录与网络请求" aria-label="系统日志">
-              <span class="${LOG_ICON_CLASS}"></span>
-              <span id="${HOME_LOG_BADGE_ID}" class="kaleido-home__log-badge" data-state="idle" hidden></span>
+            <button type="button" id="${HOME_GAME_BUTTON_ID}" class="kaleido-home__log-btn" title="游戏模式：玩家数据档案" aria-label="游戏模式">
+              <span class="${GAME_ICON_CLASS}"></span>
             </button>
           </div>
           <div class="kaleido-home__grid">
-            <button type="button" id="${HOME_API_CARD_ID}" class="kaleido-home__card" title="配置 AI 接口，引擎的基石">
+<button type="button" id="${HOME_API_CARD_ID}" class="kaleido-home__card" title="配置 AI 接口，引擎的基石">
               <span class="kaleido-home__card-icon"><span class="${API_ICON_CLASS}"></span></span>
               <span class="kaleido-home__card-text">
                 <span class="kaleido-home__card-title">API 连接</span>
                 <span id="${HOME_API_STATUS_ID}" class="kaleido-home__card-status" data-state="idle">尚未连接</span>
               </span>
             </button>
-            <button type="button" id="${HOME_STORY_CARD_ID}" class="kaleido-home__card" title="剧情脉络：节点与事件的工作台">
-              <span class="kaleido-home__card-icon"><span class="${STORY_ICON_CLASS}"></span></span>
-              <span class="kaleido-home__card-text">
-                <span class="kaleido-home__card-title">剧情脉络</span>
-                <span id="${HOME_STORY_STATUS_ID}" class="kaleido-home__card-status" data-state="idle">尚未添加</span>
-              </span>
-            </button>
-            <button type="button" id="${HOME_PRESET_CARD_ID}" class="kaleido-home__card" title="预设模版：修改与重置默认提示词">
+<button type="button" id="${HOME_PRESET_CARD_ID}" class="kaleido-home__card" title="预设模版：修改与重置默认提示词">
               <span class="kaleido-home__card-icon"><span class="${PRESET_ICON_CLASS}"></span></span>
               <span class="kaleido-home__card-text">
                 <span class="kaleido-home__card-title">预设模版</span>
                 <span id="${HOME_PRESET_STATUS_ID}" class="kaleido-home__card-status" data-state="idle">默认配置</span>
               </span>
             </button>
-            <button type="button" id="${HOME_INJECT_CARD_ID}" class="kaleido-home__card" title="剧情预筛：点击发送时自动挑选并注入本轮事件">
+<button type="button" id="${HOME_VALUES_CARD_ID}" class="kaleido-home__card" title="变量系统：变量注册 + 默认值 / 游戏值，AI 自动维护">
+              <span class="kaleido-home__card-icon"><span class="${VALUES_ICON_CLASS}"></span></span>
+              <span class="kaleido-home__card-text">
+                <span class="kaleido-home__card-title">变量系统</span>
+                <span id="${HOME_VALUES_STATUS_ID}" class="kaleido-home__card-status" data-state="idle">尚未添加</span>
+              </span>
+            </button>
+<button type="button" id="${HOME_STORY_CARD_ID}" class="kaleido-home__card" title="剧情脉络：节点与事件的工作台">
+              <span class="kaleido-home__card-icon"><span class="${STORY_ICON_CLASS}"></span></span>
+              <span class="kaleido-home__card-text">
+                <span class="kaleido-home__card-title">剧情脉络</span>
+                <span id="${HOME_STORY_STATUS_ID}" class="kaleido-home__card-status" data-state="idle">尚未添加</span>
+              </span>
+            </button>
+<button type="button" id="${HOME_LOG_CARD_ID}" class="kaleido-home__card" title="系统日志：后台运行记录与网络请求">
+              <span class="kaleido-home__card-icon"><span class="${LOG_ICON_CLASS}"></span></span>
+              <span class="kaleido-home__card-text">
+                <span class="kaleido-home__card-title">系统日志</span>
+                <span id="${HOME_LOG_STATUS_ID}" class="kaleido-home__card-status" data-state="idle">暂无记录</span>
+              </span>
+            </button>
+<button type="button" id="${HOME_INJECT_CARD_ID}" class="kaleido-home__card" title="剧情预筛：点击发送时自动挑选并注入本轮事件">
               <span class="kaleido-home__card-icon"><span class="${INJECT_ICON_CLASS}"></span></span>
               <span class="kaleido-home__card-text">
                 <span class="kaleido-home__card-title">注入实录</span>
                 <span id="${HOME_INJECT_STATUS_ID}" class="kaleido-home__card-status" data-state="idle">尚未运行</span>
               </span>
             </button>
-          </div>
+</div>
         </section>
         <section id="${API_VIEW_ID}" class="kaleido-view" aria-hidden="true">
           <div class="kaleido-api">
@@ -503,6 +528,28 @@ function createPanel() {
                 <button type="button" id="${PRESET_GATE_TOGGLE_ID}" class="kaleido-btn kaleido-api__concurrency-toggle" title="开启/关闭剧情预筛">🎬 剧情预筛：开</button>
               </div>
             </div>
+            <div class="kaleido-preset__gate">
+              <div class="kaleido-preset__gate-head">
+                <span class="kaleido-preset__gate-title">变量自动维护</span>
+                <span id="${PRESET_VALUES_STATUS_ID}" class="kaleido-preset__status" data-state="idle">未启用</span>
+              </div>
+              <p class="kaleido-preset__gate-hint">每轮生成结束后，自动调用 AI 依据「已注册变量的变化规则 + 当前游戏值 + 最新 2 条消息」维护聊天中的游戏值（存聊天文件）。</p>
+              <div class="kaleido-preset__gate-row">
+                <span class="kaleido-preset__gate-label">启用变量自动维护</span>
+                <button type="button" id="${PRESET_VALUES_TOGGLE_ID}" class="kaleido-btn kaleido-api__concurrency-toggle" title="开启/关闭变量自动维护">✨ 变量自动维护：开</button>
+              </div>
+            </div>
+            <div class="kaleido-preset__gate">
+              <div class="kaleido-preset__gate-head">
+                <span class="kaleido-preset__gate-title">剧情触发</span>
+                <span id="${PRESET_TRIGGER_STATUS_ID}" class="kaleido-preset__status" data-state="idle">未启用</span>
+              </div>
+              <p class="kaleido-preset__gate-hint">不依赖 AI 判断：每次发送前按「某节点下变量的当前值」是否满足预设条件，确定性触发对应剧情事件并注入上下文（条件与事件在变量工作台「剧情触发」页配置）。</p>
+              <div class="kaleido-preset__gate-row">
+                <span class="kaleido-preset__gate-label">启用剧情触发</span>
+                <button type="button" id="${PRESET_TRIGGER_TOGGLE_ID}" class="kaleido-btn kaleido-api__concurrency-toggle" title="开启/关闭剧情触发">⚡ 剧情触发：开</button>
+              </div>
+            </div>
             <p class="kaleido-preset__note">各子系统提示词按标签页切换编辑，改完点「💾 保存」；「↺ 恢复默认」可还原出厂内容。</p>
             <div id="${PRESET_TABS_ID}" class="kaleido-preset__tabs" role="tablist" aria-label="选择要编辑的提示词">
               ${Object.entries(PRESET_META).map(([key, meta]) => `
@@ -540,6 +587,12 @@ function createPanel() {
               <button type="button" id="${INJECT_COPY_ID}" class="kaleido-btn kaleido-btn--ghost kaleido-inject__copy">⧉ 复制</button>
             </div>
             <pre id="${INJECT_TEXT_ID}" class="kaleido-inject__inject-text" hidden></pre>
+            <div class="kaleido-inject__trigger-head" hidden>
+              <span class="kaleido-panel__section-title">剧情触发（变量条件）</span>
+            </div>
+            <div id="${INJECT_TRIGGER_SUMMARY_ID}" class="kaleido-inject__summary" hidden></div>
+            <div id="${INJECT_TRIGGER_EVENTS_ID}" class="kaleido-inject__events" hidden></div>
+            <pre id="${INJECT_TRIGGER_TEXT_ID}" class="kaleido-inject__inject-text" hidden></pre>
           </div>
         </section>
       </div>
@@ -554,6 +607,8 @@ function createPanel() {
   initPanelViews(panel);
   initApiSection(panel);
   initStorySection(panel);
+  initValuesSection(panel);
+  initGameSection(panel);
   initLogView(panel);
   initPresetSection(panel);
   panel.querySelector('.kaleido-panel__close')?.addEventListener('click', closePanel);
@@ -562,7 +617,7 @@ function createPanel() {
       if (event.key !== 'Escape') return;
       if (isStoryWorkbenchOpen()) return;
       const activeView = panel.querySelector('.kaleido-view.is-active');
-      if (activeView && activeView.id !== HOME_VIEW_ID) {
+      if (activeView && activeView.id !== HOME_VIEW_ID && activeView.id !== GAME_VIEW_ID) {
         showPanelView(HOME_VIEW_ID);
         return;
       }
