@@ -3062,11 +3062,8 @@ select.kaleido-input {
   align-self: center;
 }
 
-/* ---------- 游戏模式：玩家档案 · 数值总览 ---------- */
-.kaleido-panel__dialog.is-game-mode {
-  width: 540px;
-}
-
+/* ---------- 游戏模式：玩家档案 · 数值总览 ----------
+   面板内视图，宽度与首页一致（默认 372px，不再加宽）。 */
 .kaleido-game {
   display: flex;
   flex-direction: column;
@@ -3357,6 +3354,11 @@ select.kaleido-input {
     flex: 1;
     justify-content: center;
     padding: 8px 6px;
+  }
+
+  /* 手机端：导航项隐藏图标（如「变量注册」前的 🔑），只留文字标签，节省横向空间 */
+  .kaleido-values__nav-item .kaleido-values__nav-icon {
+    display: none;
   }
 
   .kaleido-values__nav-expand {

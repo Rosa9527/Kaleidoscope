@@ -65,4 +65,10 @@ assert(/\.kaleido-story-view\s*\{[^}]*flex-direction:\s*column/.test(style), 'st
 assert(/\.kaleido-panel__dialog\.is-story-mode\s*\{\s*width:\s*540px/.test(style), 'style.css 应有 is-story-mode 540px 宽视图');
 assert(/\.kaleido-story__editor\s*\{/.test(style), 'style.css 应有视图内编辑器样式');
 
+// 手机端变量系统导航：隐藏导航项图标（如「变量注册」前的钥匙图标），只留文字标签。
+assert(
+  /@media \(max-width: 640px\)[\s\S]*?\.kaleido-values__nav-item \.kaleido-values__nav-icon\s*\{\s*display:\s*none;?\s*\}/.test(style),
+  'style.css 手机端应隐藏变量系统导航项图标',
+);
+
 console.log('移动端面板定位静态检查通过');

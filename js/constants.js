@@ -1,7 +1,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '0.13.3';
+const MODULE_VERSION = '1.0.0';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 
 // ---------- DOM ID / class ----------
@@ -565,13 +565,13 @@ const PANEL_VIEW_TITLES = Object.freeze({
   [GAME_VIEW_ID]: '游戏模式',
 });
 // 宽视图模式：日志视图需要更宽的窗口展示时间/级别/来源/内容。
+// 游戏模式是面板内视图（与首页一致），不需要加宽。
 const PANEL_WIDE_MODES = Object.freeze({
   [LOG_VIEW_ID]: 'is-log-mode',
   [PRESET_VIEW_ID]: 'is-preset-mode',
   [INJECT_VIEW_ID]: 'is-inject-mode',
   [STORY_VIEW_ID]: 'is-story-mode',
   [VALUES_VIEW_ID]: 'is-values-mode',
-  [GAME_VIEW_ID]: 'is-game-mode',
 });
 const ESC_KEY_HANDLER_KEY = '__kaleido_esc_key_handler__';
 const MENU_RECOVERY_OBSERVER_KEY = '__kaleido_menu_recovery_observer__';
