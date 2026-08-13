@@ -103,6 +103,9 @@ function pushLogEntry(level, source, args, detail) {
         && NETWORK_NOISE_PATTERNS.some((pattern) => pattern.test(entry.message))) return;
       // 宿主扩展更新检查的已知报错（error 级，见 constants 注释）：按内容精确匹配，不误伤其他 error。
       if (ERROR_NOISE_PATTERNS.some((pattern) => pattern.test(entry.message))) return;
+      // 第三方扩展的弃用 API 警告（[DEPRECATED] 开头，warn 级，见 constants 注释）：
+      // 他方代码的未来兼容性提示，不干预其他扩展，按内容精确匹配成噪音。
+      if (CONSOLE_NOISE_PATTERNS.some((pattern) => pattern.test(entry.message))) return;
     }
     // 连续重复折叠：同一级别/来源/内容紧挨着出现时，只更新最后一条的计数与时间
     const last = logEntries[logEntries.length - 1];
@@ -645,7 +648,7 @@ function initLogView(panel) {
   noiseToggle?.addEventListener('click', () => {
     logConsoleNoise = !logConsoleNoise;
     noiseToggle.classList.toggle('is-active', logConsoleNoise);
-    noiseToggle.title = logConsoleNoise ? '过滤已知噪音（世界书扫描 / 宏变量 dump / 正则跳过 / 事件总线 / 内部保存 / 非模型网络调用 / 宿主扩展更新检查报错）' : '不过滤噪音（显示全部 console 与网络日志）';
+    noiseToggle.title = logConsoleNoise ? '过滤已知噪音（世界书扫描 / 宏变量 dump / 正则跳过 / 事件总线 / 内部保存 / 非模型网络调用 / 宿主扩展更新检查报错 / 第三方扩展弃用 API 警告）' : '不过滤噪音（显示全部 console 与网络日志）';
     renderLogList();
     updateLogStats();
   });

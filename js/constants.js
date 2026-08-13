@@ -1,7 +1,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.0.1';
+const MODULE_VERSION = '1.0.2';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 
 // ---------- DOM ID / class ----------
@@ -418,6 +418,13 @@ const ERROR_NOISE_PATTERNS = Object.freeze([
   /Authenticated Git remote URLs are not supported/,
   /Failed to get extension version/,
   /\/api\/extensions\/version/,
+]);
+// 第三方扩展的弃用 API 警告（console warn，[DEPRECATED] 开头）：属他方代码的
+// 未来兼容性提示，万华镜不干预其他扩展，统一按噪音过滤。内容匹配、不分级别，
+// 只认该前缀，不误伤其他 warn/error。已知实例：JS-Slash-Runner 用旧 API
+// MacrosParser.registerMacro 注册 userAvatarPath / charAvatarPath 宏。
+const CONSOLE_NOISE_PATTERNS = Object.freeze([
+  /^\[DEPRECATED\]/i,
 ]);
 const LOG_LEVELS = Object.freeze(['debug', 'info', 'warn', 'error']);
 const HOST_EVENTS_TO_LOG = Object.freeze([
