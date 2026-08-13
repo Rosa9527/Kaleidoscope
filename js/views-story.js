@@ -412,7 +412,7 @@ function handleStoryEditorExport() {
 }
 
 // ---------- 删除 ----------
-function handleStoryDeleteNode(ctx, id) {
+async function handleStoryDeleteNode(ctx, id) {
   const node = getStoryNodeById(ctx, id);
   if (!node) return;
   const children = getStoryNodeChildren(ctx, id);
@@ -421,7 +421,7 @@ function handleStoryDeleteNode(ctx, id) {
   if (children.length > 0) parts.push(`${children.length} 个子节点将上移`);
   if (scripts.length > 0) parts.push(`${scripts.length} 个事件将转为未分类`);
   const suffix = parts.length > 0 ? `（${parts.join('，')}，均不会删除）` : '';
-  if (!globalThis.confirm?.(`确定删除节点「${node.name}」？${suffix}`)) return;
+  if (!(await kaleidoConfirm(`确定删除节点「${node.name}」？${suffix}`))) return;
   const result = deleteStoryNode(ctx, id);
   if (!result) return;
   renderStoryTree();
@@ -434,10 +434,10 @@ function handleStoryDeleteNode(ctx, id) {
   storyToastr('success', message);
 }
 
-function handleStoryDeleteScript(ctx, id) {
+async function handleStoryDeleteScript(ctx, id) {
   const script = getStoryScriptById(ctx, id);
   if (!script) return;
-  if (!globalThis.confirm?.(`确定删除事件「${script.name}」？`)) return;
+  if (!(await kaleidoConfirm(`确定删除事件「${script.name}」？`))) return;
   deleteStoryScript(ctx, id);
   renderStoryTree();
   refreshHomeStoryStatus();

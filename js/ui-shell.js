@@ -615,6 +615,11 @@ function createPanel() {
   if (!globalThis[ESC_KEY_HANDLER_KEY]) {
     globalThis[ESC_KEY_HANDLER_KEY] = (event) => {
       if (event.key !== 'Escape') return;
+      // 确认弹层优先：开着时 Esc 只取消确认，不关面板。
+      if (isKaleidoConfirmOpen()) {
+        settleKaleidoConfirm(false);
+        return;
+      }
       if (isStoryWorkbenchOpen()) return;
       const activeView = panel.querySelector('.kaleido-view.is-active');
       if (activeView && activeView.id !== HOME_VIEW_ID && activeView.id !== GAME_VIEW_ID) {
@@ -626,4 +631,60 @@ function createPanel() {
     document.addEventListener('keydown', globalThis[ESC_KEY_HANDLER_KEY]);
   }
   return panel;
+}
+
+// ---------- 确认弹层 ----------
+// TauriTavern 的 WebView 会把原生 window.confirm 拦截为 plugin:dialog|confirm 命令，
+// 但宿主 ACL 未放行该命令，调用会 Promise reject 并打印
+// 「Command plugin:dialog|confirm not allowed by ACL」。因此自绘确认弹层，
+// 破坏性操作统一用 await kaleidoConfirm(...) 确认，避免误删也避免未处理拒绝。
+const KALEIDO_CONFIRM_ID = 'kaleido-confirm-overlay';
+let kaleidoConfirmResolve = null;
+
+function isKaleidoConfirmOpen() {
+  const overlay = document.getElementById(KALEIDO_CONFIRM_ID);
+  return Boolean(overlay && overlay.classList.contains('is-open'));
+}
+
+function settleKaleidoConfirm(result) {
+  const resolve = kaleidoConfirmResolve;
+  kaleidoConfirmResolve = null;
+  const overlay = document.getElementById(KALEIDO_CONFIRM_ID);
+  if (overlay) overlay.classList.remove('is-open');
+  resolve?.(result);
+}
+
+function getKaleidoConfirmOverlay() {
+  let overlay = document.getElementById(KALEIDO_CONFIRM_ID);
+  if (overlay) return overlay;
+  overlay = document.createElement('div');
+  overlay.id = KALEIDO_CONFIRM_ID;
+  overlay.className = 'kaleido-confirm';
+  overlay.innerHTML = `
+    <div class="kaleido-confirm__card" role="alertdialog" aria-modal="true" aria-label="确认操作">
+      <p class="kaleido-confirm__message"></p>
+      <div class="kaleido-confirm__actions">
+        <button type="button" class="kaleido-confirm__cancel">取消</button>
+        <button type="button" class="kaleido-btn kaleido-confirm__ok">确定</button>
+      </div>
+    </div>
+  `;
+  overlay.querySelector('.kaleido-confirm__cancel')?.addEventListener('click', () => settleKaleidoConfirm(false));
+  overlay.querySelector('.kaleido-confirm__ok')?.addEventListener('click', () => settleKaleidoConfirm(true));
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+// 自绘确认：返回 Promise<boolean>，await 后为 true 表示用户点了「确定」。
+// 同一时刻只允许一个待确认弹层，新的会以「取消」结掉旧的。
+function kaleidoConfirm(message) {
+  if (kaleidoConfirmResolve) settleKaleidoConfirm(false);
+  const overlay = getKaleidoConfirmOverlay();
+  overlay.querySelector('.kaleido-confirm__message').textContent = message;
+  overlay.classList.add('is-open');
+  const okButton = overlay.querySelector('.kaleido-confirm__ok');
+  setTimeout(() => okButton?.focus?.(), 0);
+  return new Promise((resolve) => {
+    kaleidoConfirmResolve = resolve;
+  });
 }

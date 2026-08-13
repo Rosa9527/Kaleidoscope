@@ -9,7 +9,6 @@ const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
 });
 
 const toasts = [];
-const confirms = [];
 const quietConsole = {
   log() {}, info() {}, debug() {},
   warn(...args) { console.warn(...args); },
@@ -33,7 +32,6 @@ const sandbox = {
     createObjectURL: () => 'blob:mock',
     revokeObjectURL: () => {},
   }),
-  confirm: (message) => { confirms.push(String(message)); return true; },
   toastr: {
     success: (msg) => toasts.push(['success', msg]),
     info: (msg) => toasts.push(['info', msg]),
@@ -58,6 +56,22 @@ function dblclick(el) {
 
 async function flush() {
   await new Promise((resolve) => setTimeout(resolve, 10));
+}
+
+// 自绘确认弹层（kaleidoConfirm）辅助：宿主拦截原生 confirm，测试改为点击弹层按钮。
+function confirmOverlay() {
+  const overlay = $('kaleido-confirm-overlay');
+  return overlay && overlay.classList.contains('is-open') ? overlay : null;
+}
+
+function confirmMessage() {
+  return confirmOverlay()?.querySelector('.kaleido-confirm__message').textContent || '';
+}
+
+function clickConfirmOk() {
+  const overlay = confirmOverlay();
+  assert(overlay, '确认弹层应已打开');
+  click(overlay.querySelector('.kaleido-confirm__ok'));
 }
 
 function clearToasts() { toasts.length = 0; }
@@ -466,7 +480,6 @@ runner.test('整包导出文件名使用角色卡名', () => {
 
 runner.test('整包导入识别格式标记并提示来源角色卡', async () => {
   const beforeNodes = ui.getStoryNodes(hostCtx).length;
-  confirms.length = 0;
   const yaml = [
     'format: kaleidoscope-story',
     'version: 1',
@@ -488,24 +501,30 @@ runner.test('整包导入识别格式标记并提示来源角色卡', async () =
 });
 
 // ---------- 删除 ----------
-runner.test('删除事件', () => {
+runner.test('删除事件', async () => {
   const before = ui.getStoryScripts(hostCtx).length;
   const row = rowByName('山间古道');
   click(actionButton(row, 'delete-script'));
+  assert(confirmMessage().includes('确定删除事件「山间古道」'), '删除事件应先弹确认');
+  clickConfirmOk();
+  await flush();
   assert(ui.getStoryScripts(hostCtx).length === before - 1, '事件应已删除');
   assert(!rowNames().includes('山间古道'), '树不应再显示该事件');
 });
 
-runner.test('删除节点：其下事件转未分类', () => {
+runner.test('删除节点：其下事件转未分类', async () => {
   const vol1 = ui.getStoryRootNodes(hostCtx).find((n) => n.name === '第一卷');
   const ch1Node = ui.getStoryNodeChildren(hostCtx, vol1.id)[0];
   click(actionButton(rowByName('第一章'), 'delete'));
+  const message = confirmMessage();
+  assert(message.includes('确定删除节点「第一章」') && message.includes('1 个事件将转为未分类'), '删除节点应询问确认并说明影响');
+  clickConfirmOk();
+  await flush();
   assert(ui.getStoryNodeById(hostCtx, ch1Node.id) === null, '第一章应已删除');
   assert(ui.getStoryNodeById(hostCtx, vol1.id) !== null, '第一卷应保留');
   assert(ui.getStoryNodeChildren(hostCtx, vol1.id).length === 0, '第一卷下应无子节点');
   const rain = ui.getStoryScripts(hostCtx).find((s) => s.name === '雨夜事件（修订）');
   assert(rain && rain.nodeId === '', '雨夜事件应转未分类');
-  assert(confirms.some((msg) => msg.includes('确定删除节点「第一章」') && msg.includes('1 个事件将转为未分类')), '删除节点应询问确认并说明影响');
 });
 
 // ---------- 未分类分组 ----------
@@ -605,9 +624,11 @@ runner.test('编辑后保存写入设置', () => {
   assert($('kaleido-home-preset-status').textContent === '已自定义 1 份', '首页卡片状态应显示已自定义');
 });
 
-runner.test('恢复默认还原出厂内容', () => {
+runner.test('恢复默认还原出厂内容', async () => {
   click($('kaleido-preset-reset'));
-  assert(confirms.some((msg) => msg.includes('恢复为默认内容')), '恢复默认前应询问确认');
+  assert(confirmMessage().includes('恢复为默认内容'), '恢复默认前应询问确认');
+  clickConfirmOk();
+  await flush();
   const textarea = $('kaleido-preset-text');
   assert(textarea.value === presetDefaultText, '编辑区应还原为默认提示词');
   assert(ui.getSettings(hostCtx).storyGatePrompt === '', '设置应清空回退默认');

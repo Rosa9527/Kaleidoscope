@@ -7,7 +7,8 @@
 .kaleido-sphere,
 .kaleido-panel,
 .kaleido-story-dialog,
-.kaleido-values-dialog {
+.kaleido-values-dialog,
+.kaleido-confirm {
   --k-ink: #3b332a;
   --k-ink-soft: rgba(59, 51, 42, 0.45);
   --k-paper: #f7f1e3;
@@ -170,6 +171,70 @@
 
 .kaleido-panel__dialog.is-dragging {
   cursor: grabbing;
+}
+
+/* ---------- 确认弹层（宿主拦截原生 confirm，自绘替代） ---------- */
+.kaleido-confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(36, 28, 18, 0.48);
+}
+
+.kaleido-confirm.is-open {
+  display: flex;
+}
+
+.kaleido-confirm__card {
+  width: 320px;
+  max-width: calc(100vw - 48px);
+  padding: 22px 24px 18px;
+  color: var(--k-ink);
+  background: var(--k-paper);
+  border: 1.5px solid rgba(59, 51, 42, 0.8);
+  border-radius: 8px;
+  box-shadow:
+    0 10px 28px rgba(59, 51, 42, 0.35),
+    0 0 0 1px rgba(184, 134, 47, 0.35);
+}
+
+.kaleido-confirm__message {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.8;
+  white-space: pre-line;
+  text-align: center;
+  word-break: break-word;
+}
+
+.kaleido-confirm__actions {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.kaleido-confirm__cancel {
+  padding: 7px 18px;
+  font-family: var(--k-font);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--k-ink);
+  background: var(--k-paper-light);
+  border: 1.5px solid rgba(59, 51, 42, 0.35);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, filter 0.2s ease;
+}
+
+.kaleido-confirm__cancel:hover {
+  border-color: var(--k-cinnabar);
+  filter: brightness(0.98);
 }
 
 /* 标题栏：墨色横批 + 鎏金底边 */

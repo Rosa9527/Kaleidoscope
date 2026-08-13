@@ -9,7 +9,6 @@ const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
 });
 
 const toasts = [];
-const confirms = [];
 const quietConsole = {
   log() {}, info() {}, debug() {},
   warn(...args) { console.warn(...args); },
@@ -35,7 +34,6 @@ const sandbox = {
     createObjectURL: () => 'blob:mock',
     revokeObjectURL: () => {},
   }),
-  confirm: (message) => { confirms.push(String(message)); return true; },
   toastr: {
     success: (msg) => toasts.push(['success', msg]),
     info: (msg) => toasts.push(['info', msg]),
@@ -56,6 +54,22 @@ function click(el) {
 
 async function flush() {
   await new Promise((resolve) => setTimeout(resolve, 10));
+}
+
+// 自绘确认弹层（kaleidoConfirm）辅助：宿主拦截原生 confirm，测试改为点击弹层按钮。
+function confirmOverlay() {
+  const overlay = $('kaleido-confirm-overlay');
+  return overlay && overlay.classList.contains('is-open') ? overlay : null;
+}
+
+function confirmMessage() {
+  return confirmOverlay()?.querySelector('.kaleido-confirm__message').textContent || '';
+}
+
+function clickConfirmOk() {
+  const overlay = confirmOverlay();
+  assert(overlay, '确认弹层应已打开');
+  click(overlay.querySelector('.kaleido-confirm__ok'));
 }
 
 function setValue(id, value) {
@@ -301,9 +315,14 @@ runner.test('新建节点：张三 → 节点下新建键', () => {
   const injectConfig = ui.getValuesInjectConfig(hostCtx);
   assert(injectConfig.paths.includes('张三/好感'), '节点下新建变量应默认开启注入');
   assert(injectConfig.paths.includes('张三'), '打开下级应自动提升上级');
-  // 展开张三
+  // 新建节点默认展开：无需手动点击即可看到子键（顶层也有同名 好感，须按路径区分）
+  const childVisible = () => treeRows().some((r) => JSON.parse(r.dataset.path || '[]').join('/') === '张三/好感');
+  assert(childVisible(), '新建节点默认展开，应直接显示子键');
+  // 收起 / 再展开
   click(actionButton(rowByName('张三'), 'toggle'));
-  assert(rowNames().includes('好感'), '展开后应显示子键');
+  assert(!childVisible(), '收起后应隐藏子键');
+  click(actionButton(rowByName('张三'), 'toggle'));
+  assert(childVisible(), '再次展开后应显示子键');
 });
 
 // ---------- 编辑键：键名只读 ----------
@@ -366,16 +385,21 @@ runner.test('游戏值层：注册金钱后新建键写入 chatMetadata', () => 
 });
 
 // ---------- 删除 ----------
-runner.test('删除条目：确认后从当前层移除', () => {
+runner.test('删除条目：确认后从当前层移除', async () => {
   click($('kaleido-values-layer-game'));
   const moneyRow = rowByName('金钱');
   click(actionButton(moneyRow, 'delete'));
+  assert(confirmMessage().includes('确定删除变量「金钱」'), '删除变量应先弹确认');
+  clickConfirmOk();
+  await flush();
   assert(hostCtx.chatMetadata.kaleidoscope_values.values['金钱'] === undefined, '游戏值层应删除金钱');
   click($('kaleido-values-layer-default'));
   const zhangRow = rowByName('张三');
   click(actionButton(zhangRow, 'delete'));
+  assert(confirmMessage().includes('确定删除节点「张三」'), '删除节点应先弹确认');
+  clickConfirmOk();
+  await flush();
   assert(ui.getValuesDefaults(hostCtx)['张三'] === undefined, '默认值层应删除张三');
-  assert(confirms.length > 0, '删除应弹确认');
 });
 
 // ---------- 空树新建节点 ----------
@@ -406,7 +430,7 @@ runner.test('层联动：默认值层隐藏维护与重置，游戏值层显示'
 });
 
 // ---------- 游戏值重置为默认值 ----------
-runner.test('游戏值重置：点击重置按钮恢复为默认值并写入聊天文件', () => {
+runner.test('游戏值重置：点击重置按钮恢复为默认值并写入聊天文件', async () => {
   const defaults = ui.getValuesDefaults(hostCtx);
   defaults['好感'] = 30;
   ui.saveValuesData(hostCtx);
@@ -417,9 +441,10 @@ runner.test('游戏值重置：点击重置按钮恢复为默认值并写入聊�
     lastSignature: 'old-sig',
   };
   click($('kaleido-values-layer-game'));
-  const before = confirms.length;
   click($('kaleido-values-reset-game'));
-  assert(confirms.length === before + 1, '重置应弹确认');
+  assert(confirmMessage().includes('重置为默认值'), '重置应弹确认');
+  clickConfirmOk();
+  await flush();
   const state = hostCtx.chatMetadata.kaleidoscope_values;
   assert(state.values['好感'] === 30, '游戏值应重置为默认值 30');
   assert(state.lastSignature === '', '重置后应清空 lastSignature');
@@ -652,7 +677,7 @@ runner.test('剧情触发：新建触发（名称 / 逻辑 / 条件 / 正文）'
   assert(triggerRows()[0].querySelector('.kaleido-values__row-trigger-type').textContent === '常驻', '应显示常驻徽标');
 });
 
-runner.test('剧情触发：启停滑块与删除', () => {
+runner.test('剧情触发：启停滑块与删除', async () => {
   const triggers = ui.getValuesTriggers(hostCtx);
   assert(triggers.length === 1, '前置：应有 1 个触发');
   openTriggersTab();
@@ -665,6 +690,9 @@ runner.test('剧情触发：启停滑块与删除', () => {
   assert(ui.getValuesTriggerById(hostCtx, triggers[0].id).enabled === true, '再点应激活');
   row = triggerRows()[0];
   click(row.querySelector('[data-action="delete-trigger"]'));
+  assert(confirmMessage().includes('确定删除剧情触发'), '删除触发应先弹确认');
+  clickConfirmOk();
+  await flush();
   assert(ui.getValuesTriggers(hostCtx).length === 0, '删除后应为空');
   assert(triggerRows().length === 0, '列表应清空');
 });

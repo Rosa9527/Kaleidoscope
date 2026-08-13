@@ -2,7 +2,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.0.2';
+const MODULE_VERSION = '1.0.4';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 
 // ---------- DOM ID / class ----------
@@ -1983,6 +1983,11 @@ function createPanel() {
   if (!globalThis[ESC_KEY_HANDLER_KEY]) {
     globalThis[ESC_KEY_HANDLER_KEY] = (event) => {
       if (event.key !== 'Escape') return;
+      // 确认弹层优先：开着时 Esc 只取消确认，不关面板。
+      if (isKaleidoConfirmOpen()) {
+        settleKaleidoConfirm(false);
+        return;
+      }
       if (isStoryWorkbenchOpen()) return;
       const activeView = panel.querySelector('.kaleido-view.is-active');
       if (activeView && activeView.id !== HOME_VIEW_ID && activeView.id !== GAME_VIEW_ID) {
@@ -1994,6 +1999,62 @@ function createPanel() {
     document.addEventListener('keydown', globalThis[ESC_KEY_HANDLER_KEY]);
   }
   return panel;
+}
+
+// ---------- 确认弹层 ----------
+// TauriTavern 的 WebView 会把原生 window.confirm 拦截为 plugin:dialog|confirm 命令，
+// 但宿主 ACL 未放行该命令，调用会 Promise reject 并打印
+// 「Command plugin:dialog|confirm not allowed by ACL」。因此自绘确认弹层，
+// 破坏性操作统一用 await kaleidoConfirm(...) 确认，避免误删也避免未处理拒绝。
+const KALEIDO_CONFIRM_ID = 'kaleido-confirm-overlay';
+let kaleidoConfirmResolve = null;
+
+function isKaleidoConfirmOpen() {
+  const overlay = document.getElementById(KALEIDO_CONFIRM_ID);
+  return Boolean(overlay && overlay.classList.contains('is-open'));
+}
+
+function settleKaleidoConfirm(result) {
+  const resolve = kaleidoConfirmResolve;
+  kaleidoConfirmResolve = null;
+  const overlay = document.getElementById(KALEIDO_CONFIRM_ID);
+  if (overlay) overlay.classList.remove('is-open');
+  resolve?.(result);
+}
+
+function getKaleidoConfirmOverlay() {
+  let overlay = document.getElementById(KALEIDO_CONFIRM_ID);
+  if (overlay) return overlay;
+  overlay = document.createElement('div');
+  overlay.id = KALEIDO_CONFIRM_ID;
+  overlay.className = 'kaleido-confirm';
+  overlay.innerHTML = `
+    <div class="kaleido-confirm__card" role="alertdialog" aria-modal="true" aria-label="确认操作">
+      <p class="kaleido-confirm__message"></p>
+      <div class="kaleido-confirm__actions">
+        <button type="button" class="kaleido-confirm__cancel">取消</button>
+        <button type="button" class="kaleido-btn kaleido-confirm__ok">确定</button>
+      </div>
+    </div>
+  `;
+  overlay.querySelector('.kaleido-confirm__cancel')?.addEventListener('click', () => settleKaleidoConfirm(false));
+  overlay.querySelector('.kaleido-confirm__ok')?.addEventListener('click', () => settleKaleidoConfirm(true));
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+// 自绘确认：返回 Promise<boolean>，await 后为 true 表示用户点了「确定」。
+// 同一时刻只允许一个待确认弹层，新的会以「取消」结掉旧的。
+function kaleidoConfirm(message) {
+  if (kaleidoConfirmResolve) settleKaleidoConfirm(false);
+  const overlay = getKaleidoConfirmOverlay();
+  overlay.querySelector('.kaleido-confirm__message').textContent = message;
+  overlay.classList.add('is-open');
+  const okButton = overlay.querySelector('.kaleido-confirm__ok');
+  setTimeout(() => okButton?.focus?.(), 0);
+  return new Promise((resolve) => {
+    kaleidoConfirmResolve = resolve;
+  });
 }
 
 
@@ -3266,8 +3327,7 @@ async function resetPreset(key) {
   const text = getPresetEditorText();
   if (dirty || text !== getPresetDefaultText(key)) {
     const what = dirty ? '未保存的修改' : '已保存的自定义内容';
-    const confirmed = globalThis.confirm?.(`将「${meta.title}」恢复为默认内容？当前${what}将被默认内容覆盖。`);
-    if (!confirmed) return;
+    if (!(await kaleidoConfirm(`将「${meta.title}」恢复为默认内容？当前${what}将被默认内容覆盖。`))) return;
   }
   const textarea = document.getElementById(PRESET_TEXT_ID);
   if (textarea) textarea.value = getPresetDefaultText(key);
@@ -5441,7 +5501,7 @@ function handleStoryEditorExport() {
 }
 
 // ---------- 删除 ----------
-function handleStoryDeleteNode(ctx, id) {
+async function handleStoryDeleteNode(ctx, id) {
   const node = getStoryNodeById(ctx, id);
   if (!node) return;
   const children = getStoryNodeChildren(ctx, id);
@@ -5450,7 +5510,7 @@ function handleStoryDeleteNode(ctx, id) {
   if (children.length > 0) parts.push(`${children.length} 个子节点将上移`);
   if (scripts.length > 0) parts.push(`${scripts.length} 个事件将转为未分类`);
   const suffix = parts.length > 0 ? `（${parts.join('，')}，均不会删除）` : '';
-  if (!globalThis.confirm?.(`确定删除节点「${node.name}」？${suffix}`)) return;
+  if (!(await kaleidoConfirm(`确定删除节点「${node.name}」？${suffix}`))) return;
   const result = deleteStoryNode(ctx, id);
   if (!result) return;
   renderStoryTree();
@@ -5463,10 +5523,10 @@ function handleStoryDeleteNode(ctx, id) {
   storyToastr('success', message);
 }
 
-function handleStoryDeleteScript(ctx, id) {
+async function handleStoryDeleteScript(ctx, id) {
   const script = getStoryScriptById(ctx, id);
   if (!script) return;
-  if (!globalThis.confirm?.(`确定删除事件「${script.name}」？`)) return;
+  if (!(await kaleidoConfirm(`确定删除事件「${script.name}」？`))) return;
   deleteStoryScript(ctx, id);
   renderStoryTree();
   refreshHomeStoryStatus();
@@ -8214,6 +8274,9 @@ function parseValuesEditorText(text) {
         return;
       }
       valuesSetAtPath(tree, parentPath.concat(name), {});
+      // 新建节点默认展开，方便继续往里挂条目；挂在子层时父节点一并展开以便看到新节点。
+      valuesExpanded.add(parentPath.concat(name).join('/'));
+      if (parentPath.length > 0) valuesExpanded.add(parentPath.join('/'));
     }
     logApp('info', valuesEditorPath ? '节点已更新' : '节点已添加', name, valuesActiveLayer);
     valuesToastr('success', valuesEditorPath ? '节点已保存' : '节点已添加');
@@ -8259,7 +8322,7 @@ function parseValuesEditorText(text) {
 }
 
 // 删除：节点带确认（连同子树）。
-function handleValuesDelete(path) {
+async function handleValuesDelete(path) {
   const ctx = getContextSafe();
   if (!ctx || !valuesActiveTree) return;
   const node = valuesGetAtPath(valuesActiveTree, path);
@@ -8272,7 +8335,7 @@ function handleValuesDelete(path) {
       ? `确定删除节点「${name}」吗？其下 ${childCount} 个子条目会一并删除。`
       : `确定删除节点「${name}」吗？`)
     : `确定删除变量「${name}」吗？`;
-  if (!globalThis.confirm(confirmText)) return;
+  if (!(await kaleidoConfirm(confirmText))) return;
   valuesDeleteAtPath(valuesActiveTree, path);
   saveValuesActiveTree(ctx, valuesActiveTree);
   logApp('info', isNode ? '节点已删除' : '变量已删除', name, valuesActiveLayer);
@@ -8678,7 +8741,7 @@ function saveValuesKeyEditor() {
   refreshHomeValuesStatus();
 }
 
-function handleValuesDeleteKey(name) {
+async function handleValuesDeleteKey(name) {
   const ctx = getContextSafe();
   if (!ctx) return;
   const dependents = getValuesChildKeysByParent(ctx, name);
@@ -8686,7 +8749,7 @@ function handleValuesDeleteKey(name) {
     valuesToastr('warning', `请先删除或改绑依赖它的子变量：${dependents.map((key) => key.name).join('、')}`);
     return;
   }
-  if (!globalThis.confirm(`确定删除已注册变量「${name}」吗？已存在的变量不会自动删除。`)) return;
+  if (!(await kaleidoConfirm(`确定删除已注册变量「${name}」吗？已存在的变量不会自动删除。`))) return;
   deleteValuesKey(ctx, name);
   logApp('info', '变量已删除', name);
   valuesToastr('success', `已删除变量「${name}」`);
@@ -8973,12 +9036,12 @@ function saveValuesTriggerEditor() {
   refreshHomeValuesStatus();
 }
 
-function handleValuesDeleteTrigger(id) {
+async function handleValuesDeleteTrigger(id) {
   const ctx = getContextSafe();
   if (!ctx) return;
   const trigger = getValuesTriggerById(ctx, id);
   if (!trigger) return;
-  if (!globalThis.confirm(`确定删除剧情触发「${trigger.name}」吗？`)) return;
+  if (!(await kaleidoConfirm(`确定删除剧情触发「${trigger.name}」吗？`))) return;
   deleteValuesTrigger(ctx, id);
   logApp('info', '剧情触发已删除', trigger.name);
   valuesToastr('success', '触发已删除');
@@ -9029,7 +9092,7 @@ function refreshValuesMaintainStatus() {
 }
 
 // 游戏值重置：把当前聊天的游戏值整体重置为角色卡默认值（写入聊天文件）。
-function handleValuesResetGame() {
+async function handleValuesResetGame() {
   const ctx = getContextSafe();
   if (!ctx) return;
   const defaults = getValuesDefaults(ctx);
@@ -9037,7 +9100,7 @@ function handleValuesResetGame() {
   const confirmText = count > 0
     ? `确定把游戏值重置为默认值吗？当前 ${count} 项游戏值会被默认值覆盖。`
     : '确定把游戏值重置为默认值吗？当前游戏值会被清空（默认值当前为空）。';
-  if (!globalThis.confirm(confirmText)) return;
+  if (!(await kaleidoConfirm(confirmText))) return;
   const saved = saveValuesChatState(ctx, cloneValue(defaults), { immediate: true });
   logApp('info', '游戏值已重置为默认值', `覆盖 ${count} 项`);
   valuesToastr('success', saved ? '游戏值已重置为默认值' : '游戏值已重置（写入聊天文件失败）');
@@ -9061,9 +9124,9 @@ async function handleValuesImportFile(file) {
   try {
     const text = await readTextFile(file);
     const parsed = parseValuesBundle(text);
-    if (!globalThis.confirm(
+    if (!(await kaleidoConfirm(
       '导入将更新变量注册表与默认值：\n- 同名变量更新变化规则，其余追加；\n- 默认值按路径合并，同名路径覆盖。\n继续？'
-    )) return;
+    ))) return;
     applyValuesBundle(ctx, parsed, 'merge');
     logApp('info', '变量包已导入', `变量 ${parsed.keys.length} 个`);
     valuesToastr('success', `已导入 ${parsed.keys.length} 个变量`);

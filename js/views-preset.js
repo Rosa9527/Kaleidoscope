@@ -201,8 +201,7 @@ async function resetPreset(key) {
   const text = getPresetEditorText();
   if (dirty || text !== getPresetDefaultText(key)) {
     const what = dirty ? '未保存的修改' : '已保存的自定义内容';
-    const confirmed = globalThis.confirm?.(`将「${meta.title}」恢复为默认内容？当前${what}将被默认内容覆盖。`);
-    if (!confirmed) return;
+    if (!(await kaleidoConfirm(`将「${meta.title}」恢复为默认内容？当前${what}将被默认内容覆盖。`))) return;
   }
   const textarea = document.getElementById(PRESET_TEXT_ID);
   if (textarea) textarea.value = getPresetDefaultText(key);

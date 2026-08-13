@@ -624,6 +624,9 @@ function parseValuesEditorText(text) {
         return;
       }
       valuesSetAtPath(tree, parentPath.concat(name), {});
+      // 新建节点默认展开，方便继续往里挂条目；挂在子层时父节点一并展开以便看到新节点。
+      valuesExpanded.add(parentPath.concat(name).join('/'));
+      if (parentPath.length > 0) valuesExpanded.add(parentPath.join('/'));
     }
     logApp('info', valuesEditorPath ? '节点已更新' : '节点已添加', name, valuesActiveLayer);
     valuesToastr('success', valuesEditorPath ? '节点已保存' : '节点已添加');
@@ -669,7 +672,7 @@ function parseValuesEditorText(text) {
 }
 
 // 删除：节点带确认（连同子树）。
-function handleValuesDelete(path) {
+async function handleValuesDelete(path) {
   const ctx = getContextSafe();
   if (!ctx || !valuesActiveTree) return;
   const node = valuesGetAtPath(valuesActiveTree, path);
@@ -682,7 +685,7 @@ function handleValuesDelete(path) {
       ? `确定删除节点「${name}」吗？其下 ${childCount} 个子条目会一并删除。`
       : `确定删除节点「${name}」吗？`)
     : `确定删除变量「${name}」吗？`;
-  if (!globalThis.confirm(confirmText)) return;
+  if (!(await kaleidoConfirm(confirmText))) return;
   valuesDeleteAtPath(valuesActiveTree, path);
   saveValuesActiveTree(ctx, valuesActiveTree);
   logApp('info', isNode ? '节点已删除' : '变量已删除', name, valuesActiveLayer);
@@ -1088,7 +1091,7 @@ function saveValuesKeyEditor() {
   refreshHomeValuesStatus();
 }
 
-function handleValuesDeleteKey(name) {
+async function handleValuesDeleteKey(name) {
   const ctx = getContextSafe();
   if (!ctx) return;
   const dependents = getValuesChildKeysByParent(ctx, name);
@@ -1096,7 +1099,7 @@ function handleValuesDeleteKey(name) {
     valuesToastr('warning', `请先删除或改绑依赖它的子变量：${dependents.map((key) => key.name).join('、')}`);
     return;
   }
-  if (!globalThis.confirm(`确定删除已注册变量「${name}」吗？已存在的变量不会自动删除。`)) return;
+  if (!(await kaleidoConfirm(`确定删除已注册变量「${name}」吗？已存在的变量不会自动删除。`))) return;
   deleteValuesKey(ctx, name);
   logApp('info', '变量已删除', name);
   valuesToastr('success', `已删除变量「${name}」`);
@@ -1383,12 +1386,12 @@ function saveValuesTriggerEditor() {
   refreshHomeValuesStatus();
 }
 
-function handleValuesDeleteTrigger(id) {
+async function handleValuesDeleteTrigger(id) {
   const ctx = getContextSafe();
   if (!ctx) return;
   const trigger = getValuesTriggerById(ctx, id);
   if (!trigger) return;
-  if (!globalThis.confirm(`确定删除剧情触发「${trigger.name}」吗？`)) return;
+  if (!(await kaleidoConfirm(`确定删除剧情触发「${trigger.name}」吗？`))) return;
   deleteValuesTrigger(ctx, id);
   logApp('info', '剧情触发已删除', trigger.name);
   valuesToastr('success', '触发已删除');
@@ -1439,7 +1442,7 @@ function refreshValuesMaintainStatus() {
 }
 
 // 游戏值重置：把当前聊天的游戏值整体重置为角色卡默认值（写入聊天文件）。
-function handleValuesResetGame() {
+async function handleValuesResetGame() {
   const ctx = getContextSafe();
   if (!ctx) return;
   const defaults = getValuesDefaults(ctx);
@@ -1447,7 +1450,7 @@ function handleValuesResetGame() {
   const confirmText = count > 0
     ? `确定把游戏值重置为默认值吗？当前 ${count} 项游戏值会被默认值覆盖。`
     : '确定把游戏值重置为默认值吗？当前游戏值会被清空（默认值当前为空）。';
-  if (!globalThis.confirm(confirmText)) return;
+  if (!(await kaleidoConfirm(confirmText))) return;
   const saved = saveValuesChatState(ctx, cloneValue(defaults), { immediate: true });
   logApp('info', '游戏值已重置为默认值', `覆盖 ${count} 项`);
   valuesToastr('success', saved ? '游戏值已重置为默认值' : '游戏值已重置（写入聊天文件失败）');
@@ -1471,9 +1474,9 @@ async function handleValuesImportFile(file) {
   try {
     const text = await readTextFile(file);
     const parsed = parseValuesBundle(text);
-    if (!globalThis.confirm(
+    if (!(await kaleidoConfirm(
       '导入将更新变量注册表与默认值：\n- 同名变量更新变化规则，其余追加；\n- 默认值按路径合并，同名路径覆盖。\n继续？'
-    )) return;
+    ))) return;
     applyValuesBundle(ctx, parsed, 'merge');
     logApp('info', '变量包已导入', `变量 ${parsed.keys.length} 个`);
     valuesToastr('success', `已导入 ${parsed.keys.length} 个变量`);
