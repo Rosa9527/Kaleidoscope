@@ -214,6 +214,18 @@ runner.test('工作台对话框继承主题变量（回归：编辑器不再透�
   assert(menuItemRule.test(css), '变量系统新建菜单文字应与剧情脉络菜单一致（主题文字色）');
 });
 
+runner.test('手绘涂鸦主题：注册表含 doodle，样式含变量块与直角兜底（回归）', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const css = fs.readFileSync(path.join(__dirname, '..', 'style.css'), 'utf8');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'js', 'constants.js'), 'utf8');
+  assert(src.includes("{ id: 'doodle', name: '手绘涂鸦' }"), 'THEMES 注册表应含手绘涂鸦主题');
+  const varBlock = /html\[data-theme='doodle'\][^{]*\{[^}]*--k-window:\s*#[0-9a-fA-F]{3,8}/;
+  assert(varBlock.test(css), '手绘涂鸦主题应定义 --k-window 主题变量');
+  const squareRule = /html\[data-theme='doodle'\][^{]*\.kaleido-panel[^{]*\{[^}]*border-radius:\s*0;/;
+  assert(squareRule.test(css), '手绘涂鸦主题应有直角兜底规则（方方正正）');
+});
+
 runner.test('样式表含 hidden 覆盖规则（回归：display 不能压过 hidden）', () => {
   const fs = require('fs');
   const css = fs.readFileSync(require('path').join(__dirname, '..', 'style.css'), 'utf8');

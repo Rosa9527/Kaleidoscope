@@ -2,7 +2,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.1.0';
+const MODULE_VERSION = '1.1.1';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 
 // ---------- 主题 ----------
@@ -15,6 +15,7 @@ const DEFAULT_THEME = 'gufeng';
 const THEMES = Object.freeze([
   { id: 'macos', name: 'macOS 风格' },
   { id: 'gufeng', name: '古风典雅' },
+  { id: 'doodle', name: '手绘涂鸦' },
 ]);
 
 // ---------- DOM ID / class ----------
