@@ -77,4 +77,30 @@ assert(
   'style.css 手机端 .kaleido-game__cover 应保持单行 flex-wrap: nowrap',
 );
 
+// 回归：游戏档案数值列不被固定百分比上限截断（窄屏「好感等级 ····· 相谈甚欢、刮目相看」
+// 只显示成「相谈甚…」）。数值列应取用名称与点线目次让出的剩余空间（可收缩 + min-width:0），
+// 空间真正不足时才省略号兜底；手机端也不应再对数值列二次限宽。
+const gameEntryValueRule = style.match(/\.kaleido-game__entry-value\s*\{([^}]*)\}/);
+assert(gameEntryValueRule, 'style.css 缺少 .kaleido-game__entry-value 基础规则');
+assert(
+  /flex:\s*0\s+1\s+auto/.test(gameEntryValueRule[1]),
+  '数值列应可收缩（flex: 0 1 auto），超长值才能省略号兜底',
+);
+assert(
+  /min-width:\s*0/.test(gameEntryValueRule[1]),
+  '数值列应允许收缩到 0（min-width: 0），否则 flex 无法让位',
+);
+assert(
+  !/max-width/.test(gameEntryValueRule[1]),
+  '数值列不应再有固定最大宽度（曾被 44% 上限截断长值）',
+);
+assert(
+  !/@media \(max-width: 640px\)[\s\S]*?\.kaleido-game__entry-value\s*\{[^}]*max-width:\s*40%/.test(style),
+  '手机端不应再对数值列施加 40% 最大宽度截断',
+);
+assert(
+  /@media \(max-width: 640px\)[\s\S]*?\.kaleido-game__entry-name\s*\{[^}]*max-width:\s*40%/.test(style),
+  '手机端名称列应保留 40% 占比上限，保护点线目次与数值空间',
+);
+
 console.log('移动端面板定位静态检查通过');

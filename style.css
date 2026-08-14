@@ -3333,8 +3333,10 @@ select.kaleido-input {
 }
 
 .kaleido-game__entry-value {
-  flex: none;
-  max-width: 44%;
+  /* 数值列取用名称与点线目次让出的剩余空间（shrink + min-width:0），
+     不再被固定百分比上限截断；空间真正不足时才省略号兜底。 */
+  flex: 0 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3726,8 +3728,8 @@ select.kaleido-input {
     padding: 6px 10px;
   }
 
-  .kaleido-game__entry-name,
-  .kaleido-game__entry-value {
+  /* 名称限制占比以保护点线目次；数值列不再二次限宽（由基础规则取剩余空间） */
+  .kaleido-game__entry-name {
     max-width: 40%;
   }
 }
