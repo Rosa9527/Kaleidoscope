@@ -17,3 +17,9 @@ tests/_repro_shot.png
 tests/_repro_values.html
 tests/_tmp_layer_preview.html
 tests/_tmp_layer_shot.png
+
+# ZCode 会话计划（本地工具产物）
+.zcode/
+
+# 调试截图（主页重设计）
+tests/_home_*.png

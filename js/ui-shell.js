@@ -84,8 +84,7 @@ function createSphere() {
   sphere.setAttribute('aria-label', MODULE_DISPLAY_NAME);
   sphere.innerHTML = `
     <span class="kaleido-sphere__frame" aria-hidden="true"></span>
-    <span class="kaleido-sphere__eye" aria-hidden="true"></span>
-    <span class="kaleido-sphere__hub" aria-hidden="true"></span>
+    <span class="kaleido-sphere__fan" aria-hidden="true"><span class="${MENU_ICON_CLASS}"></span></span>
   `;
   document.body.appendChild(sphere);
   initDraggableSphere(sphere);
@@ -307,7 +306,10 @@ function showPanelView(viewId) {
   const back = document.getElementById(PANEL_BACK_ID);
   if (back) back.style.visibility = (viewId === HOME_VIEW_ID || viewId === GAME_VIEW_ID) ? 'hidden' : 'visible';
   const title = document.getElementById(PANEL_TITLE_ID);
-  if (title) title.textContent = PANEL_VIEW_TITLES[viewId] || MODULE_DISPLAY_NAME;
+  if (title) {
+    title.textContent = PANEL_VIEW_TITLES[viewId] || MODULE_DISPLAY_NAME;
+    title.classList.toggle('is-homepage', viewId === HOME_VIEW_ID);
+  }
   if (viewId === LOG_VIEW_ID) {
     renderLogList();
     updateLogStats();
@@ -320,7 +322,9 @@ function showPanelView(viewId) {
     refreshHomeStoryStatus();
   }
   if (viewId === VALUES_VIEW_ID) {
-    renderValuesTree();
+    // 变量树永远从「游戏数值」层开始（与桌面工作台一致）：不记住上次停留的层，
+    // 默认数值需手动切换后才显示。（setValuesLayer 内部已重渲染树。）
+    setValuesLayer('game');
     refreshHomeValuesStatus();
   }
   if (viewId === GAME_VIEW_ID) {
@@ -361,62 +365,61 @@ function createPanel() {
     <div class="kaleido-panel__dialog" role="dialog" aria-label="${MODULE_DISPLAY_NAME}">
       <div class="kaleido-panel__header kaleido-drag-handle">
         <button type="button" id="${PANEL_BACK_ID}" class="kaleido-panel__back" aria-label="返回" title="返回" style="visibility:hidden">←</button>
-        <span class="kaleido-panel__logo" aria-hidden="true"><span class="${MENU_ICON_CLASS}"></span></span>
         <span id="${PANEL_TITLE_ID}" class="kaleido-panel__title">${MODULE_DISPLAY_NAME}</span>
         <button type="button" class="kaleido-panel__close" aria-label="关闭" title="关闭">✕</button>
       </div>
       <div class="kaleido-panel__body">
         <section id="${HOME_VIEW_ID}" class="kaleido-view is-active" aria-hidden="false">
-          <div class="kaleido-home__hero">
-            <p class="kaleido-home__slogan"><span class="kaleido-home__slogan-first" aria-hidden="true">镜</span>中万象，皆是文章</p>
-            <button type="button" id="${HOME_GAME_BUTTON_ID}" class="kaleido-home__log-btn" title="游戏模式：玩家数据档案" aria-label="游戏模式">
-              <span class="${GAME_ICON_CLASS}"></span>
-            </button>
+          <div class="kaleido-home">
+            <div class="kaleido-home__hero">
+              <span class="kaleido-home__logo"><span class="${MENU_ICON_CLASS}"></span></span>
+              <p class="kaleido-home__slogan"><span class="kaleido-home__slogan-first" aria-hidden="true">镜</span>中万象，皆是文章</p>
+              <button type="button" id="${HOME_GAME_BUTTON_ID}" class="kaleido-home__log-btn" title="游戏模式：玩家数据档案" aria-label="游戏模式">
+                <span class="${GAME_ICON_CLASS}"></span>
+              </button>
+            </div>
+            <div class="kaleido-home__section-head">
+              <span class="kaleido-panel__section-title">功能一览</span>
+            </div>
+            <div class="kaleido-home__rows">
+              <button type="button" id="${HOME_API_CARD_ID}" class="kaleido-home__row" title="配置 AI 接口，引擎的基石">
+                <span class="kaleido-home__row-icon"><span class="${API_ICON_CLASS}"></span></span>
+                <span class="kaleido-home__row-label">API 连接</span>
+                <span id="${HOME_API_STATUS_ID}" class="kaleido-home__row-status" data-state="idle">尚未连接</span>
+                <span class="kaleido-home__row-chevron" aria-hidden="true"></span>
+              </button>
+              <button type="button" id="${HOME_PRESET_CARD_ID}" class="kaleido-home__row" title="预设模版：修改与重置默认提示词">
+                <span class="kaleido-home__row-icon"><span class="${PRESET_ICON_CLASS}"></span></span>
+                <span class="kaleido-home__row-label">预设模版</span>
+                <span id="${HOME_PRESET_STATUS_ID}" class="kaleido-home__row-status" data-state="idle">默认配置</span>
+                <span class="kaleido-home__row-chevron" aria-hidden="true"></span>
+              </button>
+              <button type="button" id="${HOME_VALUES_CARD_ID}" class="kaleido-home__row" title="变量系统：变量注册 + 默认值 / 游戏值，AI 自动维护">
+                <span class="kaleido-home__row-icon"><span class="${VALUES_ICON_CLASS}"></span></span>
+                <span class="kaleido-home__row-label">变量系统</span>
+                <span id="${HOME_VALUES_STATUS_ID}" class="kaleido-home__row-status" data-state="idle">尚未添加</span>
+                <span class="kaleido-home__row-chevron" aria-hidden="true"></span>
+              </button>
+              <button type="button" id="${HOME_STORY_CARD_ID}" class="kaleido-home__row" title="剧情脉络：节点与事件的工作台">
+                <span class="kaleido-home__row-icon"><span class="${STORY_ICON_CLASS}"></span></span>
+                <span class="kaleido-home__row-label">剧情脉络</span>
+                <span id="${HOME_STORY_STATUS_ID}" class="kaleido-home__row-status" data-state="idle">尚未添加</span>
+                <span class="kaleido-home__row-chevron" aria-hidden="true"></span>
+              </button>
+              <button type="button" id="${HOME_LOG_CARD_ID}" class="kaleido-home__row" title="系统日志：后台运行记录与网络请求">
+                <span class="kaleido-home__row-icon"><span class="${LOG_ICON_CLASS}"></span></span>
+                <span class="kaleido-home__row-label">系统日志</span>
+                <span id="${HOME_LOG_STATUS_ID}" class="kaleido-home__row-status" data-state="idle">暂无记录</span>
+                <span class="kaleido-home__row-chevron" aria-hidden="true"></span>
+              </button>
+              <button type="button" id="${HOME_INJECT_CARD_ID}" class="kaleido-home__row" title="剧情预筛：点击发送时自动挑选并注入本轮事件">
+                <span class="kaleido-home__row-icon"><span class="${INJECT_ICON_CLASS}"></span></span>
+                <span class="kaleido-home__row-label">注入实录</span>
+                <span id="${HOME_INJECT_STATUS_ID}" class="kaleido-home__row-status" data-state="idle">尚未运行</span>
+                <span class="kaleido-home__row-chevron" aria-hidden="true"></span>
+              </button>
+            </div>
           </div>
-          <div class="kaleido-home__grid">
-<button type="button" id="${HOME_API_CARD_ID}" class="kaleido-home__card" title="配置 AI 接口，引擎的基石">
-              <span class="kaleido-home__card-icon"><span class="${API_ICON_CLASS}"></span></span>
-              <span class="kaleido-home__card-text">
-                <span class="kaleido-home__card-title">API 连接</span>
-                <span id="${HOME_API_STATUS_ID}" class="kaleido-home__card-status" data-state="idle">尚未连接</span>
-              </span>
-            </button>
-<button type="button" id="${HOME_PRESET_CARD_ID}" class="kaleido-home__card" title="预设模版：修改与重置默认提示词">
-              <span class="kaleido-home__card-icon"><span class="${PRESET_ICON_CLASS}"></span></span>
-              <span class="kaleido-home__card-text">
-                <span class="kaleido-home__card-title">预设模版</span>
-                <span id="${HOME_PRESET_STATUS_ID}" class="kaleido-home__card-status" data-state="idle">默认配置</span>
-              </span>
-            </button>
-<button type="button" id="${HOME_VALUES_CARD_ID}" class="kaleido-home__card" title="变量系统：变量注册 + 默认值 / 游戏值，AI 自动维护">
-              <span class="kaleido-home__card-icon"><span class="${VALUES_ICON_CLASS}"></span></span>
-              <span class="kaleido-home__card-text">
-                <span class="kaleido-home__card-title">变量系统</span>
-                <span id="${HOME_VALUES_STATUS_ID}" class="kaleido-home__card-status" data-state="idle">尚未添加</span>
-              </span>
-            </button>
-<button type="button" id="${HOME_STORY_CARD_ID}" class="kaleido-home__card" title="剧情脉络：节点与事件的工作台">
-              <span class="kaleido-home__card-icon"><span class="${STORY_ICON_CLASS}"></span></span>
-              <span class="kaleido-home__card-text">
-                <span class="kaleido-home__card-title">剧情脉络</span>
-                <span id="${HOME_STORY_STATUS_ID}" class="kaleido-home__card-status" data-state="idle">尚未添加</span>
-              </span>
-            </button>
-<button type="button" id="${HOME_LOG_CARD_ID}" class="kaleido-home__card" title="系统日志：后台运行记录与网络请求">
-              <span class="kaleido-home__card-icon"><span class="${LOG_ICON_CLASS}"></span></span>
-              <span class="kaleido-home__card-text">
-                <span class="kaleido-home__card-title">系统日志</span>
-                <span id="${HOME_LOG_STATUS_ID}" class="kaleido-home__card-status" data-state="idle">暂无记录</span>
-              </span>
-            </button>
-<button type="button" id="${HOME_INJECT_CARD_ID}" class="kaleido-home__card" title="剧情预筛：点击发送时自动挑选并注入本轮事件">
-              <span class="kaleido-home__card-icon"><span class="${INJECT_ICON_CLASS}"></span></span>
-              <span class="kaleido-home__card-text">
-                <span class="kaleido-home__card-title">注入实录</span>
-                <span id="${HOME_INJECT_STATUS_ID}" class="kaleido-home__card-status" data-state="idle">尚未运行</span>
-              </span>
-            </button>
-</div>
         </section>
         <section id="${API_VIEW_ID}" class="kaleido-view" aria-hidden="true">
           <div class="kaleido-api">
@@ -451,7 +454,6 @@ function createPanel() {
                 <button type="button" id="${API_CONCURRENCY_TOGGLE_ID}" class="kaleido-btn kaleido-api__concurrency-toggle" title="开启/关闭并发限制">🔀 并发限制：开</button>
                 <input id="${API_CONCURRENCY_INPUT_ID}" class="kaleido-input kaleido-api__concurrency-input" type="number" min="1" max="10" step="1" placeholder="3" autocomplete="off" aria-label="并发上限" />
               </div>
-              <p class="kaleido-api__hint">同时最多发送的 AI 请求数（默认 3）；多出的请求会排队等待前面的请求完成后再发送。</p>
             </div>
             <div class="kaleido-api__field">
               <span class="kaleido-api__label">思考强度</span>
@@ -463,9 +465,7 @@ function createPanel() {
                 <option value="high">高</option>
                 <option value="max">最大</option>
               </select>
-              <p class="kaleido-api__hint">仅对带思考能力的模型生效；「关闭思考」可避免模型把输出预算花在思考上导致正文为空。</p>
             </div>
-            <p class="kaleido-api__hint">填入接口地址与 API Key 后点「连接并拉取模型」，再从列表选择模型；不支持模型列表的渠道可直接手动填写模型名称。</p>
           </div>
         </section>
         <section id="${LOG_VIEW_ID}" class="kaleido-view" aria-hidden="true">
@@ -522,7 +522,6 @@ function createPanel() {
                 <span class="kaleido-preset__gate-title">剧情预筛</span>
                 <span id="${PRESET_GATE_STATUS_ID}" class="kaleido-preset__status" data-state="idle">未启用</span>
               </div>
-              <p class="kaleido-preset__gate-hint">点击发送时，AI 先读取剧情脉络（节点与事件的名字 / ID / 触发条件 / 描述）与最近 4 条消息，挑选本轮应触发的事件，再把事件正文注入上下文。</p>
               <div class="kaleido-preset__gate-row">
                 <span class="kaleido-preset__gate-label">启用剧情预筛</span>
                 <button type="button" id="${PRESET_GATE_TOGGLE_ID}" class="kaleido-btn kaleido-api__concurrency-toggle" title="开启/关闭剧情预筛">🎬 剧情预筛：开</button>
@@ -533,7 +532,6 @@ function createPanel() {
                 <span class="kaleido-preset__gate-title">变量自动维护</span>
                 <span id="${PRESET_VALUES_STATUS_ID}" class="kaleido-preset__status" data-state="idle">未启用</span>
               </div>
-              <p class="kaleido-preset__gate-hint">每轮生成结束后，自动调用 AI 依据「已注册变量的变化规则 + 当前游戏值 + 最新 2 条消息」维护聊天中的游戏值（存聊天文件）。</p>
               <div class="kaleido-preset__gate-row">
                 <span class="kaleido-preset__gate-label">启用变量自动维护</span>
                 <button type="button" id="${PRESET_VALUES_TOGGLE_ID}" class="kaleido-btn kaleido-api__concurrency-toggle" title="开启/关闭变量自动维护">✨ 变量自动维护：开</button>
@@ -544,13 +542,11 @@ function createPanel() {
                 <span class="kaleido-preset__gate-title">剧情触发</span>
                 <span id="${PRESET_TRIGGER_STATUS_ID}" class="kaleido-preset__status" data-state="idle">未启用</span>
               </div>
-              <p class="kaleido-preset__gate-hint">不依赖 AI 判断：每次发送前按「某节点下变量的当前值」是否满足预设条件，确定性触发对应剧情事件并注入上下文（条件与事件在变量工作台「剧情触发」页配置）。</p>
               <div class="kaleido-preset__gate-row">
                 <span class="kaleido-preset__gate-label">启用剧情触发</span>
                 <button type="button" id="${PRESET_TRIGGER_TOGGLE_ID}" class="kaleido-btn kaleido-api__concurrency-toggle" title="开启/关闭剧情触发">⚡ 剧情触发：开</button>
               </div>
             </div>
-            <p class="kaleido-preset__note">各子系统提示词按标签页切换编辑，改完点「💾 保存」；「↺ 恢复默认」可还原出厂内容。</p>
             <div id="${PRESET_TABS_ID}" class="kaleido-preset__tabs" role="tablist" aria-label="选择要编辑的提示词">
               ${Object.entries(PRESET_META).map(([key, meta]) => `
                 <button type="button" class="kaleido-preset__tab${key === presetActiveKey ? ' is-active' : ''}" role="tab" aria-selected="${key === presetActiveKey ? 'true' : 'false'}" data-prompt-key="${key}" title="${meta.title}">${meta.label}</button>
@@ -571,9 +567,8 @@ function createPanel() {
         </section>
         <section id="${INJECT_VIEW_ID}" class="kaleido-view" aria-hidden="true">
           <div class="kaleido-inject">
-            <p class="kaleido-inject__note">展示最近一轮「剧情预筛」的完整结果：预筛原文（Gate 返回）、本轮触发的事件，以及最终注入上下文的提示词原文。</p>
             <div id="${INJECT_SUMMARY_ID}" class="kaleido-inject__summary" hidden></div>
-            <div id="${INJECT_EMPTY_ID}" class="kaleido-inject__empty" hidden>还没有预筛记录：开启「剧情预筛」并发送消息后，这里会展示最近一轮的结果。</div>
+            <div id="${INJECT_EMPTY_ID}" class="kaleido-inject__empty" hidden>还没有预筛记录。</div>
             <div class="kaleido-inject__gate-head" hidden>
               <span class="kaleido-panel__section-title">预筛原文（Gate 返回）</span>
             </div>
@@ -598,6 +593,10 @@ function createPanel() {
       </div>
       <div class="kaleido-panel__footer">
         <span class="kaleido-panel__version">v${MODULE_VERSION}</span>
+        <span class="kaleido-panel__theme-wrap">
+          <button type="button" id="${THEME_ID}" class="kaleido-panel__theme" aria-haspopup="menu" aria-expanded="false" title="切换主题">🎨 古风典雅</button>
+          <div id="${THEME_MENU_ID}" class="kaleido-panel__theme-menu" role="menu" hidden></div>
+        </span>
         <span class="kaleido-panel__slogan">镜中万象 · 皆是文章</span>
       </div>
     </div>
@@ -611,6 +610,7 @@ function createPanel() {
   initGameSection(panel);
   initLogView(panel);
   initPresetSection(panel);
+  initThemeSection(panel);
   panel.querySelector('.kaleido-panel__close')?.addEventListener('click', closePanel);
   if (!globalThis[ESC_KEY_HANDLER_KEY]) {
     globalThis[ESC_KEY_HANDLER_KEY] = (event) => {
@@ -631,6 +631,101 @@ function createPanel() {
     document.addEventListener('keydown', globalThis[ESC_KEY_HANDLER_KEY]);
   }
   return panel;
+}
+
+// ---------- 主题切换 ----------
+// 主题注册表见 constants.js 的 THEMES / DEFAULT_THEME；id 对应 style.css 中
+// [data-theme='...'] 的变量覆盖。默认「古风典雅」，切换后持久化到 settings.theme。
+function getCurrentTheme() {
+  try {
+    const ctx = getContextSafe();
+    const settings = ctx ? getSettings(ctx) : null;
+    const id = settings?.theme;
+    return THEMES.some((theme) => theme.id === id) ? id : DEFAULT_THEME;
+  } catch (error) {
+    logApp('warn', `读取主题设置失败: ${String(error?.message || error)}`);
+    return DEFAULT_THEME;
+  }
+}
+
+function applyTheme(themeId) {
+  const id = THEMES.some((theme) => theme.id === themeId) ? themeId : DEFAULT_THEME;
+  // 以 <html> 为唯一主题作用域：所有宿主元素（含后续懒创建的工作台对话框、确认弹层、
+  // 新建菜单等）都是 html 的后代，主题经变量继承自动覆盖到每一个窗口。
+  document.documentElement?.setAttribute('data-theme', id);
+  const panel = getPanel();
+  const sphere = getSphere();
+  if (panel) panel.dataset.theme = id;
+  if (sphere) sphere.dataset.theme = id;
+  const theme = THEMES.find((item) => item.id === id);
+  const button = document.getElementById(THEME_ID);
+  if (button && theme) button.textContent = '🎨 ' + theme.name;
+  return id;
+}
+
+function initThemeSection(panel) {
+  if (!panel || panel.dataset.themeReady === 'true') return;
+  const button = document.getElementById(THEME_ID);
+  const menu = document.getElementById(THEME_MENU_ID);
+  if (!button || !menu) return;
+
+  const closeThemeMenu = () => {
+    menu.hidden = true;
+    button.setAttribute('aria-expanded', 'false');
+  };
+
+  const renderThemeMenu = () => {
+    const current = getCurrentTheme();
+    menu.innerHTML = '';
+    for (const theme of THEMES) {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'kaleido-panel__theme-option';
+      item.dataset.themeId = theme.id;
+      item.textContent = theme.name;
+      item.setAttribute('role', 'menuitemradio');
+      item.setAttribute('aria-checked', String(theme.id === current));
+      if (theme.id === current) item.classList.add('is-active');
+      item.addEventListener('click', () => {
+        try {
+          const ctx = getContextSafe();
+          const settings = ctx ? getSettings(ctx) : null;
+          if (settings) {
+            settings.theme = theme.id;
+            saveSettings(ctx);
+          }
+        } catch (error) {
+          logApp('warn', `保存主题失败: ${String(error?.message || error)}`);
+        }
+        applyTheme(theme.id);
+        closeThemeMenu();
+      });
+      menu.appendChild(item);
+    }
+  };
+
+  button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (menu.hidden) {
+      renderThemeMenu();
+      menu.hidden = false;
+      button.setAttribute('aria-expanded', 'true');
+    } else {
+      closeThemeMenu();
+    }
+  });
+  document.addEventListener('click', (event) => {
+    if (menu.hidden) return;
+    if (event.target instanceof Element && typeof event.target.closest === 'function'
+      && event.target.closest('#' + THEME_ID + ', #' + THEME_MENU_ID)) return;
+    closeThemeMenu();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !menu.hidden) closeThemeMenu();
+  });
+
+  applyTheme(getCurrentTheme());
+  panel.dataset.themeReady = 'true';
 }
 
 // ---------- 确认弹层 ----------

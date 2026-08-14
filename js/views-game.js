@@ -63,7 +63,7 @@ function buildGameEntry(path, name, node, depth) {
   return entry;
 }
 
-// 章节头：朱砂印（章节名）+ 鎏金分隔线。
+// 章节头：节点名（比变量条目稍大）+ 渐变分隔线。
 function buildGameChapter(path, name, depth) {
   const chapter = document.createElement('section');
   chapter.className = 'kaleido-game__chapter';
@@ -109,7 +109,7 @@ function renderGameTree(ctx) {
   if (Object.keys(tree).length === 0) {
     const empty = document.createElement('div');
     empty.className = 'kaleido-game__empty';
-    empty.textContent = '在「变量系统」登记变量并设置默认值后，这里会呈现你的游戏数据。';
+    empty.textContent = '暂无游戏数据。';
     body.appendChild(empty);
     return;
   }

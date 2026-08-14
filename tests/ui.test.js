@@ -135,7 +135,7 @@ runner.test('打开工作台显示空状态提示（无默认节点）', () => {
   ui.openStoryWorkbench();
   assert($('kaleido-story-dialog').classList.contains('is-open'), '应处于打开状态');
   const empty = $('kaleido-story-tree-body').querySelector('.kaleido-story__empty');
-  assert(empty && empty.textContent.includes('新建节点'), '空状态应提示如何开始');
+  assert(empty && empty.textContent.includes('新建'), '空状态应提示如何开始');
   assert(treeRows().length === 0, '全新数据不应有任何节点行');
   assert(!empty.textContent.includes('第一章'), '空状态不应出现会被误认成默认节点的名称');
 });
@@ -204,14 +204,14 @@ runner.test('工作台对话框继承主题变量（回归：编辑器不再透�
     let defined = false;
     let m;
     while ((m = varScope.exec(css)) !== null) {
-      if (m[2].includes('--k-paper:')) { defined = true; break; }
+      if (m[2].includes('--k-window:')) { defined = true; break; }
     }
-    assert(defined, `${scope} 应定义 --k-paper 主题变量`);
+    assert(defined, `${scope} 应定义 --k-window 主题变量`);
   }
-  const editorRule = /.kaleido-story-dialog__editor[^{]*\{[^}]*background:\s*var\(--k-paper\)/;
+  const editorRule = /.kaleido-story-dialog__editor[^{]*\{[^}]*background:\s*var\(--k-window\)/;
   assert(editorRule.test(css), '编辑器背景应使用主题变量');
-  const menuItemRule = /.kaleido-values__add-menu-item[^{]*\{[^}]*color:\s*var\(--k-ink\)/;
-  assert(menuItemRule.test(css), '变量系统新建菜单文字应与剧情脉络菜单一致（墨色）');
+  const menuItemRule = /.kaleido-values__add-menu-item[^{]*\{[^}]*color:\s*var\(--k-text\)/;
+  assert(menuItemRule.test(css), '变量系统新建菜单文字应与剧情脉络菜单一致（主题文字色）');
 });
 
 runner.test('样式表含 hidden 覆盖规则（回归：display 不能压过 hidden）', () => {
@@ -583,6 +583,15 @@ runner.test('打开面板默认进入游戏模式主页', () => {
   ui.openPanel();
   assert($('kaleido-game-view').classList.contains('is-active'), '打开面板应默认进入游戏模式');
   assert($('kaleido-home-view').classList.contains('is-active') === false, '工作台首页不应默认激活');
+});
+
+runner.test('主页标题显示 Kaleidoscope 铜板体字标，其他视图恢复中文标题', () => {
+  ui.showPanelView('kaleido-home-view');
+  assert($('kaleido-panel-title').textContent === 'Kaleidoscope', '首页标题应为 Kaleidoscope');
+  assert($('kaleido-panel-title').classList.contains('is-homepage'), '首页标题应带 is-homepage 艺术字样式');
+  ui.showPanelView('kaleido-story-view');
+  assert($('kaleido-panel-title').textContent === '剧情脉络', '剧情视图标题应为中文');
+  assert(!$('kaleido-panel-title').classList.contains('is-homepage'), '非首页视图不应带 is-homepage');
 });
 
 runner.test('首页标语旁游戏小图标打开游戏模式视图', () => {

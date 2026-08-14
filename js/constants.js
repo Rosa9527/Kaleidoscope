@@ -1,8 +1,20 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.0.7';
+const MODULE_VERSION = '1.0.9';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
+
+// ---------- 主题 ----------
+// 主题注册表：id 对应 style.css 中 [data-theme='...'] 的变量覆盖；name 显示在按钮与菜单里。
+// 默认主题为「macOS 风格」（首位即默认，保持既有用户观感），新增主题只需在此追加条目
+// 并在 style.css 补变量覆盖。
+const THEME_ID = 'kaleido-theme';
+const THEME_MENU_ID = 'kaleido-theme-menu';
+const DEFAULT_THEME = 'gufeng';
+const THEMES = Object.freeze([
+  { id: 'macos', name: 'macOS 风格' },
+  { id: 'gufeng', name: '古风典雅' },
+]);
 
 // ---------- DOM ID / class ----------
 const PANEL_ID = 'kaleido-panel';
@@ -505,6 +517,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   valuesTriggerEnabled: true,
   storyGatePrompt: '',
   valuesNavCollapsed: false,
+  theme: DEFAULT_THEME,
 });
 
 // 宿主上下文不可扩展时的兜底设置存储（WeakMap 随上下文释放）。
@@ -613,7 +626,7 @@ const PRESET_META = Object.freeze({
 
 // 视图标题表：showPanelView 切换时更新面板标题。
 const PANEL_VIEW_TITLES = Object.freeze({
-  [HOME_VIEW_ID]: MODULE_DISPLAY_NAME,
+  [HOME_VIEW_ID]: 'Kaleidoscope', // 首页标题：英文铜板体字标（Copperplate）
   [API_VIEW_ID]: 'API 连接',
   [LOG_VIEW_ID]: '系统日志',
   [PRESET_VIEW_ID]: '预设模版',

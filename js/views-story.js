@@ -95,7 +95,7 @@ function renderStoryTree() {
   body.innerHTML = '';
   const roots = ctx ? getStoryRootNodes(ctx).sort(byStoryCreatedAt) : [];
   if (roots.length === 0) {
-    body.appendChild(buildStoryEmpty('还没有节点。点击上方「＋」新建节点或事件；\n节点可层层嵌套，事件可挂在任意节点下。'));
+    body.appendChild(buildStoryEmpty('还没有节点。点击「＋ 新建」开始。'));
     return;
   }
   for (const root of roots) renderStoryNodeRows(body, ctx, root, 0);
@@ -551,7 +551,6 @@ function buildStoryContentHTML(editorClass) {
         <div id="${STORY_TREE_ID}" class="kaleido-story__tree">
           <div class="kaleido-story__tree-actions">
             <button type="button" id="${STORY_ROOT_ADD_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--primary" title="新建节点或事件">＋ 新建</button>
-            <span class="kaleido-story__tree-hint">节点可层层嵌套 · 事件挂在节点下</span>
           </div>
           <div id="${STORY_TREE_BODY_ID}" class="kaleido-story__tree-body"></div>
         </div>

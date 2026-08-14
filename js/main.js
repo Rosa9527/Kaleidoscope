@@ -175,6 +175,7 @@ async function bootstrap() {
     createPanel();
     createSphere();
     showSphere();
+    applyTheme(getCurrentTheme());
     await registerMenuItem();
     logApp('info', `扩展就绪 v${MODULE_VERSION}`);
   } catch (error) {

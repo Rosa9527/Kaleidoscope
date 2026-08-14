@@ -549,6 +549,20 @@ runner.test('层切换按钮：只显示当前层，点击按钮切换', () => {
   assert(title.textContent === before, '再点应回到原层');
 });
 
+// ---------- 打开工作台：总是先展示游戏数值层 ----------
+runner.test('打开工作台：不记住上次停留的层，总是先展示游戏数值', () => {
+  // 上次停在默认数值层
+  click($('kaleido-values-layer-default'));
+  assert($('kaleido-values-layer-title').textContent === '默认数值', '前置：当前应为默认数值层');
+  // 重新打开工作台 → 应回到游戏数值层
+  ui.openValuesWorkbench();
+  assert($('kaleido-values-layer-title').textContent === '游戏数值', '重开工作台应先展示游戏数值');
+  assert($('kaleido-values-layer-row').dataset.layer === 'game', '指示条应标记为游戏值层');
+  assert($('kaleido-values-add-root').hidden, '游戏值层应隐藏新建按钮');
+  assert(!$('kaleido-values-maintain-now').hidden, '游戏值层应显示立即维护');
+  assert($('kaleido-values-default-hint').hidden, '游戏值层应隐藏默认值手动提示');
+});
+
 // ---------- 注入提示词（默认数值层） ----------
 function injectCheck(row) {
   const button = row.querySelector('button[data-inject-toggle]');
@@ -617,6 +631,30 @@ runner.test('注入预览：标签页展示实际注入的 <Values> 内容', () 
   // 切回变量树：注入预览面板应取消激活
   click($('kaleido-values-tab-tree'));
   assert(!pane.classList.contains('is-active'), '切回变量树后注入预览面板应取消激活');
+});
+
+runner.test('导航切换：面板 hidden 与 is-active 同步（回归：注册/触发/注入视图空白）', () => {
+  const panes = {
+    tree: $('kaleido-values-tree-pane'),
+    keys: $('kaleido-values-keys-pane'),
+    triggers: $('kaleido-values-triggers-pane'),
+    inject: $('kaleido-values-inject-pane'),
+  };
+  const assertVisible = (name) => {
+    for (const [key, pane] of Object.entries(panes)) {
+      assert(pane.classList.contains('is-active') === (key === name), `${key} is-active 应${key === name ? '激活' : '取消'}`);
+      assert(pane.hidden === (key !== name), `${key} hidden 应${key === name ? '移除' : '置位'}`);
+    }
+  };
+  assertVisible('tree');
+  click($('kaleido-values-tab-keys'));
+  assertVisible('keys');
+  click($('kaleido-values-tab-triggers'));
+  assertVisible('triggers');
+  click($('kaleido-values-tab-inject'));
+  assertVisible('inject');
+  click($('kaleido-values-tab-tree'));
+  assertVisible('tree');
 });
 
 runner.test('行内滑块：打开下级自动提升上级，关闭上级级联关闭后代', () => {

@@ -87,7 +87,7 @@ runner.test('首页剧情卡片由主页切换进入剧情脉络视图', () => {
 
 runner.test('剧情脉络视图显示空状态提示', () => {
   const empty = $('kaleido-story-tree-body').querySelector('.kaleido-story__empty');
-  assert(empty && empty.textContent.includes('新建节点'), '空状态应提示如何开始');
+  assert(empty && empty.textContent.includes('新建'), '空状态应提示如何开始');
   assert(treeRows().length === 0, '全新数据不应有任何节点行');
 });
 

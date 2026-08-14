@@ -39,7 +39,9 @@ function openValuesWorkbench() {
   dialog.classList.add('is-open');
   dialog.setAttribute('aria-hidden', 'false');
   applyValuesNavState();
-  renderValuesTree();
+  // 变量树永远从「游戏数值」层开始：不记住上次停留的层，默认数值需手动切换后才显示。
+  // （setValuesLayer 内部已同步层 UI 并重渲染树。）
+  setValuesLayer('game');
   refreshHomeValuesStatus();
   logApp('debug', '变量工作台已打开');
 }
@@ -388,11 +390,11 @@ function renderValuesTree() {
   if (!hasEntries) {
     let emptyText;
     if (valuesActiveLayer === 'game' && !isValuesGameInitialized(ctx)) {
-      emptyText = '游戏值尚未初始化：默认值会在首次修改或 AI 维护后写入聊天文件。\n现在显示的是当前角色卡的默认值。';
+      emptyText = '游戏值尚未初始化，当前显示角色卡默认值。';
     } else if (valuesActiveLayer === 'game') {
-      emptyText = '游戏值还没有条目：请在「默认数值」层新建，\n或等 AI 维护按注册规则自动建立。';
+      emptyText = '游戏值还没有条目。';
     } else {
-      emptyText = '还没有节点。点击上方「＋ 新建」新建节点或变量；\n节点可层层嵌套，变量挂在节点下。';
+      emptyText = '还没有节点。';
     }
     body.appendChild(buildValuesEmpty(emptyText));
     return;
@@ -948,7 +950,7 @@ function renderValuesKeyRules(rules) {
   if (list.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'kaleido-values__key-rules-empty';
-    empty.textContent = '还没有区间规则：添加「父变量值区间 → 子变量文本」的映射，如 0~30 冷淡、31~60 颇具好感。';
+    empty.textContent = '还没有区间规则。';
     container.appendChild(empty);
   }
   for (const rule of list) {
@@ -1521,16 +1523,24 @@ async function handleValuesImportFile(file) {
     valuesToastr('error', `导入失败：${message.slice(0, 160)}`);
   }
 }// ---------- 内容事件绑定（对话框与面板视图共用） ----------
+// 面板切换：is-active 控制显示，hidden 同步（[hidden] 覆盖规则会强制隐藏）
+function setValuesPaneActive(paneId, active) {
+  const pane = document.getElementById(paneId);
+  if (!pane) return;
+  pane.classList.toggle('is-active', active);
+  pane.hidden = !active;
+}
+
 function bindValuesContentEvents() {
   document.getElementById(VALUES_TAB_TREE_ID)?.addEventListener('click', () => {
     document.getElementById(VALUES_TAB_TREE_ID)?.classList.add('is-active');
     document.getElementById(VALUES_TAB_KEYS_ID)?.classList.remove('is-active');
     document.getElementById(VALUES_TAB_TRIGGERS_ID)?.classList.remove('is-active');
     document.getElementById(VALUES_TAB_INJECT_ID)?.classList.remove('is-active');
-    document.getElementById(VALUES_TREE_PANE_ID)?.classList.add('is-active');
-    document.getElementById(VALUES_KEYS_PANE_ID)?.classList.remove('is-active');
-    document.getElementById(VALUES_TRIGGERS_PANE_ID)?.classList.remove('is-active');
-    document.getElementById(VALUES_INJECT_PANE_ID)?.classList.remove('is-active');
+    setValuesPaneActive(VALUES_TREE_PANE_ID, true);
+    setValuesPaneActive(VALUES_KEYS_PANE_ID, false);
+    setValuesPaneActive(VALUES_TRIGGERS_PANE_ID, false);
+    setValuesPaneActive(VALUES_INJECT_PANE_ID, false);
     closeValuesEditor();
     closeValuesKeyEditor();
     closeValuesTriggerEditor();
@@ -1542,10 +1552,10 @@ function bindValuesContentEvents() {
     document.getElementById(VALUES_TAB_KEYS_ID)?.classList.add('is-active');
     document.getElementById(VALUES_TAB_TRIGGERS_ID)?.classList.remove('is-active');
     document.getElementById(VALUES_TAB_INJECT_ID)?.classList.remove('is-active');
-    document.getElementById(VALUES_TREE_PANE_ID)?.classList.remove('is-active');
-    document.getElementById(VALUES_KEYS_PANE_ID)?.classList.add('is-active');
-    document.getElementById(VALUES_TRIGGERS_PANE_ID)?.classList.remove('is-active');
-    document.getElementById(VALUES_INJECT_PANE_ID)?.classList.remove('is-active');
+    setValuesPaneActive(VALUES_TREE_PANE_ID, false);
+    setValuesPaneActive(VALUES_KEYS_PANE_ID, true);
+    setValuesPaneActive(VALUES_TRIGGERS_PANE_ID, false);
+    setValuesPaneActive(VALUES_INJECT_PANE_ID, false);
     closeValuesEditor();
     closeValuesKeyEditor();
     closeValuesTriggerEditor();
@@ -1557,10 +1567,10 @@ function bindValuesContentEvents() {
     document.getElementById(VALUES_TAB_KEYS_ID)?.classList.remove('is-active');
     document.getElementById(VALUES_TAB_TRIGGERS_ID)?.classList.add('is-active');
     document.getElementById(VALUES_TAB_INJECT_ID)?.classList.remove('is-active');
-    document.getElementById(VALUES_TREE_PANE_ID)?.classList.remove('is-active');
-    document.getElementById(VALUES_KEYS_PANE_ID)?.classList.remove('is-active');
-    document.getElementById(VALUES_TRIGGERS_PANE_ID)?.classList.add('is-active');
-    document.getElementById(VALUES_INJECT_PANE_ID)?.classList.remove('is-active');
+    setValuesPaneActive(VALUES_TREE_PANE_ID, false);
+    setValuesPaneActive(VALUES_KEYS_PANE_ID, false);
+    setValuesPaneActive(VALUES_TRIGGERS_PANE_ID, true);
+    setValuesPaneActive(VALUES_INJECT_PANE_ID, false);
     closeValuesEditor();
     closeValuesKeyEditor();
     closeValuesTriggerEditor();
@@ -1573,17 +1583,16 @@ function bindValuesContentEvents() {
     document.getElementById(VALUES_TAB_KEYS_ID)?.classList.remove('is-active');
     document.getElementById(VALUES_TAB_TRIGGERS_ID)?.classList.remove('is-active');
     document.getElementById(VALUES_TAB_INJECT_ID)?.classList.add('is-active');
-    document.getElementById(VALUES_TREE_PANE_ID)?.classList.remove('is-active');
-    document.getElementById(VALUES_KEYS_PANE_ID)?.classList.remove('is-active');
-    document.getElementById(VALUES_TRIGGERS_PANE_ID)?.classList.remove('is-active');
-    document.getElementById(VALUES_INJECT_PANE_ID)?.classList.add('is-active');
+    setValuesPaneActive(VALUES_TREE_PANE_ID, false);
+    setValuesPaneActive(VALUES_KEYS_PANE_ID, false);
+    setValuesPaneActive(VALUES_TRIGGERS_PANE_ID, false);
+    setValuesPaneActive(VALUES_INJECT_PANE_ID, true);
     closeValuesEditor();
     closeValuesKeyEditor();
     closeValuesTriggerEditor();
     closeValuesAddMenu();
     renderValuesInjectPreview();
   });
-
   document.getElementById(VALUES_LAYER_DEFAULT_ID)?.addEventListener('click', () => setValuesLayer('default'));
   document.getElementById(VALUES_LAYER_GAME_ID)?.addEventListener('click', () => setValuesLayer('game'));
   document.getElementById(VALUES_LAYER_TOGGLE_ID)?.addEventListener('click', () => {
@@ -1923,7 +1932,6 @@ function buildValuesContentHTML(editorClass) {
             <div id="${VALUES_INJECT_PANE_ID}" class="kaleido-values__pane" hidden>
               <div class="kaleido-values__inject-preview-head">
                 <span class="kaleido-values__inject-preview-title"><span class="${VALUES_INJECT_PREVIEW_ICON_CLASS}"></span> 注入预览</span>
-                <span class="kaleido-values__inject-preview-hint">勾选变量并打开注入开关后，这里显示主模型实际读到的 <Values> 内容</span>
               </div>
               <pre id="${VALUES_INJECT_TEXT_ID}" class="kaleido-values__inject-text" spellcheck="false"></pre>
             </div>
@@ -1994,7 +2002,6 @@ function buildValuesContentHTML(editorClass) {
                   <span class="kaleido-api__label">派生区间 *</span>
                   <div id="${VALUES_KEY_EDITOR_RULES_ID}" class="kaleido-values__key-rules"></div>
                   <button type="button" id="${VALUES_KEY_EDITOR_RULES_ADD_ID}" class="kaleido-btn kaleido-btn--mini">＋ 添加区间</button>
-                  <div class="kaleido-values__key-rules-hint">区间不能重叠（含边界）：如 0~1000 之后只能从 1001 开始；新行会自动接续下限。</div>
                 </div>
               </div>
               <div class="kaleido-values__editor-actions">
