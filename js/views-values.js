@@ -349,39 +349,12 @@ function renderValuesTreeRows(container, ctx, node, path, depth) {
   }
 }
 
-// 左侧导航徽标：变量树显示当前层顶层条目数，变量注册显示已注册变量数。
-function refreshValuesNavCounts() {
-  const treeBadge = document.getElementById(VALUES_NAV_TREE_COUNT_ID);
-  const keysBadge = document.getElementById(VALUES_NAV_KEYS_COUNT_ID);
-  const ctx = getContextSafe();
-  if (treeBadge) {
-    const tree = ctx ? getValuesActiveTree(ctx) : {};
-    const count = Object.keys(tree).length;
-    treeBadge.textContent = String(count);
-    treeBadge.hidden = count === 0;
-  }
-  if (keysBadge) {
-    const keys = ctx ? getValuesKeys(ctx) : [];
-    const count = keys.length;
-    keysBadge.textContent = String(count);
-    keysBadge.hidden = count === 0;
-  }
-  const triggersBadge = document.getElementById(VALUES_NAV_TRIGGERS_COUNT_ID);
-  if (triggersBadge) {
-    const triggers = ctx ? getValuesTriggers(ctx) : [];
-    const count = triggers.length;
-    triggersBadge.textContent = String(count);
-    triggersBadge.hidden = count === 0;
-  }
-}
-
 function renderValuesTree() {
   const body = document.getElementById(VALUES_TREE_BODY_ID);
   if (!body) return;
   const ctx = getContextSafe();
   refreshValuesBindingStatus();
   refreshValuesMaintainStatus();
-  refreshValuesNavCounts();
   syncValuesLayerUI();
   refreshValuesInjectUI();
   valuesActiveTree = ctx ? getValuesActiveTree(ctx) : {};
@@ -846,7 +819,6 @@ function renderValuesKeys() {
   if (!body) return;
   const ctx = getContextSafe();
   const keys = ctx ? getValuesKeys(ctx) : [];
-  refreshValuesNavCounts();
   body.innerHTML = '';
   if (keys.length === 0) {
     body.appendChild(buildValuesEmpty('还没有注册任何变量。点击上方「＋ 注册新变量」创建，\n注册时填写该变量的变化规则，AI 自动维护会严格按规则更新。'));
@@ -1195,7 +1167,6 @@ function renderValuesTriggers() {
   if (!body) return;
   const ctx = getContextSafe();
   const triggers = ctx ? getValuesTriggers(ctx) : [];
-  refreshValuesNavCounts();
   refreshValuesTriggerStatus();
   body.innerHTML = '';
   if (triggers.length === 0) {
@@ -1862,17 +1833,14 @@ function buildValuesContentHTML(editorClass) {
             <button type="button" id="${VALUES_TAB_TREE_ID}" class="kaleido-values__nav-item is-active" role="tab" aria-selected="true" title="变量树：按节点层级查看与编辑变量">
               <span class="kaleido-values__nav-icon"><span class="${VALUES_TREE_ICON_CLASS}"></span></span>
               <span class="kaleido-values__nav-label">变量树</span>
-              <span id="${VALUES_NAV_TREE_COUNT_ID}" class="kaleido-values__nav-badge" hidden>0</span>
             </button>
             <button type="button" id="${VALUES_TAB_KEYS_ID}" class="kaleido-values__nav-item" role="tab" aria-selected="false" title="变量注册：注册变量名与变化规则，AI 自动维护的唯一依据">
               <span class="kaleido-values__nav-icon"><span class="${VALUES_KEYS_ICON_CLASS}"></span></span>
               <span class="kaleido-values__nav-label">变量注册</span>
-              <span id="${VALUES_NAV_KEYS_COUNT_ID}" class="kaleido-values__nav-badge" hidden>0</span>
             </button>
             <button type="button" id="${VALUES_TAB_TRIGGERS_ID}" class="kaleido-values__nav-item" role="tab" aria-selected="false" title="剧情触发：按变量当前值是否满足条件，确定性触发剧情事件（不依赖 AI 判断）">
               <span class="kaleido-values__nav-icon"><span class="${VALUES_TRIGGER_ICON_CLASS}"></span></span>
               <span class="kaleido-values__nav-label">剧情触发</span>
-              <span id="${VALUES_NAV_TRIGGERS_COUNT_ID}" class="kaleido-values__nav-badge" hidden>0</span>
             </button>
             <button type="button" id="${VALUES_TAB_INJECT_ID}" class="kaleido-values__nav-item" role="tab" aria-selected="false" title="注入预览：查看实际注入提示词的 <Values> 内容（只读）">
               <span class="kaleido-values__nav-icon"><span class="${VALUES_INJECT_PREVIEW_ICON_CLASS}"></span></span>

@@ -177,8 +177,6 @@ const VALUES_IMPORT_BTN_ID = 'kaleido-values-import-btn';
 const VALUES_IMPORT_INPUT_ID = 'kaleido-values-import-input';
 const VALUES_EXPORT_BTN_ID = 'kaleido-values-export-btn';
 const VALUES_TAB_TREE_ID = 'kaleido-values-tab-tree';
-const VALUES_NAV_TREE_COUNT_ID = 'kaleido-values-nav-tree-count';
-const VALUES_NAV_KEYS_COUNT_ID = 'kaleido-values-nav-keys-count';
 const VALUES_NAV_COLLAPSE_ID = 'kaleido-values-nav-collapse';
 const VALUES_NAV_EXPAND_ID = 'kaleido-values-nav-expand';
 const VALUES_NAV_COLLAPSE_ICON_CLASS = 'fa-solid fa-chevron-left';
@@ -320,7 +318,6 @@ const VALUES_INJECT_TEXT_ID = 'kaleido-values-inject-text';
 // 剧情触发（变量条件确定性触发）：不依赖 API，按变量当前值判定事件是否触发。
 const VALUES_TRIGGER_ICON_CLASS = 'fa-solid fa-bolt';
 const VALUES_TAB_TRIGGERS_ID = 'kaleido-values-tab-triggers';
-const VALUES_NAV_TRIGGERS_COUNT_ID = 'kaleido-values-nav-triggers-count';
 const VALUES_TRIGGERS_PANE_ID = 'kaleido-values-triggers-pane';
 const VALUES_TRIGGERS_TOGGLE_ID = 'kaleido-values-triggers-toggle';
 const VALUES_TRIGGERS_ADD_ID = 'kaleido-values-triggers-add';
