@@ -1,7 +1,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.0.6';
+const MODULE_VERSION = '1.0.7';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 
 // ---------- DOM ID / class ----------
@@ -239,6 +239,47 @@ const VALUES_CHAT_SAVE_TIMER_KEY = '__kaleido_values_chat_save_timer__';
 const VALUES_BUNDLE_FORMAT = 'kaleidoscope-values';
 const VALUES_BUNDLE_FILENAME_PREFIX = '万华镜-变量';
 const VALUES_CARD_BUNDLE_FILENAME_PREFIX = '变量: ';
+// 内置默认注册变量：任何角色卡 / 聊天都可直接用，无需手动注册。
+// 虚拟合并进 getValuesKeys 返回（不落盘、不随 YAML 导出）；卡内注册同名键
+// 自动遮蔽内置（编辑内置 = 生成卡级自定义规则，删除卡键 = 恢复内置默认）。
+const VALUES_BUILTIN_KEYS = [
+  {
+    name: '友谊',
+    type: VALUES_KEY_TYPE_PARENT,
+    rule: '友谊度区间为0~100，变化幅度取决于当前关系——例如:泛泛之交打招呼可以+3，而莫逆之交则不会变化；较大利益赠予对泛泛之交+20，但对莫逆之交可能只+10。',
+  },
+  {
+    name: '友谊等级',
+    type: VALUES_KEY_TYPE_CHILD,
+    parent: '友谊',
+    rule: '',
+    rules: [
+      { min: 0, max: 20, value: 'lv1: 萍水相逢' },
+      { min: 21, max: 40, value: 'lv2: 泛泛之交' },
+      { min: 41, max: 60, value: 'lv3: 意气相投' },
+      { min: 61, max: 80, value: 'lv4: 莫逆之交' },
+      { min: 81, max: 100, value: 'lv5: 生死与共' },
+    ],
+  },
+  {
+    name: '情欲',
+    type: VALUES_KEY_TYPE_PARENT,
+    rule: '情欲值的变化幅度取决于亲密行为的强度,而非日常互动的日积月累——例如:一个暧昧的眼神对视只能有+5左右的小增量,一次亲吻可以带来+20甚至更多的跃迁式增长,发生关系则会直接带来+40以上的大幅跃升;但同样的行为,对情欲值已经很高的关系加成会递减,后期的增长更多依赖亲密互动的频率与默契积累,而非单次行为本身的强度。',
+  },
+  {
+    name: '情欲等级',
+    type: VALUES_KEY_TYPE_CHILD,
+    parent: '情欲',
+    rule: '',
+    rules: [
+      { min: 0, max: 20, value: 'lv1: 暗生情愫' },
+      { min: 21, max: 40, value: 'lv2: 眉来眼去' },
+      { min: 41, max: 60, value: 'lv3: 卿卿我我' },
+      { min: 61, max: 80, value: 'lv4: 干柴烈火' },
+      { min: 81, max: 100, value: 'lv5: 鱼水之欢' },
+    ],
+  },
+];
 // 变量自动维护（AI 维护管线）
 const VALUES_AUTO_UPDATE_ENABLED = true;
 const VALUES_MAINTAIN_RECENT_COUNT = 2;

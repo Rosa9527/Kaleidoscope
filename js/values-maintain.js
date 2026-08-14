@@ -59,18 +59,23 @@ function getValuesMaintainPrompt(ctx) {
 // 当前值 YAML 是唯一可改动的数据，recent_messages 严格取最新 2 条。
 function buildValuesMaintainMessages(ctx, prompt) {
   const keys = getValuesKeys(ctx);
+  const current = getValuesGameTree(ctx);
   // 子变量是派生变量：不参与 AI 维护，规则块里只列父变量并注明子变量由系统计算。
   const parentKeys = keys.filter(isValuesParentKey);
   const childKeys = keys.filter(isValuesChildKey);
+  // 内置变量的规则只在树里已出现该变量名时才列出：防止 AI 在从未使用过
+  // 内置变量的聊天里凭空创建（卡内注册的键照旧全列，与旧行为一致）。
+  const builtinInUse = (key) => valuesTreeContainsName(current, String(key?.name || ''));
   const keyRulesText = parentKeys
+    .filter((key) => !isValuesBuiltinKey(key) || builtinInUse(key))
     .map((key) => `- ${String(key?.name || '')}: ${String(key?.rule || '')}`)
     .join('\n') || '（尚未注册任何父变量）';
-  const childNote = childKeys.length > 0
+  const childKeysInUse = childKeys.filter((key) => !isValuesBuiltinKey(key) || builtinInUse(key));
+  const childNote = childKeysInUse.length > 0
     ? '\n\n（子变量为派生变量，由系统按父变量自动计算，禁止修改：' +
-      childKeys.map((key) => `${String(key?.name || '')} ← ${String(key?.parent || '')}`).join('、') +
+      childKeysInUse.map((key) => `${String(key?.name || '')} ← ${String(key?.parent || '')}`).join('、') +
       '）'
     : '';
-  const current = getValuesGameTree(ctx);
   // 子变量是派生变量：发给 AI 的值表只含父变量，子变量不发送（也不允许 AI 改动）。
   const parentCurrent = stripValuesChildLeaves(current, keys);
   const currentText = serializeValuesTree(parentCurrent, '') || '{}';
@@ -142,7 +147,11 @@ async function runValuesMaintain(ctx, settings, options = {}) {
   try {
     const keys = getValuesKeys(ctx);
     const current = getValuesGameTree(ctx);
-    if (keys.length === 0 && valuesCountEntries(current) === 0) {
+    // 空态跳过只认卡内注册键：内置变量（友谊 / 友谊等级）常驻存在，但
+    // 没有值也没有卡内注册键时没必要每轮发起维护（内置规则只有在树里
+    // 已出现时才进提示词，见 buildValuesMaintainMessages）。
+    const bundle = getValuesBundle(ctx);
+    if (bundle.keys.length === 0 && valuesCountEntries(current) === 0) {
       logApp('debug', '变量维护跳过：没有已注册变量也没有现有变量');
       finish({ skipped: true });
       return record;

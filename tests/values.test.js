@@ -40,16 +40,30 @@ function makeChatCtx() {
 }
 
 // ---------- 键注册表 ----------
-runner.test('注册键：名称去重、规则更新', () => {
+runner.test('注册键：名称去重、规则更新（内置变量常驻 / 卡键遮蔽内置）', () => {
   const c = fresh();
-  ctx.upsertValuesKey(c, '好感', '友好互动 +5，冲突 -10，上限 100');
+  // 内置默认注册变量（友谊 / 友谊等级 / 情欲 / 情欲等级）：无任何注册时也可
+  // 直接使用，但不写入角色卡 / 全局设置（虚拟合并，不随 YAML 导出）。
+  const builtinNames = ctx.getValuesKeys(c).map((key) => key.name).sort();
+  assert(builtinNames.join(',') === '友谊,友谊等级,情欲,情欲等级', '无注册时应有内置键');
+  assert(ctx.getValuesKeys(c).every((key) => ctx.isValuesBuiltinKey(key)), '初始键应全部为内置');
+  assert(ctx.getValuesBundle(c).keys.length === 0, '内置键不应写入角色卡 / 全局设置');
+  ctx.upsertValuesKey(c, '友谊', '友好互动 +5，冲突 -10，上限 100');
   ctx.upsertValuesKey(c, '金钱', '按剧情收支变化');
-  assert(ctx.getValuesKeys(c).length === 2, '应有 2 个键');
-  ctx.upsertValuesKey(c, '好感', '新规则');
-  assert(ctx.getValuesKeys(c).length === 2, '同名键不应重复');
-  assert(ctx.getValuesKeyByName(c, '好感').rule === '新规则', '规则应更新');
+  assert(ctx.getValuesBundle(c).keys.length === 2, '卡内应有 2 个键');
+  // 卡内同名键遮蔽内置：编辑内置 = 生成卡级自定义规则。
+  const builtinShadowed = ctx.getValuesKeys(c).filter((key) => key.name === '友谊');
+  assert(builtinShadowed.length === 1 && !ctx.isValuesBuiltinKey(builtinShadowed[0]), '卡键应遮蔽内置友谊');
+  assert(ctx.getValuesKeys(c).length === 5, '合并内置后应有 5 个键');
+  ctx.upsertValuesKey(c, '友谊', '新规则');
+  assert(ctx.getValuesBundle(c).keys.length === 2, '同名键不应重复');
+  assert(ctx.getValuesKeyByName(c, '友谊').rule === '新规则', '规则应更新');
   assert(ctx.deleteValuesKey(c, '金钱') === true, '删除应成功');
-  assert(ctx.getValuesKeys(c).length === 1, '删除后应剩 1 个键');
+  assert(ctx.getValuesBundle(c).keys.length === 1, '删除后卡内应剩 1 个键');
+  // 删除卡键后内置恢复（删除 = 恢复内置默认）。
+  assert(ctx.deleteValuesKey(c, '友谊') === true, '删除卡键应成功');
+  assert(ctx.getValuesKeys(c).length === 4, '删除卡键后内置键应恢复');
+  assert(ctx.getValuesKeys(c).every((key) => ctx.isValuesBuiltinKey(key)), '恢复的键应全部为内置');
 });
 
 // ---------- 默认值：角色卡绑定 ----------
@@ -217,6 +231,56 @@ runner.test('维护消息：键规则 + 当前值 + 最新 2 条消息', () => {
   assert(recent[0].content === '送你礼物' && recent[1].content === '谢谢！', '应取最后两条');
 });
 
+// ---------- 内置默认注册变量 ----------
+runner.test('内置变量：子变量参与派生 / 维护提示词只在树中出现时列出', () => {
+  // 无任何注册时：内置好感等级 ← 内置好感 直接可派生。
+  const c = makeChatCtx();
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['拉姆', '友谊'], 68);
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['拉姆', '友谊等级'], '占位');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['拉姆', '情欲'], 55);
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['拉姆', '情欲等级'], '占位');
+  const game = ctx.getValuesGameTree(c);
+  assert(game['拉姆']['友谊等级'] === 'lv4: 莫逆之交', '内置子变量应按内置区间派生（68 → lv4）');
+  assert(game['拉姆']['情欲等级'] === 'lv3: 卿卿我我', '内置子变量应按内置区间派生（55 → lv3）');
+  // 维护提示词：树里还没有内置变量时，内置规则不列入（防止 AI 凭空创建）。
+  const c2 = makeChatCtx();
+  c2.chat = [{ is_user: true, name: '玩家', mes: '你好' }, { is_user: false, name: '角色', mes: '你好呀' }];
+  const msgs1 = ctx.buildValuesMaintainMessages(c2, '系统提示词');
+  assert(!msgs1[1].content.includes('友谊') && !msgs1[1].content.includes('情欲'), '树中没有内置变量时内置规则不应列入');
+  // 树里出现内置变量（玩家新建值）后，内置规则与派生说明才进入提示词。
+  const c3 = makeChatCtx();
+  c3.chat = [{ is_user: true, name: '玩家', mes: '你好' }, { is_user: false, name: '角色', mes: '你好呀' }];
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c3), ['拉姆', '友谊'], 68);
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c3), ['拉姆', '友谊等级'], '占位');
+  const msgs2 = ctx.buildValuesMaintainMessages(c3, '系统提示词');
+  assert(msgs2[1].content.includes('友谊: 友谊度区间为0~100'), '树中出现友谊时内置规则应列入');
+  assert(msgs2[1].content.includes('友谊等级'), '子变量派生说明应列入');
+  assert(msgs2[2].content.includes('友谊: 68'), '当前值应发送父变量');
+  assert(!msgs2[2].content.includes('友谊等级'), '内置子变量叶子应被剔除，不发送给 AI');
+  assert(!msgs2[1].content.includes('情欲'), '树中没有情欲时内置情欲规则不应列入');
+});
+
+runner.test('内置变量：YAML 导出不含内置键，导入同名键按卡保存', () => {
+  const character = makeCharacter('测试角色', 'avatar-1');
+  const c = makeContext({ characters: [character], characterId: 0, writeExtensionField: () => Promise.resolve() });
+  const yaml = ctx.serializeValuesBundle(c);
+  assert(!yaml.includes('友谊') && !yaml.includes('情欲'), '内置键不应出现在 YAML 导出中');
+  // 导入含同名键的包 → 卡内保存（遮蔽内置），导出随卡携带。
+  ctx.applyValuesBundle(c, ctx.parseValuesBundle(
+    'format: kaleidoscope-values\nkeys:\n  - name: 友谊\n    type: parent\n    rule: 自定义规则\ndefaults: {}'
+  ), 'merge');
+  assert(ctx.getValuesBundle(c).keys.length === 1, '导入的同名键应按卡保存');
+  assert(ctx.getValuesKeyByName(c, '友谊').rule === '自定义规则', '卡键规则应覆盖内置');
+  assert(ctx.serializeValuesBundle(c).includes('自定义规则'), '卡内同名键应随 YAML 导出');
+});
+
+runner.test('valuesTreeContainsName：任意层级命中', () => {
+  assert(ctx.valuesTreeContainsName({ 张三: { 好感: 68 } }, '好感') === true, '嵌套叶子应命中');
+  assert(ctx.valuesTreeContainsName({ 张三: { 好感: 68 } }, '金钱') === false, '不存在的名字不应命中');
+  assert(ctx.valuesTreeContainsName({ 好感: 68 }, '好感') === true, '顶层叶子应命中');
+  assert(ctx.valuesTreeContainsName({ 张三: { 好感: 68 } }, '') === false, '空名字不应命中');
+});
+
 // ---------- 树工具 ----------
 runner.test('变量树工具：路径读写删除与计数', () => {
   const tree = {};
@@ -294,13 +358,16 @@ runner.test('注册子变量：类型 / 父变量 / 区间规则，旧键归一�
     { min: 61, max: 100, value: '生死相依' },
   ] });
   const keys = ctx.getValuesKeys(c);
-  assert(keys.length === 2, '应有 2 个键');
+  assert(keys.filter((key) => !ctx.isValuesBuiltinKey(key)).length === 2, '卡内应有 2 个键（另含 2 个内置键）');
   const attitude = ctx.getValuesKeyByName(c, '态度');
   assert(ctx.isValuesChildKey(attitude) === true, '态度应为子变量');
   assert(attitude.parent === '好感度', '父变量名应保存');
   assert(attitude.rules.length === 3, '应有 3 条区间规则');
   assert(ctx.isValuesParentKey(ctx.getValuesKeyByName(c, '好感度')) === true, '好感度应为父变量');
   assert(ctx.getValuesChildKeysByParent(c, '好感度').length === 1, '应能查到依赖好感度的子变量');
+  // 删除守卫：内置子变量（友谊等级 ← 友谊）不算卡键依赖，删除卡内友谊不会被误拦截。
+  ctx.upsertValuesKey(c, '好感', '规则');
+  assert(ctx.getValuesChildKeysByParent(c, '好感').length === 0, '内置子变量不应算作删除依赖');
   // 缺省 type 的旧键归一化为父变量
   const c2 = fresh();
   ctx.upsertValuesKey(c2, '金钱', '按剧情收支变化');
@@ -568,12 +635,12 @@ runner.test('键注册表重排：按名称调整顺序并保存', () => {
   ctx.upsertValuesKey(c, '金钱', '规则2');
   ctx.upsertValuesKey(c, '体力', '规则3');
   ctx.reorderValuesKeys(c, ['体力', '好感', '金钱']);
-  const names = ctx.getValuesKeys(c).map((key) => key.name);
+  const names = ctx.getValuesKeys(c).filter((key) => !ctx.isValuesBuiltinKey(key)).map((key) => key.name);
   assert(names.join(',') === '体力,好感,金钱', '应按给定顺序重排');
   // 未列出的键按原相对顺序追加在末尾
   ctx.upsertValuesKey(c, '魔力', '规则4');
   ctx.reorderValuesKeys(c, ['金钱']);
-  const names2 = ctx.getValuesKeys(c).map((key) => key.name);
+  const names2 = ctx.getValuesKeys(c).filter((key) => !ctx.isValuesBuiltinKey(key)).map((key) => key.name);
   assert(names2.join(',') === '金钱,体力,好感,魔力', '未列出的键应追加在末尾');
 });
 

@@ -2,7 +2,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.0.6';
+const MODULE_VERSION = '1.0.7';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 
 // ---------- DOM ID / class ----------
@@ -240,6 +240,47 @@ const VALUES_CHAT_SAVE_TIMER_KEY = '__kaleido_values_chat_save_timer__';
 const VALUES_BUNDLE_FORMAT = 'kaleidoscope-values';
 const VALUES_BUNDLE_FILENAME_PREFIX = '万华镜-变量';
 const VALUES_CARD_BUNDLE_FILENAME_PREFIX = '变量: ';
+// 内置默认注册变量：任何角色卡 / 聊天都可直接用，无需手动注册。
+// 虚拟合并进 getValuesKeys 返回（不落盘、不随 YAML 导出）；卡内注册同名键
+// 自动遮蔽内置（编辑内置 = 生成卡级自定义规则，删除卡键 = 恢复内置默认）。
+const VALUES_BUILTIN_KEYS = [
+  {
+    name: '友谊',
+    type: VALUES_KEY_TYPE_PARENT,
+    rule: '友谊度区间为0~100，变化幅度取决于当前关系——例如:泛泛之交打招呼可以+3，而莫逆之交则不会变化；较大利益赠予对泛泛之交+20，但对莫逆之交可能只+10。',
+  },
+  {
+    name: '友谊等级',
+    type: VALUES_KEY_TYPE_CHILD,
+    parent: '友谊',
+    rule: '',
+    rules: [
+      { min: 0, max: 20, value: 'lv1: 萍水相逢' },
+      { min: 21, max: 40, value: 'lv2: 泛泛之交' },
+      { min: 41, max: 60, value: 'lv3: 意气相投' },
+      { min: 61, max: 80, value: 'lv4: 莫逆之交' },
+      { min: 81, max: 100, value: 'lv5: 生死与共' },
+    ],
+  },
+  {
+    name: '情欲',
+    type: VALUES_KEY_TYPE_PARENT,
+    rule: '情欲值的变化幅度取决于亲密行为的强度,而非日常互动的日积月累——例如:一个暧昧的眼神对视只能有+5左右的小增量,一次亲吻可以带来+20甚至更多的跃迁式增长,发生关系则会直接带来+40以上的大幅跃升;但同样的行为,对情欲值已经很高的关系加成会递减,后期的增长更多依赖亲密互动的频率与默契积累,而非单次行为本身的强度。',
+  },
+  {
+    name: '情欲等级',
+    type: VALUES_KEY_TYPE_CHILD,
+    parent: '情欲',
+    rule: '',
+    rules: [
+      { min: 0, max: 20, value: 'lv1: 暗生情愫' },
+      { min: 21, max: 40, value: 'lv2: 眉来眼去' },
+      { min: 41, max: 60, value: 'lv3: 卿卿我我' },
+      { min: 61, max: 80, value: 'lv4: 干柴烈火' },
+      { min: 81, max: 100, value: 'lv5: 鱼水之欢' },
+    ],
+  },
+];
 // 变量自动维护（AI 维护管线）
 const VALUES_AUTO_UPDATE_ENABLED = true;
 const VALUES_MAINTAIN_RECENT_COUNT = 2;
@@ -6130,6 +6171,21 @@ function saveValuesData(ctx) {
 }
 
 // ---------- 键注册表 ----------
+// 内置默认注册变量（VALUES_BUILTIN_KEYS，见 constants.js）：虚拟合并进
+// getValuesKeys 的返回——不写进角色卡 / 全局设置、不随 YAML 导出；卡内注册
+// 同名键自动遮蔽内置（编辑内置 = 生成卡级自定义规则），删除卡键后内置恢复
+// （删除 = 恢复内置默认）。克隆副本带 builtin 标记，UI 据此渲染内置行。
+function isValuesBuiltinKey(key) {
+  return Boolean(key && key.builtin === true);
+}
+
+// 返回未被卡内同名键遮蔽的内置键克隆（带 builtin 标记）。
+function getValuesBuiltinKeys(cardKeyNames) {
+  return VALUES_BUILTIN_KEYS
+    .filter((key) => !cardKeyNames.has(String(key?.name || '').trim()))
+    .map((key) => Object.assign(cloneValue(key), { builtin: true }));
+}
+
 function getValuesKeys(ctx) {
   const bundle = ctx ? getValuesBundle(ctx) : null;
   if (!bundle) return [];
@@ -6143,7 +6199,9 @@ function getValuesKeys(ctx) {
       if (!Array.isArray(key.rules)) key.rules = [];
     }
   }
-  return bundle.keys;
+  const cardKeyNames = new Set(bundle.keys.map((key) => String(key?.name || '').trim()).filter(Boolean));
+  const builtins = getValuesBuiltinKeys(cardKeyNames);
+  return builtins.length > 0 ? builtins.concat(bundle.keys) : bundle.keys;
 }
 
 function getValuesRegistryNames(ctx) {
@@ -6248,9 +6306,13 @@ function getValuesChildKeys(ctx) {
 }
 
 // 依赖指定父变量的全部子变量（删除父变量前的依赖检查用）。
+// 内置子变量不参与检查：内置父变量无法删除，其派生依赖恒被满足；
+// 删除卡内同名父键（内置覆盖）后内置父键仍存在，不会孤立任何子变量。
 function getValuesChildKeysByParent(ctx, parentName) {
   const target = String(parentName || '').trim();
-  return getValuesKeys(ctx).filter((key) => isValuesChildKey(key) && String(key.parent || '').trim() === target);
+  return getValuesKeys(ctx).filter(
+    (key) => isValuesChildKey(key) && !isValuesBuiltinKey(key) && String(key.parent || '').trim() === target,
+  );
 }
 
 // 归一化子变量区间规则：{ min?, max?, value }，min / max 可省略（省略 = 不设
@@ -6544,6 +6606,23 @@ function valuesCountEntries(tree) {
   };
   walk(tree);
   return count;
+}
+
+// 树中是否存在指定名字的条目（任意层级的叶子 / 节点名）。
+// 维护提示词过滤内置规则用：内置变量规则只在树里已出现该变量名时才发给 AI，
+// 避免 AI 在从未使用过该变量的聊天里凭空创建。
+function valuesTreeContainsName(tree, name) {
+  const target = String(name || '').trim();
+  if (!target) return false;
+  const walk = (node) => {
+    if (!valuesIsContainer(node)) return false;
+    for (const key of Object.keys(node)) {
+      if (key === target) return true;
+      if (walk(node[key])) return true;
+    }
+    return false;
+  };
+  return walk(tree);
 }
 
 // 按顺序表返回节点下的条目名：已记录顺序的条目按记录排列，未记录的按名称排序追加。
@@ -7055,18 +7134,23 @@ function getValuesMaintainPrompt(ctx) {
 // 当前值 YAML 是唯一可改动的数据，recent_messages 严格取最新 2 条。
 function buildValuesMaintainMessages(ctx, prompt) {
   const keys = getValuesKeys(ctx);
+  const current = getValuesGameTree(ctx);
   // 子变量是派生变量：不参与 AI 维护，规则块里只列父变量并注明子变量由系统计算。
   const parentKeys = keys.filter(isValuesParentKey);
   const childKeys = keys.filter(isValuesChildKey);
+  // 内置变量的规则只在树里已出现该变量名时才列出：防止 AI 在从未使用过
+  // 内置变量的聊天里凭空创建（卡内注册的键照旧全列，与旧行为一致）。
+  const builtinInUse = (key) => valuesTreeContainsName(current, String(key?.name || ''));
   const keyRulesText = parentKeys
+    .filter((key) => !isValuesBuiltinKey(key) || builtinInUse(key))
     .map((key) => `- ${String(key?.name || '')}: ${String(key?.rule || '')}`)
     .join('\n') || '（尚未注册任何父变量）';
-  const childNote = childKeys.length > 0
+  const childKeysInUse = childKeys.filter((key) => !isValuesBuiltinKey(key) || builtinInUse(key));
+  const childNote = childKeysInUse.length > 0
     ? '\n\n（子变量为派生变量，由系统按父变量自动计算，禁止修改：' +
-      childKeys.map((key) => `${String(key?.name || '')} ← ${String(key?.parent || '')}`).join('、') +
+      childKeysInUse.map((key) => `${String(key?.name || '')} ← ${String(key?.parent || '')}`).join('、') +
       '）'
     : '';
-  const current = getValuesGameTree(ctx);
   // 子变量是派生变量：发给 AI 的值表只含父变量，子变量不发送（也不允许 AI 改动）。
   const parentCurrent = stripValuesChildLeaves(current, keys);
   const currentText = serializeValuesTree(parentCurrent, '') || '{}';
@@ -7138,7 +7222,11 @@ async function runValuesMaintain(ctx, settings, options = {}) {
   try {
     const keys = getValuesKeys(ctx);
     const current = getValuesGameTree(ctx);
-    if (keys.length === 0 && valuesCountEntries(current) === 0) {
+    // 空态跳过只认卡内注册键：内置变量（友谊 / 友谊等级）常驻存在，但
+    // 没有值也没有卡内注册键时没必要每轮发起维护（内置规则只有在树里
+    // 已出现时才进提示词，见 buildValuesMaintainMessages）。
+    const bundle = getValuesBundle(ctx);
+    if (bundle.keys.length === 0 && valuesCountEntries(current) === 0) {
       logApp('debug', '变量维护跳过：没有已注册变量也没有现有变量');
       finish({ skipped: true });
       return record;
@@ -8557,21 +8645,33 @@ function renderValuesKeys() {
     const row = document.createElement('div');
     row.className = 'kaleido-values__row kaleido-values__row--key';
     row.dataset.name = String(key.name || '');
+    const isBuiltin = isValuesBuiltinKey(key);
     const isChild = isValuesChildKey(key);
     const typeBadge = isChild
       ? `<span class="kaleido-values__row-type-badge is-child" title="子变量：值由父变量自动派生，不参与 AI 维护">子</span>`
       : `<span class="kaleido-values__row-type-badge" title="父变量：由 AI 按变化规则维护">父</span>`;
+    // 内置行：带「内置」徽标、不可拖动、无删除按钮（编辑 = 按当前角色卡保存
+    // 自定义规则并生成卡级覆盖，之后该行变为普通卡键行，删除即恢复内置默认）。
+    const builtinBadge = isBuiltin
+      ? `<span class="kaleido-values__row-type-badge is-builtin" title="内置变量：任何角色卡 / 聊天默认注册，可直接使用；编辑后按当前角色卡覆盖">内置</span>`
+      : '';
     const ruleText = isChild
       ? `由「${String(key.parent || '')}」派生：${formatValuesChildRulesSummary(key)}`
       : String(key.rule || '（未填写变化规则）');
+    const dragHandle = isBuiltin
+      ? ''
+      : `<button type="button" class="kaleido-values__drag-handle" data-action="drag" title="拖动排序" aria-label="拖动排序"><span class="${VALUES_DRAG_ICON_CLASS}"></span></button>`;
+    const deleteButton = isBuiltin
+      ? ''
+      : `<button type="button" class="kaleido-values__icon-btn kaleido-values__icon-btn--danger" data-action="delete-key" title="删除变量" aria-label="删除变量"><span class="${VALUES_DELETE_ICON_CLASS}"></span></button>`;
     row.innerHTML = `
-      <button type="button" class="kaleido-values__drag-handle" data-action="drag" title="拖动排序" aria-label="拖动排序"><span class="${VALUES_DRAG_ICON_CLASS}"></span></button>
-      <span class="kaleido-values__row-name is-registered" title="已注册变量">${escapeHtml(String(key.name || ''))}</span>
-      ${typeBadge}
+      ${dragHandle}
+      <span class="kaleido-values__row-name is-registered" title="${isBuiltin ? '内置变量（默认注册，可直接使用）' : '已注册变量'}">${escapeHtml(String(key.name || ''))}</span>
+      ${builtinBadge}${typeBadge}
       <span class="kaleido-values__row-rule" title="${escapeHtml(ruleText)}">${escapeHtml(ruleText)}</span>
       <span class="kaleido-values__row-actions">
         <button type="button" class="kaleido-values__icon-btn" data-action="edit-key" title="编辑变量" aria-label="编辑变量"><span class="${VALUES_EDIT_ICON_CLASS}"></span></button>
-        <button type="button" class="kaleido-values__icon-btn kaleido-values__icon-btn--danger" data-action="delete-key" title="删除变量" aria-label="删除变量"><span class="${VALUES_DELETE_ICON_CLASS}"></span></button>
+        ${deleteButton}
       </span>
     `;
     body.appendChild(row);
@@ -8796,8 +8896,13 @@ function saveValuesKeyEditor() {
     const rule = String(document.getElementById(VALUES_KEY_EDITOR_RULE_ID)?.value || '').trim();
     upsertValuesKey(ctx, name, rule, { type });
   }
+  // 保存内置变量（友谊 / 友谊等级）时提示覆盖语义：编辑内置 = 生成卡级
+  // 自定义规则，删除该卡键后恢复内置默认。
+  const isBuiltinName = VALUES_BUILTIN_KEYS.some((key) => String(key?.name || '') === String(name || ''));
   logApp('info', valuesKeyEditorName ? '变量已更新' : '变量已注册', name);
-  valuesToastr('success', valuesKeyEditorName ? '变量已保存' : `变量「${name}」已注册`);
+  valuesToastr('success', valuesKeyEditorName
+    ? (isBuiltinName ? `「${name}」自定义规则已保存（删除后恢复内置默认）` : '变量已保存')
+    : (isBuiltinName ? `「${name}」已注册（覆盖内置默认规则）` : `变量「${name}」已注册`));
   closeValuesKeyEditor();
   renderValuesKeys();
   renderValuesTree();
@@ -8812,10 +8917,15 @@ async function handleValuesDeleteKey(name) {
     valuesToastr('warning', `请先删除或改绑依赖它的子变量：${dependents.map((key) => key.name).join('、')}`);
     return;
   }
-  if (!(await kaleidoConfirm(`确定删除已注册变量「${name}」吗？已存在的变量不会自动删除。`))) return;
+  // 删除内置变量名的卡键 = 删除自定义规则并恢复内置默认（内置本身不可删除）。
+  const isBuiltinName = VALUES_BUILTIN_KEYS.some((key) => String(key?.name || '') === String(name || ''));
+  const message = isBuiltinName
+    ? `确定删除「${name}」的自定义规则吗？删除后将恢复内置默认规则。`
+    : `确定删除已注册变量「${name}」吗？已存在的变量不会自动删除。`;
+  if (!(await kaleidoConfirm(message))) return;
   deleteValuesKey(ctx, name);
   logApp('info', '变量已删除', name);
-  valuesToastr('success', `已删除变量「${name}」`);
+  valuesToastr('success', isBuiltinName ? `已删除「${name}」自定义规则，恢复内置默认` : `已删除变量「${name}」`);
   renderValuesKeys();
   renderValuesTree();
   refreshHomeValuesStatus();

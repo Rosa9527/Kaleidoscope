@@ -192,6 +192,21 @@ function saveValuesData(ctx) {
 }
 
 // ---------- 键注册表 ----------
+// 内置默认注册变量（VALUES_BUILTIN_KEYS，见 constants.js）：虚拟合并进
+// getValuesKeys 的返回——不写进角色卡 / 全局设置、不随 YAML 导出；卡内注册
+// 同名键自动遮蔽内置（编辑内置 = 生成卡级自定义规则），删除卡键后内置恢复
+// （删除 = 恢复内置默认）。克隆副本带 builtin 标记，UI 据此渲染内置行。
+function isValuesBuiltinKey(key) {
+  return Boolean(key && key.builtin === true);
+}
+
+// 返回未被卡内同名键遮蔽的内置键克隆（带 builtin 标记）。
+function getValuesBuiltinKeys(cardKeyNames) {
+  return VALUES_BUILTIN_KEYS
+    .filter((key) => !cardKeyNames.has(String(key?.name || '').trim()))
+    .map((key) => Object.assign(cloneValue(key), { builtin: true }));
+}
+
 function getValuesKeys(ctx) {
   const bundle = ctx ? getValuesBundle(ctx) : null;
   if (!bundle) return [];
@@ -205,7 +220,9 @@ function getValuesKeys(ctx) {
       if (!Array.isArray(key.rules)) key.rules = [];
     }
   }
-  return bundle.keys;
+  const cardKeyNames = new Set(bundle.keys.map((key) => String(key?.name || '').trim()).filter(Boolean));
+  const builtins = getValuesBuiltinKeys(cardKeyNames);
+  return builtins.length > 0 ? builtins.concat(bundle.keys) : bundle.keys;
 }
 
 function getValuesRegistryNames(ctx) {
@@ -310,9 +327,13 @@ function getValuesChildKeys(ctx) {
 }
 
 // 依赖指定父变量的全部子变量（删除父变量前的依赖检查用）。
+// 内置子变量不参与检查：内置父变量无法删除，其派生依赖恒被满足；
+// 删除卡内同名父键（内置覆盖）后内置父键仍存在，不会孤立任何子变量。
 function getValuesChildKeysByParent(ctx, parentName) {
   const target = String(parentName || '').trim();
-  return getValuesKeys(ctx).filter((key) => isValuesChildKey(key) && String(key.parent || '').trim() === target);
+  return getValuesKeys(ctx).filter(
+    (key) => isValuesChildKey(key) && !isValuesBuiltinKey(key) && String(key.parent || '').trim() === target,
+  );
 }
 
 // 归一化子变量区间规则：{ min?, max?, value }，min / max 可省略（省略 = 不设
@@ -606,6 +627,23 @@ function valuesCountEntries(tree) {
   };
   walk(tree);
   return count;
+}
+
+// 树中是否存在指定名字的条目（任意层级的叶子 / 节点名）。
+// 维护提示词过滤内置规则用：内置变量规则只在树里已出现该变量名时才发给 AI，
+// 避免 AI 在从未使用过该变量的聊天里凭空创建。
+function valuesTreeContainsName(tree, name) {
+  const target = String(name || '').trim();
+  if (!target) return false;
+  const walk = (node) => {
+    if (!valuesIsContainer(node)) return false;
+    for (const key of Object.keys(node)) {
+      if (key === target) return true;
+      if (walk(node[key])) return true;
+    }
+    return false;
+  };
+  return walk(tree);
 }
 
 // 按顺序表返回节点下的条目名：已记录顺序的条目按记录排列，未记录的按名称排序追加。

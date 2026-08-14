@@ -2701,6 +2701,12 @@ select.kaleido-input {
   background: rgba(184, 134, 47, 0.1);
   border-color: rgba(184, 134, 47, 0.4);
 }
+/* 内置变量徽标（青绿）：默认注册，可直接使用；编辑后按当前角色卡覆盖 */
+.kaleido-values__row-type-badge.is-builtin {
+  color: #1d7d6a;
+  background: rgba(29, 125, 106, 0.1);
+  border-color: rgba(29, 125, 106, 0.4);
+}
 
 /* 树行派生徽标：子变量（金） */
 .kaleido-values__row-derived-badge {

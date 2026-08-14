@@ -854,21 +854,33 @@ function renderValuesKeys() {
     const row = document.createElement('div');
     row.className = 'kaleido-values__row kaleido-values__row--key';
     row.dataset.name = String(key.name || '');
+    const isBuiltin = isValuesBuiltinKey(key);
     const isChild = isValuesChildKey(key);
     const typeBadge = isChild
       ? `<span class="kaleido-values__row-type-badge is-child" title="子变量：值由父变量自动派生，不参与 AI 维护">子</span>`
       : `<span class="kaleido-values__row-type-badge" title="父变量：由 AI 按变化规则维护">父</span>`;
+    // 内置行：带「内置」徽标、不可拖动、无删除按钮（编辑 = 按当前角色卡保存
+    // 自定义规则并生成卡级覆盖，之后该行变为普通卡键行，删除即恢复内置默认）。
+    const builtinBadge = isBuiltin
+      ? `<span class="kaleido-values__row-type-badge is-builtin" title="内置变量：任何角色卡 / 聊天默认注册，可直接使用；编辑后按当前角色卡覆盖">内置</span>`
+      : '';
     const ruleText = isChild
       ? `由「${String(key.parent || '')}」派生：${formatValuesChildRulesSummary(key)}`
       : String(key.rule || '（未填写变化规则）');
+    const dragHandle = isBuiltin
+      ? ''
+      : `<button type="button" class="kaleido-values__drag-handle" data-action="drag" title="拖动排序" aria-label="拖动排序"><span class="${VALUES_DRAG_ICON_CLASS}"></span></button>`;
+    const deleteButton = isBuiltin
+      ? ''
+      : `<button type="button" class="kaleido-values__icon-btn kaleido-values__icon-btn--danger" data-action="delete-key" title="删除变量" aria-label="删除变量"><span class="${VALUES_DELETE_ICON_CLASS}"></span></button>`;
     row.innerHTML = `
-      <button type="button" class="kaleido-values__drag-handle" data-action="drag" title="拖动排序" aria-label="拖动排序"><span class="${VALUES_DRAG_ICON_CLASS}"></span></button>
-      <span class="kaleido-values__row-name is-registered" title="已注册变量">${escapeHtml(String(key.name || ''))}</span>
-      ${typeBadge}
+      ${dragHandle}
+      <span class="kaleido-values__row-name is-registered" title="${isBuiltin ? '内置变量（默认注册，可直接使用）' : '已注册变量'}">${escapeHtml(String(key.name || ''))}</span>
+      ${builtinBadge}${typeBadge}
       <span class="kaleido-values__row-rule" title="${escapeHtml(ruleText)}">${escapeHtml(ruleText)}</span>
       <span class="kaleido-values__row-actions">
         <button type="button" class="kaleido-values__icon-btn" data-action="edit-key" title="编辑变量" aria-label="编辑变量"><span class="${VALUES_EDIT_ICON_CLASS}"></span></button>
-        <button type="button" class="kaleido-values__icon-btn kaleido-values__icon-btn--danger" data-action="delete-key" title="删除变量" aria-label="删除变量"><span class="${VALUES_DELETE_ICON_CLASS}"></span></button>
+        ${deleteButton}
       </span>
     `;
     body.appendChild(row);
@@ -1093,8 +1105,13 @@ function saveValuesKeyEditor() {
     const rule = String(document.getElementById(VALUES_KEY_EDITOR_RULE_ID)?.value || '').trim();
     upsertValuesKey(ctx, name, rule, { type });
   }
+  // 保存内置变量（友谊 / 友谊等级）时提示覆盖语义：编辑内置 = 生成卡级
+  // 自定义规则，删除该卡键后恢复内置默认。
+  const isBuiltinName = VALUES_BUILTIN_KEYS.some((key) => String(key?.name || '') === String(name || ''));
   logApp('info', valuesKeyEditorName ? '变量已更新' : '变量已注册', name);
-  valuesToastr('success', valuesKeyEditorName ? '变量已保存' : `变量「${name}」已注册`);
+  valuesToastr('success', valuesKeyEditorName
+    ? (isBuiltinName ? `「${name}」自定义规则已保存（删除后恢复内置默认）` : '变量已保存')
+    : (isBuiltinName ? `「${name}」已注册（覆盖内置默认规则）` : `变量「${name}」已注册`));
   closeValuesKeyEditor();
   renderValuesKeys();
   renderValuesTree();
@@ -1109,10 +1126,15 @@ async function handleValuesDeleteKey(name) {
     valuesToastr('warning', `请先删除或改绑依赖它的子变量：${dependents.map((key) => key.name).join('、')}`);
     return;
   }
-  if (!(await kaleidoConfirm(`确定删除已注册变量「${name}」吗？已存在的变量不会自动删除。`))) return;
+  // 删除内置变量名的卡键 = 删除自定义规则并恢复内置默认（内置本身不可删除）。
+  const isBuiltinName = VALUES_BUILTIN_KEYS.some((key) => String(key?.name || '') === String(name || ''));
+  const message = isBuiltinName
+    ? `确定删除「${name}」的自定义规则吗？删除后将恢复内置默认规则。`
+    : `确定删除已注册变量「${name}」吗？已存在的变量不会自动删除。`;
+  if (!(await kaleidoConfirm(message))) return;
   deleteValuesKey(ctx, name);
   logApp('info', '变量已删除', name);
-  valuesToastr('success', `已删除变量「${name}」`);
+  valuesToastr('success', isBuiltinName ? `已删除「${name}」自定义规则，恢复内置默认` : `已删除变量「${name}」`);
   renderValuesKeys();
   renderValuesTree();
   refreshHomeValuesStatus();

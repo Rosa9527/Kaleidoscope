@@ -134,17 +134,51 @@ runner.test('initValuesSection 创建工作台对话框', () => {
 });
 
 // ---------- 键注册 ----------
-runner.test('键注册：填写名称与规则后保存', () => {
+runner.test('键注册：填写名称与规则后保存（内置变量常驻）', () => {
   click($('kaleido-values-add-key'));
   assert(!$('kaleido-values-key-editor').hidden, '应打开键编辑器');
-  setValue('kaleido-values-key-editor-name', '好感');
+  setValue('kaleido-values-key-editor-name', '友谊');
   setValue('kaleido-values-key-editor-rule', '友好互动 +5，冲突 -10，上限 100');
   click($('kaleido-values-key-editor-save'));
   const keys = ui.getValuesKeys(hostCtx);
-  assert(keys.length === 1 && keys[0].name === '好感', '应注册 1 个键');
-  assert(keys[0].rule.includes('友好互动'), '应保存变化规则');
+  assert(keys.length === 4, '合并内置后应有 4 个键（内置 3 + 卡键友谊遮蔽内置友谊）');
+  assert(keys.some((key) => key.name === '友谊' && key.rule.includes('友好互动')), '应保存变化规则');
   const rows = Array.from($('kaleido-values-keys-body').querySelectorAll('.kaleido-values__row'));
-  assert(rows.length === 1, '键列表应显示 1 行');
+  assert(rows.length === 4, '键列表应显示 4 行');
+  // 内置变量默认可选：新建变量下拉直接列出，无需先注册。
+  pickAddMenu('key');
+  const selectValues = Array.from($('kaleido-values-editor-key-select').options).map((option) => option.value);
+  assert(['友谊', '友谊等级', '情欲', '情欲等级'].every((name) => selectValues.includes(name)), '下拉应含全部内置变量');
+});
+
+// ---------- 内置变量：编辑覆盖 / 删除恢复 ----------
+runner.test('内置变量：编辑生成卡级覆盖，删除后恢复内置默认', async () => {
+  for (const key of ui.getValuesKeys(hostCtx).slice()) ui.deleteValuesKey(hostCtx, key.name);
+  click($('kaleido-values-tab-keys'));
+  ui.renderValuesKeys();
+  const rows = () => Array.from($('kaleido-values-keys-body').querySelectorAll('.kaleido-values__row'));
+  assert(rows().length === 4, '清空卡键后应只剩 4 个内置行');
+  // 编辑内置变量 → 保存生成卡级覆盖（行变为普通卡键行）。
+  const builtinRow = rows().find((r) => r.dataset.name === '友谊');
+  click(builtinRow.querySelector('button[data-action="edit-key"]'));
+  assert(!$('kaleido-values-key-editor').hidden, '应能编辑内置变量');
+  assert($('kaleido-values-key-editor-name').value === '友谊', '变量名应回填');
+  setValue('kaleido-values-key-editor-rule', '自定义规则');
+  click($('kaleido-values-key-editor-save'));
+  const cardKey = ui.getValuesKeyByName(hostCtx, '友谊');
+  assert(cardKey && cardKey.rule === '自定义规则' && !ui.isValuesBuiltinKey(cardKey), '保存应生成卡级覆盖');
+  const overriddenRow = rows().find((r) => r.dataset.name === '友谊');
+  assert(overriddenRow.querySelector('button[data-action="delete-key"]'), '覆盖态行应显示删除按钮');
+  assert(!overriddenRow.querySelector('.is-builtin'), '覆盖态行不应显示内置徽标');
+  // 删除覆盖 → 恢复内置默认。
+  click(overriddenRow.querySelector('button[data-action="delete-key"]'));
+  assert(confirmMessage().includes('内置默认'), '删除提示应说明恢复内置默认');
+  clickConfirmOk();
+  await flush();
+  assert(ui.getValuesBundle(hostCtx).keys.length === 0, '卡键应被删除');
+  const restoredRow = rows().find((r) => r.dataset.name === '友谊');
+  assert(restoredRow && restoredRow.querySelector('.is-builtin'), '删除后内置行应恢复');
+  assert(!restoredRow.querySelector('button[data-action="delete-key"]'), '恢复的内置行不应有删除按钮');
 });
 
 // ---------- 键注册：子变量 ----------
@@ -282,15 +316,15 @@ runner.test('新建键：菜单 → 下拉选择已注册键 + 键值', () => {
   assert($('kaleido-values-editor-node-fields').hidden, '不应显示节点字段');
   const select = $('kaleido-values-editor-key-select');
   const selectValues = Array.from(select.options).map((option) => option.value);
-  assert(selectValues.includes('好感'), '下拉应含已注册键 好感');
-  select.value = '好感';
+  assert(selectValues.includes('友谊'), '下拉应含已注册键 友谊');
+  select.value = '友谊';
   setValue('kaleido-values-editor-value', '30');
   click($('kaleido-values-editor-save'));
   const defaults = ui.getValuesDefaults(hostCtx);
-  assert(defaults['好感'] === 30, '默认值应保存 好感=30');
-  assert(rowNames().includes('好感'), '树应显示 好感 键行');
+  assert(defaults['友谊'] === 30, '默认值应保存 友谊=30');
+  assert(rowNames().includes('友谊'), '树应显示 友谊 键行');
   const injectConfig = ui.getValuesInjectConfig(hostCtx);
-  assert(injectConfig.paths.includes('好感'), '新建变量应默认开启注入');
+  assert(injectConfig.paths.includes('友谊'), '新建变量应默认开启注入');
 });// ---------- 新建节点 + 节点下挂键 ----------
 runner.test('新建节点：张三 → 节点下新建键', () => {
   pickAddMenu('node');
@@ -308,15 +342,15 @@ runner.test('新建节点：张三 → 节点下新建键', () => {
   assert(!$('kaleido-values-add-menu').hidden, '节点行应打开新建菜单');
   click($('kaleido-values-add-menu-key'));
   const select = $('kaleido-values-editor-key-select');
-  select.value = '好感';
+  select.value = '友谊';
   setValue('kaleido-values-editor-value', '30');
   click($('kaleido-values-editor-save'));
-  assert(defaults['张三']['好感'] === 30, '张三→好感 应保存为 30');
+  assert(defaults['张三']['友谊'] === 30, '张三→友谊 应保存为 30');
   const injectConfig = ui.getValuesInjectConfig(hostCtx);
-  assert(injectConfig.paths.includes('张三/好感'), '节点下新建变量应默认开启注入');
+  assert(injectConfig.paths.includes('张三/友谊'), '节点下新建变量应默认开启注入');
   assert(injectConfig.paths.includes('张三'), '打开下级应自动提升上级');
-  // 新建节点默认展开：无需手动点击即可看到子键（顶层也有同名 好感，须按路径区分）
-  const childVisible = () => treeRows().some((r) => JSON.parse(r.dataset.path || '[]').join('/') === '张三/好感');
+  // 新建节点默认展开：无需手动点击即可看到子键（顶层也有同名 友谊，须按路径区分）
+  const childVisible = () => treeRows().some((r) => JSON.parse(r.dataset.path || '[]').join('/') === '张三/友谊');
   assert(childVisible(), '新建节点默认展开，应直接显示子键');
   // 收起 / 再展开
   click(actionButton(rowByName('张三'), 'toggle'));
@@ -327,25 +361,25 @@ runner.test('新建节点：张三 → 节点下新建键', () => {
 
 // ---------- 编辑键：键名只读 ----------
 runner.test('编辑键：键名只读，只改键值', () => {
-  const topKeyRow = rowByName('好感');
+  const topKeyRow = rowByName('友谊');
   click(actionButton(topKeyRow, 'edit'));
   assert(!$('kaleido-values-editor').hidden, '应打开键编辑器');
   assert($('kaleido-values-editor-key-select').hidden, '编辑键时下拉应隐藏');
   assert(!$('kaleido-values-editor-key-name').hidden, '编辑键时应显示键名');
-  assert($('kaleido-values-editor-key-name').textContent === '好感', '键名应显示为 好感');
+  assert($('kaleido-values-editor-key-name').textContent === '友谊', '键名应显示为 友谊');
   setValue('kaleido-values-editor-value', '50');
   click($('kaleido-values-editor-save'));
   const defaults = ui.getValuesDefaults(hostCtx);
-  assert(defaults['好感'] === 50, '键值应更新为 50');
+  assert(defaults['友谊'] === 50, '键值应更新为 50');
 });
 
 // ---------- 双击行进入编辑 ----------
 runner.test('双击行：变量进入变量编辑，节点进入节点编辑', () => {
   const defaults = ui.getValuesDefaults(hostCtx);
-  defaults['张三'] = { '好感': 20 };
+  defaults['张三'] = { '友谊': 20 };
   ui.saveValuesData(hostCtx);
   // 双击变量行 → 变量编辑器
-  const keyRow = rowByName('好感');
+  const keyRow = rowByName('友谊');
   keyRow.dispatchEvent(new dom.window.MouseEvent('dblclick', { bubbles: true, cancelable: true }));
   assert(!$('kaleido-values-editor').hidden, '双击变量应打开编辑器');
   assert($('kaleido-values-editor-title').textContent === '编辑变量', '标题应为 编辑变量');
@@ -357,7 +391,7 @@ runner.test('双击行：变量进入变量编辑，节点进入节点编辑', (
   assert($('kaleido-values-editor-title').textContent === '编辑节点', '标题应为 编辑节点');
   click($('kaleido-values-editor-cancel'));
   // 双击按钮区域 → 不触发
-  const editBtn = actionButton(rowByName('好感'), 'edit');
+  const editBtn = actionButton(rowByName('友谊'), 'edit');
   editBtn.dispatchEvent(new dom.window.MouseEvent('dblclick', { bubbles: true, cancelable: true }));
   assert($('kaleido-values-editor').hidden, '双击按钮不应打开编辑器');
 });
@@ -792,14 +826,19 @@ runner.test('键列表：拖动把手改变注册顺序并持久化', () => {
   click($('kaleido-values-tab-keys'));
   const body = $('kaleido-values-keys-body');
   const rows = () => Array.from(body.querySelectorAll('.kaleido-values__row'));
-  assert(rows().map((r) => r.dataset.name).join(',') === '好感,金钱,体力', '初始顺序应为注册顺序');
+  assert(rows().map((r) => r.dataset.name).join(',') === '友谊,友谊等级,情欲,情欲等级,好感,金钱,体力', '初始顺序应为内置在前 + 注册顺序');
+  // 内置行（友谊）：带「内置」徽标、不可拖动、无删除按钮。
+  const builtinRow = rows()[0];
+  assert(builtinRow.dataset.name === '友谊' && builtinRow.querySelector('.is-builtin'), '内置行应显示内置徽标');
+  assert(!builtinRow.querySelector('.kaleido-values__drag-handle'), '内置行不应有拖动把手');
+  assert(!builtinRow.querySelector('[data-action="delete-key"]'), '内置行不应有删除按钮');
   stubRowRects(rows());
-  const handle = rows()[0].querySelector('.kaleido-values__drag-handle');
-  assert(handle, '键行应有拖动把手');
-  dragRowByHandle(handle, 15, 75);
-  assert(rows().map((r) => r.dataset.name).join(',') === '金钱,体力,好感', '拖动后 DOM 顺序应变化');
+  const handle = rows()[4].querySelector('.kaleido-values__drag-handle');
+  assert(handle, '卡键行应有拖动把手');
+  dragRowByHandle(handle, 135, 210);
+  assert(rows().map((r) => r.dataset.name).join(',') === '友谊,友谊等级,情欲,情欲等级,金钱,体力,好感', '拖动后 DOM 顺序应变化');
   const names = ui.getValuesKeys(hostCtx).map((key) => key.name);
-  assert(names.join(',') === '金钱,体力,好感', '数据层顺序应同步');
+  assert(names.join(',') === '友谊,友谊等级,情欲,情欲等级,金钱,体力,好感', '数据层顺序应同步');
 });
 
 runner.test('变量树：同级条目拖动排序并保持', () => {
