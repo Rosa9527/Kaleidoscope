@@ -2,7 +2,7 @@
    万华镜（Kaleidoscope）· macOS 风格界面（v2 · 全新设计）
    设计语言：macOS Sonoma —— 圆角卡片 / 分段控件 / 蓝色强调色；
    实色不透明面板（无毛玻璃半透明），亮色 + 暗色双主题自适应。
-   悬浮球：玻璃质感万花筒（旋转镜眼铺满球面）。
+   悬浮球：半透明磨砂玻璃万花筒（backdrop-filter 模糊背景，旋转镜眼铺满球面）。
    ========================================================= */
 
 /* ---------- 设计变量：亮色 / 暗色双主题 ---------- */
@@ -24,6 +24,7 @@
   --k-card: #ffffff;
   --k-field: #ffffff;
   --k-menu: #fafafc;
+  --k-sphere-glass: rgba(255, 255, 255, 0.45);
 
   --k-hover: rgba(0, 0, 0, 0.055);
   --k-pressed: rgba(0, 0, 0, 0.09);
@@ -75,6 +76,7 @@
     --k-card: #3c3c3e;
     --k-field: #3f3f42;
     --k-menu: #3a3a3c;
+    --k-sphere-glass: rgba(58, 58, 62, 0.5);
 
     --k-hover: rgba(255, 255, 255, 0.09);
     --k-pressed: rgba(255, 255, 255, 0.14);
@@ -492,12 +494,14 @@ textarea.kaleido-input {
   transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease;
 }
 
-/* 玻璃内盘：磨砂白，托住镜眼（无外圈彩环） */
+/* 玻璃内盘：半透明磨砂玻璃（模糊背景），托住镜眼（无外圈彩环） */
 .kaleido-sphere__frame {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: #f8f8fc;
+  background: var(--k-sphere-glass);
+  -webkit-backdrop-filter: blur(14px) saturate(1.6);
+  backdrop-filter: blur(14px) saturate(1.6);
   box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.9), inset 0 0 8px rgba(255, 255, 255, 0.5);
 }
 
@@ -3853,13 +3857,15 @@ html[data-theme='gufeng'] .kaleido-confirm {
   --k-shadow-pop: 0 6px 20px rgba(43, 36, 28, 0.2);
 }
 
-/* 悬浮球：朱砂印章（红底 + 墨描边 + 微旋转，印「镜」字） */
+/* 悬浮球：半透明磨砂朱砂玻璃（红底 + 墨描边 + 微旋转，印「镜」字） */
 html[data-theme='gufeng'] .kaleido-sphere {
   background:
-    radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0) 46%),
-    #b03a2e;
+    radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 46%),
+    rgba(176, 58, 46, 0.55);
   border: 1.5px solid rgba(43, 36, 28, 0.5);
   box-shadow: 2px 3px 0 rgba(43, 36, 28, 0.22);
+  -webkit-backdrop-filter: blur(14px) saturate(1.6);
+  backdrop-filter: blur(14px) saturate(1.6);
   transform: rotate(-2deg);
 }
 

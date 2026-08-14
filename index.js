@@ -2,7 +2,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.0.9';
+const MODULE_VERSION = '1.1.0';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 
 // ---------- 主题 ----------
@@ -1805,7 +1805,7 @@ function createPanel() {
           <div class="kaleido-home">
             <div class="kaleido-home__hero">
               <span class="kaleido-home__logo"><span class="${MENU_ICON_CLASS}"></span></span>
-              <p class="kaleido-home__slogan"><span class="kaleido-home__slogan-first" aria-hidden="true">镜</span>中万象，皆是文章</p>
+              <p class="kaleido-home__slogan"><span class="kaleido-home__slogan-first" aria-hidden="true">镜</span>中万象</p>
               <button type="button" id="${HOME_GAME_BUTTON_ID}" class="kaleido-home__log-btn" title="游戏模式：玩家数据档案" aria-label="游戏模式">
                 <span class="${GAME_ICON_CLASS}"></span>
               </button>
@@ -2029,7 +2029,7 @@ function createPanel() {
           <button type="button" id="${THEME_ID}" class="kaleido-panel__theme" aria-haspopup="menu" aria-expanded="false" title="切换主题">🎨 古风典雅</button>
           <div id="${THEME_MENU_ID}" class="kaleido-panel__theme-menu" role="menu" hidden></div>
         </span>
-        <span class="kaleido-panel__slogan">镜中万象 · 皆是文章</span>
+        <span class="kaleido-panel__slogan">镜中万象</span>
       </div>
     </div>
   `;
