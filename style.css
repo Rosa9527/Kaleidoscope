@@ -3156,13 +3156,13 @@ textarea.kaleido-input {
   min-width: 0;
 }
 
-.kaleido-values__key-rule-min,
-.kaleido-values__key-rule-max {
-  flex: 1;
+.kaleido-values__key-rule-row .kaleido-values__key-rule-min,
+.kaleido-values__key-rule-row .kaleido-values__key-rule-max {
+  flex: 0.6;
 }
 
-.kaleido-values__key-rule-value {
-  flex: 1.4;
+.kaleido-values__key-rule-row .kaleido-values__key-rule-value {
+  flex: 2.2;
 }
 
 .kaleido-values__key-rule-tilde {
@@ -3228,7 +3228,7 @@ textarea.kaleido-input {
 }
 
 .kaleido-values__trigger-condition-op-center {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-width: 0;
   display: flex;
   justify-content: center;
@@ -3237,7 +3237,7 @@ textarea.kaleido-input {
 .kaleido-values__trigger-condition-op-wrap {
   position: relative;
   flex: 0 1 auto;
-  min-width: 44px;
+  min-width: 24px;
   display: flex;
   align-items: stretch;
   justify-content: center;
@@ -3254,21 +3254,20 @@ textarea.kaleido-input {
 
 .kaleido-values__trigger-condition-op-text {
   pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 12px;
   font-weight: 600;
   color: var(--k-text-2);
-  background: var(--k-field);
-  border: 0.5px solid var(--k-hairline-strong);
-  border-radius: 8px;
-  padding: 7px 10px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: border-color 0.15s ease, color 0.15s ease;
+  transition: color 0.15s ease;
 }
 
+.kaleido-values__trigger-condition-op-wrap:hover .kaleido-values__trigger-condition-op-text,
 .kaleido-values__trigger-condition-op-wrap:focus-within .kaleido-values__trigger-condition-op-text {
-  border-color: var(--k-accent);
   color: var(--k-accent);
 }
 
@@ -4318,8 +4317,7 @@ html[data-theme='gufeng'] .kaleido-values__nav,
 html[data-theme='gufeng'] .kaleido-values__layer-row,
 html[data-theme='gufeng'] .kaleido-values__status-strip,
 html[data-theme='gufeng'] .kaleido-values__inject-bar,
-html[data-theme='gufeng'] .kaleido-story__editor-head,
-html[data-theme='gufeng'] .kaleido-values__editor-head {
+html[data-theme='gufeng'] .kaleido-story__editor-head {
   border: 1px solid rgba(43, 36, 28, 0.3);
   border-radius: 4px;
   box-shadow: none;
@@ -4915,8 +4913,7 @@ html[data-theme='doodle'] .kaleido-values__nav,
 html[data-theme='doodle'] .kaleido-values__layer-row,
 html[data-theme='doodle'] .kaleido-values__status-strip,
 html[data-theme='doodle'] .kaleido-values__inject-bar,
-html[data-theme='doodle'] .kaleido-story__editor-head,
-html[data-theme='doodle'] .kaleido-values__editor-head {
+html[data-theme='doodle'] .kaleido-story__editor-head {
   border: 1px solid rgba(61, 43, 31, 0.25);
   box-shadow: none;
 }
