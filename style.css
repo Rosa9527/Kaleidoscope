@@ -3218,7 +3218,7 @@ textarea.kaleido-input {
 
 .kaleido-values__trigger-condition {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   gap: 6px;
 }
 
@@ -3231,6 +3231,7 @@ textarea.kaleido-input {
   flex: 0 0 auto;
   min-width: 0;
   display: flex;
+  align-items: center;
   justify-content: center;
 }
 
@@ -3239,7 +3240,7 @@ textarea.kaleido-input {
   flex: 0 1 auto;
   min-width: 24px;
   display: flex;
-  align-items: stretch;
+  align-items: center;
   justify-content: center;
 }
 
