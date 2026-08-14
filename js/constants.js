@@ -10,7 +10,7 @@ const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // 并在 style.css 补变量覆盖。
 const THEME_ID = 'kaleido-theme';
 const THEME_MENU_ID = 'kaleido-theme-menu';
-const DEFAULT_THEME = 'gufeng';
+const DEFAULT_THEME = 'doodle';
 const THEMES = Object.freeze([
   { id: 'macos', name: 'macOS 风格' },
   { id: 'gufeng', name: '古风典雅' },

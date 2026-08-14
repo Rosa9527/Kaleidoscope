@@ -11,7 +11,7 @@ const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // 并在 style.css 补变量覆盖。
 const THEME_ID = 'kaleido-theme';
 const THEME_MENU_ID = 'kaleido-theme-menu';
-const DEFAULT_THEME = 'gufeng';
+const DEFAULT_THEME = 'doodle';
 const THEMES = Object.freeze([
   { id: 'macos', name: 'macOS 风格' },
   { id: 'gufeng', name: '古风典雅' },
@@ -2027,7 +2027,7 @@ function createPanel() {
       <div class="kaleido-panel__footer">
         <span class="kaleido-panel__version">v${MODULE_VERSION}</span>
         <span class="kaleido-panel__theme-wrap">
-          <button type="button" id="${THEME_ID}" class="kaleido-panel__theme" aria-haspopup="menu" aria-expanded="false" title="切换主题">🎨 古风典雅</button>
+          <button type="button" id="${THEME_ID}" class="kaleido-panel__theme" aria-haspopup="menu" aria-expanded="false" title="切换主题">🎨 手绘涂鸦</button>
           <div id="${THEME_MENU_ID}" class="kaleido-panel__theme-menu" role="menu" hidden></div>
         </span>
         <span class="kaleido-panel__slogan">镜中万象</span>
@@ -2068,7 +2068,7 @@ function createPanel() {
 
 // ---------- 主题切换 ----------
 // 主题注册表见 constants.js 的 THEMES / DEFAULT_THEME；id 对应 style.css 中
-// [data-theme='...'] 的变量覆盖。默认「古风典雅」，切换后持久化到 settings.theme。
+// [data-theme='...'] 的变量覆盖。默认「手绘涂鸦」，切换后持久化到 settings.theme。
 function getCurrentTheme() {
   try {
     const ctx = getContextSafe();

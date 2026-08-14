@@ -5,6 +5,15 @@
    悬浮球：半透明磨砂玻璃万花筒（backdrop-filter 模糊背景，旋转镜眼铺满球面）。
    ========================================================= */
 
+/* 手绘涂鸦主题的英文标题花体（Spencerian Script 斯宾塞体开源近似，OFL 许可） */
+@font-face {
+  font-family: 'Great Vibes';
+  src: url('fonts/GreatVibes-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ---------- 设计变量：亮色 / 暗色双主题 ---------- */
 .kaleido-sphere,
 .kaleido-panel,
@@ -4541,12 +4550,12 @@ html[data-theme='doodle'] .kaleido-panel .kaleido-panel__title {
   letter-spacing: 1px;
 }
 
-/* 主页标题：手写体圆珠笔蓝，替代铜板体渐变 */
+/* 主页标题：Spencerian Script（斯宾塞体）花体英文大字，替代铜板体渐变 */
 html[data-theme='doodle'] .kaleido-panel .kaleido-panel__title.is-homepage {
-  font-family: var(--k-font);
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 2px;
+  font-family: "Spencerian Script", "Great Vibes", "Pinyon Script", "Snell Roundhand", "Brush Script MT", "Segoe Script", cursive;
+  font-size: 26px;
+  font-weight: 400;
+  letter-spacing: 0.5px;
   text-transform: none;
   color: var(--k-accent);
   background: none;
