@@ -312,9 +312,7 @@ textarea.kaleido-input {
 
 .kaleido-story__switch-thumb,
 .kaleido-values__inject-switch-thumb {
-  position: absolute;
-  top: 2px;
-  left: 2px;
+  margin-left: 2px;
   width: 17px;
   height: 17px;
   border-radius: 50%;
@@ -339,7 +337,7 @@ textarea.kaleido-input {
 }
 
 .kaleido-values__inject-switch.is-partial .kaleido-values__inject-switch-thumb {
-  transform: translateX(8px);
+  transform: translateX(7px);
 }
 
 .kaleido-story__switch:hover,
@@ -4605,10 +4603,10 @@ html[data-theme='doodle'] .kaleido-panel .kaleido-home__slogan-first {
   color: var(--k-accent);
 }
 
-/* 首页 Logo：紫色贴纸（实底紫 + 墨棕描边 + 硬纸板阴影） */
+/* 首页 Logo：纸底 + 紫色勾勒边缘（不填充），风车图标紫色点缀 */
 html[data-theme='doodle'] .kaleido-panel .kaleido-home__logo {
-  background: var(--k-accent);
-  border: 2px solid var(--k-text);
+  background: var(--k-card);
+  border: 2px solid var(--k-accent);
   box-shadow: 3px 4px 0 rgba(61, 43, 31, 0.18);
 }
 
@@ -4616,20 +4614,21 @@ html[data-theme='doodle'] .kaleido-panel .kaleido-home__logo .fa-solid {
   background: none;
   -webkit-background-clip: initial;
   background-clip: initial;
-  color: #fffdf5;
+  color: var(--k-accent);
 }
 
-/* 游戏模式入口：圆珠笔蓝实底贴纸 */
+/* 游戏模式入口：纸底 + 紫色勾勒边缘（不填充），游戏机图标紫色 */
 html[data-theme='doodle'] .kaleido-panel .kaleido-home__log-btn {
-  color: #fffdf5;
-  background: var(--k-accent);
-  border: 1.5px solid var(--k-accent-deep);
-  box-shadow: 2px 2px 0 rgba(106, 76, 176, 0.35);
+  color: var(--k-accent);
+  background: var(--k-card);
+  border: 2px solid var(--k-accent);
+  box-shadow: 2px 2px 0 rgba(61, 43, 31, 0.18);
 }
 
 html[data-theme='doodle'] .kaleido-panel .kaleido-home__log-btn:hover {
-  border-color: var(--k-accent-deep);
-  box-shadow: 3px 3px 0 rgba(106, 76, 176, 0.4);
+  border-color: var(--k-accent);
+  background: rgba(124, 92, 191, 0.1);
+  box-shadow: 3px 3px 0 rgba(61, 43, 31, 0.2);
   transform: translateY(0);
 }
 
@@ -4866,23 +4865,23 @@ html[data-theme='doodle'] .kaleido-game__cover-title {
 }
 
 html[data-theme='doodle'] .kaleido-game__cover-seal {
-  color: #fffdf5;
-  background: var(--k-accent);
-  border: 1.5px solid var(--k-accent-deep);
-  box-shadow: 2px 2px 0 rgba(106, 76, 176, 0.35);
+  color: var(--k-accent);
+  background: var(--k-card);
+  border: 2px solid var(--k-accent);
+  box-shadow: 2px 2px 0 rgba(61, 43, 31, 0.18);
   transform: none;
 }
 
 html[data-theme='doodle'] .kaleido-game__refresh {
-  color: #fffdf5;
-  background: var(--k-accent);
-  border: 1.5px solid var(--k-accent-deep);
-  box-shadow: 2px 2px 0 rgba(106, 76, 176, 0.35);
+  color: var(--k-accent);
+  background: var(--k-card);
+  border: 2px solid var(--k-accent);
+  box-shadow: 2px 2px 0 rgba(61, 43, 31, 0.18);
 }
 
 html[data-theme='doodle'] .kaleido-game__refresh:hover {
-  background: var(--k-accent-deep);
-  border-color: var(--k-accent-deep);
+  background: rgba(124, 92, 191, 0.1);
+  border-color: var(--k-accent);
   filter: none;
 }
 
