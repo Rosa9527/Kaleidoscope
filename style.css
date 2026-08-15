@@ -386,6 +386,7 @@ textarea.kaleido-input {
 }
 
 .kaleido-api__status[data-state="ok"],
+.kaleido-preset__status[data-state="ok"],
 .kaleido-preset__status[data-state="custom"],
 .kaleido-story__binding[data-state="ok"],
 .kaleido-values__binding[data-state="ok"] {
@@ -393,6 +394,7 @@ textarea.kaleido-input {
 }
 
 .kaleido-api__status[data-state="ok"]::before,
+.kaleido-preset__status[data-state="ok"]::before,
 .kaleido-preset__status[data-state="custom"]::before,
 .kaleido-story__binding[data-state="ok"]::before,
 .kaleido-values__binding[data-state="ok"]::before {
