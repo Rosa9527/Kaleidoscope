@@ -305,23 +305,28 @@ runner.test('注入配置：默认关闭且无勾选，可开关', () => {
   assert(ctx.getValuesInjectConfig(c).enabled === false, '关闭后应生效');
 });
 
-runner.test('注入配置：打开下级自动提升祖先，关闭上级级联关闭后代', () => {
+runner.test('注入配置：打开下级自动提升祖先，打开节点级联打开后代，关闭节点级联关闭后代', () => {
   const c = fresh();
+  const defaults = ctx.getValuesDefaults(c);
+  defaults['张三'] = { '好感': 30, '金钱': 1000 };
+  ctx.saveValuesData(c);
   ctx.setValuesInjectPath(c, ['张三', '好感'], true);
   ctx.setValuesInjectPath(c, ['金钱'], true);
   let config = ctx.getValuesInjectConfig(c);
   assert(config.paths.includes('张三/好感') && config.paths.includes('金钱'), '应勾选两个变量');
   assert(config.paths.includes('张三'), '打开下级应自动提升上级');
-  // 打开节点「张三」→ 不自动打开后代（后代保持各自状态）
+  // 打开节点「张三」→ 全部后代级联打开
   ctx.setValuesInjectPath(c, ['张三'], true);
   config = ctx.getValuesInjectConfig(c);
   assert(config.paths.includes('张三'), '节点应打开');
-  assert(config.paths.includes('张三/好感'), '已打开的后代应保留');
+  assert(config.paths.includes('张三/好感'), '后代好感应级联打开');
+  assert(config.paths.includes('张三/金钱'), '后代金钱应级联打开');
   // 关闭节点 → 节点与后代全部关闭
   ctx.setValuesInjectPath(c, ['张三'], false);
   config = ctx.getValuesInjectConfig(c);
   assert(!config.paths.includes('张三'), '节点应关闭');
   assert(!config.paths.includes('张三/好感'), '后代应级联关闭');
+  assert(!config.paths.includes('张三/金钱'), '金钱应级联关闭');
   assert(config.paths.includes('金钱'), '其他路径应保留');
 });
 

@@ -679,8 +679,8 @@ function reorderValuesTreeAt(ctx, parentPath, names) {
 
 // ---------- 注入提示词配置（默认数值层勾选）----------
 // 配置存变量包 inject 字段：{ enabled, paths }。paths 是打开条目的路径数组
-// （path.join('/')），节点上下级联动：打开下级自动提升全部祖先，关闭上级
-// 级联关闭全部后代；随角色卡 / 全局设置保存。
+// （path.join('/')），节点上下级联动：打开条目 = 自身 + 全部祖先 + 全部后代
+// 打开，关闭条目 = 自身 + 全部后代关闭；随角色卡 / 全局设置保存。
 function getValuesInjectConfig(ctx) {
   const bundle = ctx ? getValuesBundle(ctx) : null;
   if (!bundle) return { enabled: false, paths: [] };
@@ -711,10 +711,9 @@ function setValuesInjectEnabled(ctx, enabled) {
   return config;
 }
 
-// 打开 / 关闭一个条目（节点上下级联动）：
-// - 打开条目 = 自身 + 全部祖先打开（下级打开 → 上级必须打开）；
-// - 关闭条目 = 自身 + 全部后代关闭（上级关闭 → 下级全部关闭）；
-// - 打开节点不自动打开后代（上级打开 → 下级选择性打开）。
+// 打开 / 关闭一个条目（节点上下级联动，打开与关闭对称）：
+// - 打开条目 = 自身 + 全部祖先 + 全部后代打开（打开节点 = 子树全部勾选）；
+// - 关闭条目 = 自身 + 全部后代关闭（上级关闭 → 下级全部关闭）。
 function setValuesInjectPath(ctx, path, checked) {
   const config = getValuesInjectConfig(ctx);
   const key = Array.isArray(path) ? path.join('/') : String(path || '');
@@ -724,6 +723,21 @@ function setValuesInjectPath(ctx, path, checked) {
     for (let i = 1; i <= segments.length; i += 1) {
       const ancestorKey = segments.slice(0, i).join('/');
       if (!config.paths.includes(ancestorKey)) config.paths.push(ancestorKey);
+    }
+    // 打开节点时级联打开全部后代条目（含嵌套节点），与关闭时的级联对称。
+    const tree = getValuesDefaults(ctx);
+    const node = valuesGetAtPath(tree, segments);
+    if (node !== undefined && valuesIsContainer(node)) {
+      const collect = (container, prefix) => {
+        for (const name of Object.keys(container)) {
+          const childPath = prefix.concat(name);
+          const childKey = childPath.join('/');
+          if (!config.paths.includes(childKey)) config.paths.push(childKey);
+          const child = container[name];
+          if (valuesIsContainer(child)) collect(child, childPath);
+        }
+      };
+      collect(node, segments);
     }
   } else {
     config.paths = config.paths.filter((item) => !(item === key || item.startsWith(key + '/')));

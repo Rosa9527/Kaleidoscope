@@ -3636,6 +3636,10 @@ textarea.kaleido-input {
     display: none;
   }
 
+  .kaleido-values__nav-item .kaleido-values__nav-label {
+    text-align: center;
+  }
+
   .kaleido-values__nav-expand {
     align-self: stretch;
     width: 100%;
@@ -4317,8 +4321,7 @@ html[data-theme='gufeng'] .kaleido-story__toolbar,
 html[data-theme='gufeng'] .kaleido-values__nav,
 html[data-theme='gufeng'] .kaleido-values__layer-row,
 html[data-theme='gufeng'] .kaleido-values__status-strip,
-html[data-theme='gufeng'] .kaleido-values__inject-bar,
-html[data-theme='gufeng'] .kaleido-story__editor-head {
+html[data-theme='gufeng'] .kaleido-values__inject-bar {
   border: 1px solid rgba(43, 36, 28, 0.3);
   border-radius: 4px;
   box-shadow: none;
@@ -4913,8 +4916,7 @@ html[data-theme='doodle'] .kaleido-story__toolbar,
 html[data-theme='doodle'] .kaleido-values__nav,
 html[data-theme='doodle'] .kaleido-values__layer-row,
 html[data-theme='doodle'] .kaleido-values__status-strip,
-html[data-theme='doodle'] .kaleido-values__inject-bar,
-html[data-theme='doodle'] .kaleido-story__editor-head {
+html[data-theme='doodle'] .kaleido-values__inject-bar {
   border: 1px solid rgba(61, 43, 31, 0.25);
   box-shadow: none;
 }

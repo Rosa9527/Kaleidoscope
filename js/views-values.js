@@ -505,16 +505,20 @@ function openValuesNodeEditor(parentPath, editPath) {
 }
 
 // 变量编辑器：从已注册变量下拉选择（编辑时变量名只读），填写变量值。
-// 子变量：值由父变量自动派生，值输入可留空（留空存 null，父变量存在时自动计算）。
+// 子变量：值由父变量自动派生，不提供值输入，只显示提示；保存时一律存 null。
 function syncValuesKeyEntryChildHint() {
   const ctx = getContextSafe();
   const keySelect = document.getElementById(VALUES_EDITOR_KEY_SELECT_ID);
   const hint = document.getElementById(VALUES_EDITOR_CHILD_HINT_ID);
   const label = document.getElementById(VALUES_EDITOR_VALUE_LABEL_ID);
-  const keyName = String(keySelect?.value || '').trim();
+  const valueInput = document.getElementById(VALUES_EDITOR_VALUE_ID);
+  const keyName = valuesEditorPath
+    ? String(valuesEditorPath[valuesEditorPath.length - 1] || '').trim()
+    : String(keySelect?.value || '').trim();
   const isChild = Boolean(keyName && ctx && isValuesChildKey(getValuesKeyByName(ctx, keyName)));
   if (hint) hint.hidden = !isChild;
-  if (label) label.textContent = isChild ? '变量值（可留空）' : '变量值 *';
+  if (label) label.hidden = isChild;
+  if (valueInput) valueInput.hidden = isChild;
 }
 
 function openValuesKeyEntryEditor(parentPath, editPath) {
@@ -612,11 +616,17 @@ function parseValuesEditorText(text) {
       // 新建节点默认展开，方便继续往里挂条目；挂在子层时父节点一并展开以便看到新节点。
       valuesExpanded.add(parentPath.concat(name).join('/'));
       if (parentPath.length > 0) valuesExpanded.add(parentPath.join('/'));
+      // 新建节点默认开启注入（仅默认数值层；打开节点会自动提升全部祖先节点）。
+      if (valuesActiveLayer === 'default') {
+        setValuesInjectPath(ctx, parentPath.concat(name), true);
+      }
     }
     logApp('info', valuesEditorPath ? '节点已更新' : '节点已添加', name, valuesActiveLayer);
-    valuesToastr('success', valuesEditorPath ? '节点已保存' : '节点已添加');
+    valuesToastr('success', valuesEditorPath
+      ? '节点已保存'
+      : (valuesActiveLayer === 'default' ? `节点「${name}」已添加（已默认开启注入）` : `节点「${name}」已添加`));
   } else if (keyVisible && !nodeVisible) {
-    // 变量：变量名来自注册表（编辑时固定）；父变量值必填，子变量可留空。
+    // 变量：变量名来自注册表（编辑时固定）；父变量值必填，子变量不填值（由父变量自动计算）。
     const keyName = valuesEditorPath
       ? String(valuesEditorPath[valuesEditorPath.length - 1])
       : String(document.getElementById(VALUES_EDITOR_KEY_SELECT_ID)?.value || '').trim();
@@ -631,7 +641,7 @@ function parseValuesEditorText(text) {
       valuesToastr('warning', '请填写变量值');
       return;
     }
-    const parsed = isChild && valueText === '' ? { value: null } : parseValuesEditorText(valueText);
+    const parsed = isChild ? { value: null } : parseValuesEditorText(valueText);
     const parentPath = valuesEditorPath ? valuesEditorPath.slice(0, -1) : (valuesEditorParentPath || []);
     const newPath = parentPath.concat(keyName);
     if (!valuesEditorPath && valuesGetAtPath(tree, newPath) !== undefined) {
@@ -1930,7 +1940,7 @@ function buildValuesContentHTML(editorClass) {
                 <label class="kaleido-api__field" for="${VALUES_EDITOR_VALUE_ID}">
                   <span id="${VALUES_EDITOR_VALUE_LABEL_ID}" class="kaleido-api__label">变量值 *</span>
                   <textarea id="${VALUES_EDITOR_VALUE_ID}" class="kaleido-input kaleido-values__textarea kaleido-values__textarea--small" rows="2" placeholder="如：30 / 1000 / 友好 / true" spellcheck="false"></textarea>
-                  <span id="${VALUES_EDITOR_CHILD_HINT_ID}" class="kaleido-values__editor-hint" hidden>子变量值由父变量自动计算，可留空</span>
+                  <span id="${VALUES_EDITOR_CHILD_HINT_ID}" class="kaleido-values__editor-hint" hidden>子变量值由父变量自动计算</span>
                 </label>
               </div>
               <div class="kaleido-values__editor-actions">
@@ -2049,9 +2059,6 @@ ${buildValuesContentHTML('kaleido-values-dialog__editor')}
   document.body.appendChild(dialog);
   bindValuesContentEvents();
   document.getElementById(VALUES_CLOSE_BTN_ID)?.addEventListener('click', closeValuesWorkbench);
-  dialog.addEventListener('click', (event) => {
-    if (event.target === dialog) closeValuesWorkbench();
-  });
   if (!globalThis[VALUES_DIALOG_KEY]) {
     globalThis[VALUES_DIALOG_KEY] = (event) => {
       if (event.key !== 'Escape') return;

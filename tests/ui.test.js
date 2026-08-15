@@ -557,10 +557,10 @@ runner.test('ESC 关闭工作台', () => {
   assert(ui.isStoryWorkbenchOpen() === false, 'isStoryWorkbenchOpen 应为 false');
 });
 
-runner.test('点击遮罩关闭工作台', () => {
+runner.test('点击遮罩不关闭工作台', () => {
   ui.openStoryWorkbench();
   click($('kaleido-story-dialog'));
-  assert(!$('kaleido-story-dialog').classList.contains('is-open'), '点击遮罩应关闭');
+  assert($('kaleido-story-dialog').classList.contains('is-open'), '点击遮罩不应关闭工作台');
   assert(toasts.some(([kind]) => kind === 'success'), '操作过程应有成功提示');
 });
 

@@ -55,16 +55,16 @@ runner.test('注入文本：只注入打开的变量，容器节点本身不注�
   const c = fresh();
   makeValues(c);
   ctx.setValuesInjectEnabled(c, true);
-  ctx.setValuesInjectPath(c, ['张三'], true);
   ctx.setValuesInjectPath(c, ['金钱'], true);
   const text = ctx.buildValuesInjectText(c);
   assert(text.startsWith('<Values>') && text.endsWith('</Values>'), '应以 <Values> 块包裹');
-  assert(!text.includes('张三:'), '只打开容器节点不应注入内容');
+  assert(!text.includes('好感:'), '未勾选的变量不应注入');
   assert(text.includes('金钱: 1000'), '应包含顶层变量');
-  // 打开「张三/好感」→ 注入好感（张三自动提升）
-  ctx.setValuesInjectPath(c, ['张三', '好感'], true);
+  // 打开节点「张三」→ 级联打开全部后代，「张三/好感」随节点一并注入
+  // （容器节点本身仍不注入内容，注入的是其后代变量）。
+  ctx.setValuesInjectPath(c, ['张三'], true);
   const text2 = ctx.buildValuesInjectText(c);
-  assert(text2.includes('张三:') && text2.includes('好感: 30'), '打开变量后应注入其子树结构');
+  assert(text2.includes('张三:') && text2.includes('好感: 30'), '打开节点应级联注入其后代变量');
   assert(text2.includes('金钱: 1000'), '其他变量应保留');
 });
 

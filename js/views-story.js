@@ -791,9 +791,6 @@ ${buildStoryContentHTML('kaleido-story-dialog__editor')}
   document.body.appendChild(dialog);
   bindStoryContentEvents();
   document.getElementById(STORY_CLOSE_BTN_ID)?.addEventListener('click', closeStoryWorkbench);
-  dialog.addEventListener('click', (event) => {
-    if (event.target === dialog) closeStoryWorkbench();
-  });
   if (!globalThis[STORY_DIALOG_KEY]) {
     globalThis[STORY_DIALOG_KEY] = (event) => {
       if (event.key !== 'Escape') return;

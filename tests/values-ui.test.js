@@ -286,14 +286,16 @@ runner.test('树行：子变量显示派生徽标、不可编辑、值自动计�
   assert(attitudeRow.querySelector('.kaleido-values__row-value').textContent === '颇具好感', '树行应显示派生后的值');
 });
 
-// ---------- 新建变量：子变量值可留空 ----------
-runner.test('新建变量：选择子变量时值可留空并显示提示', () => {
+// ---------- 新建变量：子变量值由父变量自动计算 ----------
+runner.test('新建变量：选择子变量时不提供值输入、只显示派生提示', () => {
   pickAddMenu('key');
   const select = $('kaleido-values-editor-key-select');
   select.value = '态度';
   select.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
   assert(!$('kaleido-values-editor-child-hint').hidden, '应显示子变量提示');
-  assert($('kaleido-values-editor-value-label').textContent.includes('可留空'), '标签应提示可留空');
+  assert($('kaleido-values-editor-child-hint').textContent === '子变量值由父变量自动计算', '提示文字应为「子变量值由父变量自动计算」');
+  assert($('kaleido-values-editor-value').hidden, '子变量不应显示值输入框');
+  assert($('kaleido-values-editor-value-label').hidden, '子变量不应显示值标签');
   click($('kaleido-values-editor-cancel'));
 });
 
@@ -337,6 +339,8 @@ runner.test('新建节点：张三 → 节点下新建键', () => {
   assert(defaults['张三'] && typeof defaults['张三'] === 'object', '张三应为节点（容器）');
   const zhangRow = rowByName('张三');
   assert(zhangRow.dataset.kind === 'container', '张三行应为节点行');
+  const configAfterNode = ui.getValuesInjectConfig(hostCtx);
+  assert(configAfterNode.paths.includes('张三'), '新建节点应默认开启注入');
   // 张三下新建键
   click(actionButton(zhangRow, 'add-menu'));
   assert(!$('kaleido-values-add-menu').hidden, '节点行应打开新建菜单');
@@ -563,6 +567,12 @@ runner.test('打开工作台：不记住上次停留的层，总是先展示游�
   assert($('kaleido-values-default-hint').hidden, '游戏值层应隐藏默认值手动提示');
 });
 
+runner.test('点击遮罩不关闭工作台', () => {
+  ui.openValuesWorkbench();
+  click($('kaleido-values-dialog'));
+  assert($('kaleido-values-dialog').classList.contains('is-open'), '点击遮罩不应关闭工作台');
+});
+
 // ---------- 注入提示词（默认数值层） ----------
 function injectCheck(row) {
   const button = row.querySelector('button[data-inject-toggle]');
@@ -657,11 +667,11 @@ runner.test('导航切换：面板 hidden 与 is-active 同步（回归：注册
   assertVisible('tree');
 });
 
-runner.test('行内滑块：打开下级自动提升上级，关闭上级级联关闭后代', () => {
+runner.test('行内滑块：打开下级自动提升上级，打开上级级联打开后代，关闭上级级联关闭后代', () => {
   const defaults = ui.getValuesDefaults(hostCtx);
   defaults['张三'] = { '好感': 30, '金钱': 1000 };
   ui.saveValuesData(hostCtx);
-  // 清空注入配置：前面测试新建变量已默认开启注入，避免干扰本测试的开关断言。
+  // 清空注入配置：前面测试新建变量 / 节点已默认开启注入，避免干扰本测试的开关断言。
   ui.saveValuesInjectConfig(hostCtx, { enabled: false, paths: [] });
   click($('kaleido-values-layer-default'));
   // 展开张三节点
@@ -675,7 +685,7 @@ runner.test('行内滑块：打开下级自动提升上级，关闭上级级联�
   let config = ui.getValuesInjectConfig(hostCtx);
   assert(config.paths.includes('张三/好感'), '应打开好感');
   assert(config.paths.includes('张三'), '打开下级应自动提升上级');
-  // 上级打开后，下级选择性打开：再打开「张三/金钱」
+  // 再打开「张三/金钱」
   toggleInject(rowByPath(['张三', '金钱']));
   config = ui.getValuesInjectConfig(hostCtx);
   assert(config.paths.includes('张三/金钱'), '应打开金钱');
@@ -686,6 +696,12 @@ runner.test('行内滑块：打开下级自动提升上级，关闭上级级联�
   assert(!config.paths.includes('张三'), '节点应关闭');
   assert(!config.paths.includes('张三/好感'), '好感应级联关闭');
   assert(!config.paths.includes('张三/金钱'), '金钱应级联关闭');
+  // 打开上级「张三」→ 全部后代级联打开
+  toggleInject(rowByName('张三'));
+  config = ui.getValuesInjectConfig(hostCtx);
+  assert(config.paths.includes('张三'), '节点应打开');
+  assert(config.paths.includes('张三/好感'), '好感应级联打开');
+  assert(config.paths.includes('张三/金钱'), '金钱应级联打开');
 });
 
 runner.test('行内滑块状态：数据不一致时节点显示半选（防御）', () => {
