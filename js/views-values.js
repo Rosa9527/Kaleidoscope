@@ -1248,7 +1248,7 @@ function buildValuesTriggerConditionRow(condition) {
     : '==';
   const syncOpText = () => {
     const matched = VALUES_TRIGGER_OPS.find((op) => op.value === String(opSelect.value || '').trim());
-    opText.textContent = matched ? matched.value : String(opSelect.value || '');
+    opText.textContent = matched ? (matched.display || matched.value) : String(opSelect.value || '');
     opWrap.title = matched ? matched.label : '';
   };
   const valueInput = document.createElement('input');

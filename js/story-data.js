@@ -69,7 +69,7 @@ function fallbackStoryDataToSettings(ctx, card) {
   const settings = getSettings(ctx);
   settings.storyNodes = Array.isArray(card?.nodes) ? card.nodes : [];
   settings.storyScripts = Array.isArray(card?.scripts) ? card.scripts : [];
-  saveSettings(ctx);
+  saveSettingsImmediate(ctx);
   logApp('warn', '剧情脉络写入角色卡失败，已回退全局设置');
 }
 
@@ -113,25 +113,34 @@ async function persistStoryCardData(ctx, avatar, card) {
 // 剧情脉络只显示「当前角色卡绑定的内容」：有角色但卡上无数据时返回空数组，
 // 不回退全局设置（避免把别的角色/旧数据串到当前角色卡上）；只有群聊 / 未选
 // 角色 / 宿主不支持写角色卡时才用全局设置兜底。
+// TauriTavern 下角色卡写入不可靠，读取也跳过（卡内可能有历史残留数据），
+// 只从全局设置取最新状态。
 function getStoryNodes(ctx) {
-  const card = ctx ? getStoryCardData(ctx) : null;
-  if (card) return card.nodes;
-  if (ctx && getStoryCharacter(ctx) && typeof ctx?.writeExtensionField === 'function') return [];
+  if (!isTauriTavernHost()) {
+    const card = ctx ? getStoryCardData(ctx) : null;
+    if (card) return card.nodes;
+    if (ctx && getStoryCharacter(ctx) && typeof ctx?.writeExtensionField === 'function') return [];
+  }
   const settings = ctx ? getSettings(ctx) : null;
   return Array.isArray(settings?.storyNodes) ? settings.storyNodes : [];
 }
 
 function getStoryScripts(ctx) {
-  const card = ctx ? getStoryCardData(ctx) : null;
-  if (card) return card.scripts;
-  if (ctx && getStoryCharacter(ctx) && typeof ctx?.writeExtensionField === 'function') return [];
+  if (!isTauriTavernHost()) {
+    const card = ctx ? getStoryCardData(ctx) : null;
+    if (card) return card.scripts;
+    if (ctx && getStoryCharacter(ctx) && typeof ctx?.writeExtensionField === 'function') return [];
+  }
   const settings = ctx ? getSettings(ctx) : null;
   return Array.isArray(settings?.storyScripts) ? settings.storyScripts : [];
 }
 
 // 确保当前角色卡有剧情数据容器：无卡时用旧版全局数据初始化（并清空全局兜底）。
 // 无角色 / 宿主不支持写角色卡时返回 null（保持全局设置路径）。
+// TauriTavern 角色卡扩展字段写入不可靠（见 isTauriTavernHost），直接返回 null，
+// 数据全程走全局设置，避免迁移后旧数据从磁盘回滚。
 function ensureStoryCardData(ctx) {
+  if (isTauriTavernHost()) return null;
   const character = getStoryCharacter(ctx);
   if (!character || typeof ctx?.writeExtensionField !== 'function') return null;
   let card = getStoryCardData(ctx);
@@ -153,11 +162,11 @@ function ensureStoryCardData(ctx) {
 }
 
 // 保存：有角色且宿主支持写角色卡 → 确保角色卡容器存在（首次变更时迁入旧版
-// 全局数据），随后防抖持久化；否则写全局设置。
+// 全局数据），随后防抖持久化；否则写全局设置（TauriTavern 走此路径）。
 function saveStoryData(ctx) {
   const character = getStoryCharacter(ctx);
-  if (!character || typeof ctx?.writeExtensionField !== 'function') {
-    saveSettings(ctx);
+  if (isTauriTavernHost() || !character || typeof ctx?.writeExtensionField !== 'function') {
+    saveSettingsImmediate(ctx);
     return;
   }
   const card = ensureStoryCardData(ctx);

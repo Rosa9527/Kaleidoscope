@@ -31,7 +31,10 @@ function setValuesCardData(character, card) {
 
 // 确保当前角色卡有变量数据容器：无卡时用旧版全局数据初始化（并清空全局兜底）。
 // 无角色 / 宿主不支持写角色卡时返回 null（保持全局设置路径）。
+// TauriTavern 角色卡扩展字段写入不可靠（见 isTauriTavernHost），直接返回 null，
+// 数据全程走全局设置 + 聊天文件镜像，避免迁移后旧数据从磁盘回滚。
 function ensureValuesCardData(ctx) {
+  if (isTauriTavernHost()) return null;
   const character = getStoryCharacter(ctx);
   if (!character || typeof ctx?.writeExtensionField !== 'function') return null;
   let card = getValuesCardData(ctx);
@@ -79,8 +82,31 @@ function fallbackValuesDataToSettings(ctx, card) {
       ? card.order
       : {},
   };
-  saveSettings(ctx);
+  if (isTauriTavernHost()) mirrorValuesBundleToChat(ctx, settings.valuesData);
+  saveSettingsImmediate(ctx);
   logApp('warn', '变量写入角色卡失败，已回退全局设置');
+}
+
+// TauriTavern 耐久镜像：把变量包写进聊天元数据并即时保存聊天文件。
+// 全局设置的保存是宿主防抖的（页面刷新会打断 pending 写入），聊天文件随
+// saveChat 即时落盘（与游戏值同机制）——刷新后从聊天文件恢复最新状态，
+// 保证默认值的删除 / 修改不被旧磁盘数据回滚。
+function mirrorValuesBundleToChat(ctx, bundle) {
+  const context = ctx || getContextSafe();
+  if (!context) return false;
+  let metadata = getValuesChatMetadata(context);
+  if (!metadata) {
+    try {
+      context.chatMetadata = {};
+      metadata = context.chatMetadata;
+    } catch (error) {
+      logApp('warn', '聊天元数据不可写', String(error?.message || error));
+      return false;
+    }
+  }
+  metadata[VALUES_CHAT_BUNDLE_KEY] = bundle;
+  scheduleValuesChatSave(context, true);
+  return true;
 }
 
 // 防抖持久化（与剧情脉络同模式）：按 avatar 定位角色，避免防抖期间切换角色写错卡。
@@ -117,11 +143,32 @@ async function persistValuesCardData(ctx, avatar, card) {
   }
 }
 
-// 变量包读取：优先角色卡绑定的内容；只有群聊 / 未选角色 / 宿主不支持写角色卡时
-// 才用全局设置 valuesData 兜底（避免把别的角色/旧数据串到当前角色卡上）。
+// 变量包读取：优先角色卡绑定的内容；其次聊天文件里的耐久镜像（TauriTavern 等
+// 宿主写角色卡不可靠时由 saveValuesData 写入，永远是最新状态）；只有群聊 /
+// 未选角色 / 宿主不支持写角色卡时才用全局设置 valuesData 兜底（避免把别的
+// 角色/旧数据串到当前角色卡上）。
+// TauriTavern 下角色卡写入不可靠（见 isTauriTavernHost），卡内可能有历史残留
+// 数据——读取时完全跳过角色卡，只从聊天镜像 / 全局设置取最新状态，避免删除
+// 后从角色卡回滚。
 function getValuesBundle(ctx) {
-  const card = ctx ? getValuesCardData(ctx) : null;
-  if (card) return card;
+  if (!isTauriTavernHost()) {
+    const card = ctx ? getValuesCardData(ctx) : null;
+    if (card) return card;
+  }
+  if (ctx) {
+    const chatBundle = getValuesChatMetadata(ctx)?.[VALUES_CHAT_BUNDLE_KEY];
+    if (chatBundle && typeof chatBundle === 'object' && !Array.isArray(chatBundle)) {
+      if (!Array.isArray(chatBundle.keys)) chatBundle.keys = [];
+      if (!chatBundle.defaults || typeof chatBundle.defaults !== 'object' || Array.isArray(chatBundle.defaults)) {
+        chatBundle.defaults = {};
+      }
+      if (!Array.isArray(chatBundle.triggers)) chatBundle.triggers = [];
+      if (!chatBundle.order || typeof chatBundle.order !== 'object' || Array.isArray(chatBundle.order)) {
+        chatBundle.order = {};
+      }
+      return chatBundle;
+    }
+  }
   const settings = ctx ? getSettings(ctx) : null;
   if (!settings) return { version: VALUES_CARD_DATA_VERSION, keys: [], defaults: {} };
   // 无角色卡时用全局设置兜底：首次读取即初始化容器，保证后续变更落在活对象上
@@ -141,9 +188,10 @@ function getValuesBundle(ctx) {
 }
 
 // 保存：有角色且宿主支持写角色卡 → 确保角色卡容器存在后防抖持久化；否则写全局设置。
+// TauriTavern 角色卡写入不可靠（静默失败不抛错），一律走全局设置 + 聊天文件镜像。
 function saveValuesData(ctx) {
   const character = getStoryCharacter(ctx);
-  if (!character || typeof ctx?.writeExtensionField !== 'function') {
+  if (isTauriTavernHost() || !character || typeof ctx?.writeExtensionField !== 'function') {
     const bundle = getValuesBundle(ctx);
     const settings = getSettings(ctx);
     settings.valuesData = {
@@ -158,7 +206,10 @@ function saveValuesData(ctx) {
         ? bundle.order
         : {},
     };
-    saveSettings(ctx);
+    // TauriTavern 的全局设置保存是宿主防抖的，刷新会丢 pending 写入；聊天文件
+    // 随 saveChat 即时落盘，镜像过去保证刷新后读到的是最新状态。
+    if (isTauriTavernHost()) mirrorValuesBundleToChat(ctx, settings.valuesData);
+    saveSettingsImmediate(ctx);
     return;
   }
   let card = getValuesCardData(ctx);

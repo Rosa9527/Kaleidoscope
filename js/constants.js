@@ -246,6 +246,11 @@ const VALUES_CARD_SAVE_TIMER_KEY = '__kaleido_values_card_save_timer__';
 const VALUES_CHAT_KEY = 'kaleidoscope_values';
 const VALUES_CHAT_SAVE_DEBOUNCE_MS = 400;
 const VALUES_CHAT_SAVE_TIMER_KEY = '__kaleido_values_chat_save_timer__';
+// 变量包（键注册表 + 默认值树）的聊天文件镜像：TauriTavern 等宿主写角色卡
+// 不可靠（writeExtensionField 失败只 console.error 不抛错）、全局设置保存是
+// 宿主防抖的（页面刷新会打断 pending 写入）——聊天文件随 saveChat 即时落盘，
+// 用它兜底保证默认值的删除 / 修改在刷新后不回滚。
+const VALUES_CHAT_BUNDLE_KEY = 'kaleidoscope_values_bundle';
 // 整包 YAML 的自描述格式标记与文件名前缀。
 const VALUES_BUNDLE_FORMAT = 'kaleidoscope-values';
 const VALUES_BUNDLE_FILENAME_PREFIX = '万华镜-变量';
@@ -348,15 +353,15 @@ const VALUES_TRIGGER_CLEANUP_ENDED_KEY = '__kaleido_values_trigger_cleanup_ended
 const VALUES_TRIGGER_CLEANUP_STOPPED_KEY = '__kaleido_values_trigger_cleanup_stopped__';
 // 剧情触发 · 条件运算符与逻辑选项
 const VALUES_TRIGGER_OPS = Object.freeze([
-  { value: '==', label: '等于（==）' },
-  { value: '!=', label: '不等于（!=）' },
-  { value: '>', label: '大于（>）' },
-  { value: '>=', label: '大于等于（>=）' },
-  { value: '<', label: '小于（<）' },
-  { value: '<=', label: '小于等于（<=）' },
-  { value: 'contains', label: '包含（contains）' },
-  { value: 'exists', label: '存在（exists）' },
-  { value: 'not exists', label: '不存在（not exists）' },
+  { value: '==', display: '＝', label: '等于（==）' },
+  { value: '!=', display: '≠', label: '不等于（!=）' },
+  { value: '>', display: '>', label: '大于（>）' },
+  { value: '>=', display: '≥', label: '大于等于（>=）' },
+  { value: '<', display: '<', label: '小于（<）' },
+  { value: '<=', display: '≤', label: '小于等于（<=）' },
+  { value: 'contains', display: '包含', label: '包含（contains）' },
+  { value: 'exists', display: '存在', label: '存在（exists）' },
+  { value: 'not exists', display: '不存在', label: '不存在（not exists）' },
 ]);
 const VALUES_TRIGGER_LOGIC_OPTIONS = Object.freeze([
   { value: 'all', label: '全部满足（且）' },
