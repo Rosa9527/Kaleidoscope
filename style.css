@@ -763,6 +763,57 @@ textarea.kaleido-input {
   letter-spacing: 2px;
 }
 
+/* 页脚版本号 + 版本检查胶囊：与版本号并排，点击重查；状态用颜色区分 */
+.kaleido-panel__version {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kaleido-panel__version-check {
+  padding: 2px 8px;
+  font-family: var(--k-font);
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  color: var(--k-text-3);
+  background: transparent;
+  border: 0.5px solid var(--k-hairline);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.kaleido-panel__version-check:hover {
+  color: var(--k-text);
+  background: var(--k-hover);
+  border-color: var(--k-hairline-strong);
+}
+
+/* 已是最新版：弱化绿字，与「已连接」状态胶囊同色调 */
+.kaleido-panel__version-check[data-state='ok'] {
+  color: var(--k-green-text);
+  border-color: var(--k-green);
+}
+
+/* 发现新版本：强调色填充，提醒用户更新 */
+.kaleido-panel__version-check[data-state='new'] {
+  color: #fff;
+  background: var(--k-accent);
+  border-color: var(--k-accent);
+}
+
+.kaleido-panel__version-check[data-state='new']:hover {
+  background: var(--k-accent-deep);
+  border-color: var(--k-accent-deep);
+}
+
+/* 检查失败：红色提示，点击重试 */
+.kaleido-panel__version-check[data-state='error'] {
+  color: var(--k-red-text);
+  border-color: var(--k-red);
+}
+
 /* 页脚主题切换：按钮 + 向上弹出的菜单（默认 macOS 风格，古风典雅见主题覆盖块） */
 .kaleido-panel__theme-wrap {
   position: relative;
@@ -4212,6 +4263,14 @@ html[data-theme='gufeng'] .kaleido-panel .kaleido-panel__theme {
   border-radius: 4px;
 }
 
+html[data-theme='gufeng'] .kaleido-panel .kaleido-panel__version-check {
+  border-radius: 4px;
+}
+
+html[data-theme='gufeng'] .kaleido-panel .kaleido-panel__version-check[data-state='new'] {
+  color: #faf5e9;
+}
+
 html[data-theme='gufeng'] .kaleido-panel .kaleido-panel__theme:hover {
   color: var(--k-text);
   background: var(--k-hover);
@@ -4818,6 +4877,17 @@ html[data-theme='doodle'] .kaleido-panel .kaleido-panel__theme {
   color: var(--k-text-2);
   background: transparent;
   border: 1.5px solid var(--k-hairline);
+}
+
+html[data-theme='doodle'] .kaleido-panel .kaleido-panel__version-check {
+  background: transparent;
+  border: 1.5px solid var(--k-hairline);
+}
+
+html[data-theme='doodle'] .kaleido-panel .kaleido-panel__version-check[data-state='new'] {
+  color: #fffdf5;
+  border-color: var(--k-accent-deep);
+  box-shadow: 2px 2px 0 rgba(106, 76, 176, 0.4);
 }
 
 html[data-theme='doodle'] .kaleido-panel .kaleido-panel__theme:hover {

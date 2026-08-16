@@ -4,6 +4,14 @@ const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
 const MODULE_VERSION = '1.1.1';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
+// ---------- 版本检查（GitHub 对比） ----------
+// 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
+// raw.githubusercontent 与 api.github 均为公网只读资源，无需鉴权；与 SoulLink 同构。
+const GITHUB_MANIFEST_URL = 'https://raw.githubusercontent.com/Rosa9527/Kaleidoscope/main/manifest.json';
+const GITHUB_API_MANIFEST_URL = 'https://api.github.com/repos/Rosa9527/Kaleidoscope/contents/manifest.json';
+const VERSION_CHECK_ID = 'kaleido-version-check';
+// 检查结果缓存 1 小时：避免频繁联网；手动点击强制刷新。
+const VERSION_CHECK_CACHE_MS = 60 * 60 * 1000;
 
 // ---------- 主题 ----------
 // 主题注册表：id 对应 style.css 中 [data-theme='...'] 的变量覆盖；name 显示在按钮与菜单里。
@@ -2039,7 +2047,10 @@ function createPanel() {
         </section>
       </div>
       <div class="kaleido-panel__footer">
-        <span class="kaleido-panel__version">v${MODULE_VERSION}</span>
+        <span class="kaleido-panel__version">
+          v${MODULE_VERSION}
+          <button type="button" id="${VERSION_CHECK_ID}" class="kaleido-panel__version-check" data-state="checking" title="正在联网检查 GitHub 上的最新版本">检查更新…</button>
+        </span>
         <span class="kaleido-panel__theme-wrap">
           <button type="button" id="${THEME_ID}" class="kaleido-panel__theme" aria-haspopup="menu" aria-expanded="false" title="切换主题">🎨 手绘涂鸦</button>
           <div id="${THEME_MENU_ID}" class="kaleido-panel__theme-menu" role="menu" hidden></div>
@@ -2058,6 +2069,8 @@ function createPanel() {
   initLogView(panel);
   initPresetSection(panel);
   initThemeSection(panel);
+  document.getElementById(VERSION_CHECK_ID)?.addEventListener('click', () => checkLatestVersion(true));
+  checkLatestVersion();
   panel.querySelector('.kaleido-panel__close')?.addEventListener('click', closePanel);
   if (!globalThis[ESC_KEY_HANDLER_KEY]) {
     globalThis[ESC_KEY_HANDLER_KEY] = (event) => {
@@ -2078,6 +2091,98 @@ function createPanel() {
     document.addEventListener('keydown', globalThis[ESC_KEY_HANDLER_KEY]);
   }
   return panel;
+}
+
+// ---------- 版本检查（GitHub 对比） ----------
+// 与 SoulLink 同构：拉取远端 manifest.json 的 version 与本地 MODULE_VERSION 比较，
+// 结果缓存 1 小时；点击按钮强制重查。两路源（raw 直链 / GitHub API）互为兜底。
+let versionCheckCache = null;
+
+function compareVersions(a, b) {
+  const parse = (v) => String(v || '').trim().replace(/^v/i, '').split('.').map((part) => {
+    const num = Number.parseInt(part, 10);
+    return Number.isFinite(num) ? num : 0;
+  });
+  const pa = parse(a);
+  const pb = parse(b);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i += 1) {
+    const x = pa[i] || 0;
+    const y = pb[i] || 0;
+    if (x !== y) return x > y ? 1 : -1;
+  }
+  return 0;
+}
+
+function renderVersionCheck(node, cache) {
+  if (!node || !cache) return;
+  if (cache.isLatest) {
+    node.dataset.state = 'ok';
+    node.textContent = '已是最新版';
+    node.title = '当前已是最新版本，点击重新检查';
+  } else {
+    node.dataset.state = 'new';
+    node.textContent = `发现新版本 v${cache.latest}`;
+    node.title = `GitHub 上已有新版本 v${cache.latest}，点击重新检查`;
+  }
+}
+
+async function fetchLatestManifestVersion() {
+  const sources = [
+    {
+      url: GITHUB_MANIFEST_URL,
+      parse: (text) => JSON.parse(text)?.version,
+    },
+    {
+      url: GITHUB_API_MANIFEST_URL,
+      parse: (text) => {
+        const data = JSON.parse(text);
+        if (data?.encoding !== 'base64' || typeof data?.content !== 'string') {
+          throw new Error('API 响应格式异常');
+        }
+        if (typeof globalThis.atob !== 'function') throw new Error('环境不支持 base64 解码');
+        return JSON.parse(globalThis.atob(data.content))?.version;
+      },
+    },
+  ];
+  let lastError = null;
+  for (const source of sources) {
+    try {
+      const { response, responseText } = await fetchText(source.url, { timeoutMs: 10000 });
+      if (!response?.ok) throw new Error(`HTTP ${response?.status || '?'}`);
+      const version = String(source.parse(responseText) || '').trim();
+      if (!version) throw new Error('manifest 中没有版本号');
+      return version;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error('所有检查源都失败');
+}
+
+async function checkLatestVersion(force = false) {
+  const node = document.getElementById(VERSION_CHECK_ID);
+  if (!node) return;
+  if (!force && versionCheckCache && Date.now() - versionCheckCache.checkedAt < VERSION_CHECK_CACHE_MS) {
+    renderVersionCheck(node, versionCheckCache);
+    return;
+  }
+  node.dataset.state = 'checking';
+  node.textContent = '检查更新…';
+  node.title = '正在联网检查 GitHub 上的最新版本';
+  try {
+    const latest = await fetchLatestManifestVersion();
+    const isLatest = compareVersions(MODULE_VERSION, latest) >= 0;
+    versionCheckCache = { latest, isLatest, checkedAt: Date.now() };
+    renderVersionCheck(node, versionCheckCache);
+    logApp('debug', `版本检查完成: 本地 v${MODULE_VERSION} / 远端 v${latest}${isLatest ? '（已是最新）' : '（发现新版本）'}`);
+  } catch (error) {
+    versionCheckCache = null;
+    node.dataset.state = 'error';
+    node.textContent = '检查失败，点击重试';
+    node.title = '联网检查最新版本失败，点击重试';
+    logApp('warn', `版本检查失败: ${String(error?.message || error)}`);
+  }
 }
 
 // ---------- 主题切换 ----------

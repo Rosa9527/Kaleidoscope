@@ -3,6 +3,14 @@ const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
 const MODULE_VERSION = '1.1.1';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
+// ---------- 版本检查（GitHub 对比） ----------
+// 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
+// raw.githubusercontent 与 api.github 均为公网只读资源，无需鉴权；与 SoulLink 同构。
+const GITHUB_MANIFEST_URL = 'https://raw.githubusercontent.com/Rosa9527/Kaleidoscope/main/manifest.json';
+const GITHUB_API_MANIFEST_URL = 'https://api.github.com/repos/Rosa9527/Kaleidoscope/contents/manifest.json';
+const VERSION_CHECK_ID = 'kaleido-version-check';
+// 检查结果缓存 1 小时：避免频繁联网；手动点击强制刷新。
+const VERSION_CHECK_CACHE_MS = 60 * 60 * 1000;
 
 // ---------- 主题 ----------
 // 主题注册表：id 对应 style.css 中 [data-theme='...'] 的变量覆盖；name 显示在按钮与菜单里。
