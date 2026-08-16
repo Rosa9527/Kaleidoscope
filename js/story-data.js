@@ -73,19 +73,14 @@ function fallbackStoryDataToSettings(ctx, card) {
   logApp('warn', '剧情脉络写入角色卡失败，已回退全局设置');
 }
 
-// 防抖持久化：内存态已由调用方（数组引用）更新，这里只负责把整包数据
-// 写回角色卡。按 avatar 定位角色，避免防抖期间切换角色写错卡。
-function scheduleStoryCardSave(ctx, character, card) {
+// 立即持久化（不做防抖）：与变量默认值同款修复——宿主刷新 / 退出会打断
+// setTimeout 挂起的写入，防抖窗口内退出即丢失（剧情脉络在 TauriTavern 下
+// 实测复现）。本地写卡代价极小，每次变更直接落盘。
+function saveStoryCardNow(ctx, character, card) {
   const avatar = String(character?.avatar || '');
-  if (globalThis[STORY_CARD_SAVE_TIMER_KEY]) {
-    clearTimeout(globalThis[STORY_CARD_SAVE_TIMER_KEY]);
-  }
-  globalThis[STORY_CARD_SAVE_TIMER_KEY] = setTimeout(() => {
-    globalThis[STORY_CARD_SAVE_TIMER_KEY] = null;
-    persistStoryCardData(ctx, avatar, card).catch((error) => {
-      logApp('warn', '写入角色卡失败', String(error?.message || error));
-    });
-  }, STORY_CARD_SAVE_DEBOUNCE_MS);
+  persistStoryCardData(ctx, avatar, card).catch((error) => {
+    logApp('warn', '写入角色卡失败', String(error?.message || error));
+  });
 }
 
 async function persistStoryCardData(ctx, avatar, card) {
@@ -113,34 +108,25 @@ async function persistStoryCardData(ctx, avatar, card) {
 // 剧情脉络只显示「当前角色卡绑定的内容」：有角色但卡上无数据时返回空数组，
 // 不回退全局设置（避免把别的角色/旧数据串到当前角色卡上）；只有群聊 / 未选
 // 角色 / 宿主不支持写角色卡时才用全局设置兜底。
-// TauriTavern 下角色卡写入不可靠，读取也跳过（卡内可能有历史残留数据），
-// 只从全局设置取最新状态。
 function getStoryNodes(ctx) {
-  if (!isTauriTavernHost()) {
-    const card = ctx ? getStoryCardData(ctx) : null;
-    if (card) return card.nodes;
-    if (ctx && getStoryCharacter(ctx) && typeof ctx?.writeExtensionField === 'function') return [];
-  }
+  const card = ctx ? getStoryCardData(ctx) : null;
+  if (card) return card.nodes;
+  if (ctx && getStoryCharacter(ctx) && typeof ctx?.writeExtensionField === 'function') return [];
   const settings = ctx ? getSettings(ctx) : null;
   return Array.isArray(settings?.storyNodes) ? settings.storyNodes : [];
 }
 
 function getStoryScripts(ctx) {
-  if (!isTauriTavernHost()) {
-    const card = ctx ? getStoryCardData(ctx) : null;
-    if (card) return card.scripts;
-    if (ctx && getStoryCharacter(ctx) && typeof ctx?.writeExtensionField === 'function') return [];
-  }
+  const card = ctx ? getStoryCardData(ctx) : null;
+  if (card) return card.scripts;
+  if (ctx && getStoryCharacter(ctx) && typeof ctx?.writeExtensionField === 'function') return [];
   const settings = ctx ? getSettings(ctx) : null;
   return Array.isArray(settings?.storyScripts) ? settings.storyScripts : [];
 }
 
 // 确保当前角色卡有剧情数据容器：无卡时用旧版全局数据初始化（并清空全局兜底）。
 // 无角色 / 宿主不支持写角色卡时返回 null（保持全局设置路径）。
-// TauriTavern 角色卡扩展字段写入不可靠（见 isTauriTavernHost），直接返回 null，
-// 数据全程走全局设置，避免迁移后旧数据从磁盘回滚。
 function ensureStoryCardData(ctx) {
-  if (isTauriTavernHost()) return null;
   const character = getStoryCharacter(ctx);
   if (!character || typeof ctx?.writeExtensionField !== 'function') return null;
   let card = getStoryCardData(ctx);
@@ -162,15 +148,15 @@ function ensureStoryCardData(ctx) {
 }
 
 // 保存：有角色且宿主支持写角色卡 → 确保角色卡容器存在（首次变更时迁入旧版
-// 全局数据），随后防抖持久化；否则写全局设置（TauriTavern 走此路径）。
+// 全局数据），随后立即持久化；否则写全局设置。
 function saveStoryData(ctx) {
   const character = getStoryCharacter(ctx);
-  if (isTauriTavernHost() || !character || typeof ctx?.writeExtensionField !== 'function') {
+  if (!character || typeof ctx?.writeExtensionField !== 'function') {
     saveSettingsImmediate(ctx);
     return;
   }
   const card = ensureStoryCardData(ctx);
-  if (card) scheduleStoryCardSave(ctx, character, card);
+  if (card) saveStoryCardNow(ctx, character, card);
 }
 
 function getStoryNodeById(ctx, id) {
@@ -346,6 +332,20 @@ function deleteStoryNode(ctx, id) {
   return { movedChildren, detachedScripts };
 }
 
+// 事件效果归一化（与剧情触发的 effects 同构）：过滤空路径，op 缺省 / 非法回退
+// add（加减值），value 原样保留。触发时的确定性修改由 applyValuesTriggerEffects 执行。
+function normalizeStoryScriptEffects(raw) {
+  const effects = Array.isArray(raw) ? raw : [];
+  return effects
+    .filter((effect) => effect && typeof effect === 'object' && !Array.isArray(effect))
+    .map((effect) => ({
+      path: String(effect?.path || '').trim(),
+      op: String(effect?.op || '').trim() === 'set' ? 'set' : 'add',
+      value: effect?.value !== undefined ? effect.value : null,
+    }))
+    .filter((effect) => effect.path !== '');
+}
+
 function createStoryScript(ctx, data) {
   ensureStoryCardData(ctx);
   const scripts = getStoryScripts(ctx);
@@ -356,6 +356,7 @@ function createStoryScript(ctx, data) {
     name: String(data?.name || '').trim() || '未命名事件',
     trigger: String(data?.trigger || '').trim(),
     description: String(data?.description || '').trim(),
+    effects: normalizeStoryScriptEffects(data?.effects),
     content: String(data?.content || ''),
     createdAt: now,
     updatedAt: now,
@@ -376,6 +377,7 @@ function updateStoryScript(ctx, id, data) {
     if (data.name !== undefined) script.name = String(data.name).trim() || script.name;
     if (data.trigger !== undefined) script.trigger = String(data.trigger).trim();
     if (data.description !== undefined) script.description = String(data.description).trim();
+    if (data.effects !== undefined) script.effects = normalizeStoryScriptEffects(data.effects);
     if (data.content !== undefined) script.content = String(data.content);
     if (data.nodeId !== undefined) script.nodeId = String(data.nodeId).trim();
   }
@@ -701,6 +703,17 @@ function serializeStoryBundle(ctx) {
       lines.push(`    name: ${yamlScalar(script.name)}`);
       lines.push(`    trigger: ${yamlScalar(script.trigger || '')}`);
       lines.push(`    description: ${yamlScalar(script.description || '')}`);
+      lines.push('    effects:');
+      const effects = Array.isArray(script.effects) ? script.effects : [];
+      if (effects.length === 0) {
+        lines.push('      []');
+      } else {
+        for (const effect of effects) {
+          lines.push(`      - path: ${yamlScalar(String(effect?.path || ''))}`);
+          lines.push(`        op: ${yamlScalar(String(effect?.op || 'add').trim())}`);
+          lines.push(`        value: ${yamlValueScalar(effect?.value)}`);
+        }
+      }
       lines.push(`    content: ${yamlBlockScalarText(script.content, '    ')}`);
     }
   }
@@ -716,7 +729,7 @@ function buildStoryBundleFilename(ctx) {
   return `${STORY_BUNDLE_FILENAME_PREFIX}-${storyTimestamp()}.yaml`;
 }
 
-// 单事件导出：遵循 frontmatter 格式（name / id / Trigger / description + 正文）。
+// 单事件导出：遵循 frontmatter 格式（name / id / Trigger / description / effects + 正文）。
 function serializeSingleScript(script) {
   const lines = [];
   lines.push('---');
@@ -724,6 +737,17 @@ function serializeSingleScript(script) {
   lines.push(`id: ${yamlScalar(script?.id || '')}`);
   lines.push(`Trigger: ${yamlScalar(script?.trigger || '')}`);
   lines.push(`description: ${yamlScalar(script?.description || '')}`);
+  lines.push('effects:');
+  const effects = Array.isArray(script?.effects) ? script.effects : [];
+  if (effects.length === 0) {
+    lines.push('  []');
+  } else {
+    for (const effect of effects) {
+      lines.push(`  - path: ${yamlScalar(String(effect?.path || ''))}`);
+      lines.push(`    op: ${yamlScalar(String(effect?.op || 'add').trim())}`);
+      lines.push(`    value: ${yamlValueScalar(effect?.value)}`);
+    }
+  }
   lines.push('---');
   lines.push(String(script?.content || '').replace(/\n+$/, ''));
   return `${lines.join('\n')}\n`;
@@ -753,6 +777,7 @@ function parseSingleScriptFile(text) {
     name,
     trigger: String(meta?.Trigger ?? meta?.trigger ?? '').trim(),
     description: String(meta?.description ?? '').trim(),
+    effects: normalizeStoryScriptEffects(meta?.effects),
     content,
   };
 }
@@ -858,6 +883,7 @@ function mergeStoryBundleInto(ctx, bundle, options) {
       name: String(raw.name || '').trim() || '未命名事件',
       trigger: String(raw.trigger ?? '').trim(),
       description: String(raw.description ?? '').trim(),
+      effects: normalizeStoryScriptEffects(raw.effects),
       content: String(raw.content ?? ''),
       nodeId: resolvedNodeId,
     };

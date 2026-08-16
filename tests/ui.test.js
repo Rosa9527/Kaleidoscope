@@ -438,6 +438,53 @@ runner.test('导入无 name 的事件文件应报错不落库', async () => {
   assert($('kaleido-story-editor').hidden, '编辑器应保持关闭');
 });
 
+runner.test('新建事件：事件效果（加减 / 覆盖）填写与保存，列表显示摘要', () => {
+  const defaults = ui.getValuesDefaults(hostCtx);
+  defaults['张三'] = { '好感': 30 };
+  defaults['曹操'] = { '病': '没治好' };
+  ui.saveValuesData(hostCtx);
+  click(actionButton(rowByName('第一卷'), 'add-menu'));
+  click($('kaleido-story-add-menu-script'));
+  setValue('kaleido-story-script-name', '好感事件');
+  setValue('kaleido-story-script-content', '好感提升。');
+  click($('kaleido-story-script-effect-add'));
+  click($('kaleido-story-script-effect-add'));
+  const rows = Array.from($('kaleido-story-script-effects').querySelectorAll('.kaleido-values__trigger-effect'));
+  assert(rows.length === 2, '应有 2 个效果行');
+  assert(rows[0].querySelector('.kaleido-values__trigger-effect-op').value === 'add', '默认应为加减值');
+  rows[0].querySelector('.kaleido-values__trigger-effect-path').value = '张三/好感';
+  rows[0].querySelector('.kaleido-values__trigger-effect-value').value = '30';
+  rows[1].querySelector('.kaleido-values__trigger-effect-path').value = '曹操/病';
+  rows[1].querySelector('.kaleido-values__trigger-effect-op').value = 'set';
+  rows[1].querySelector('.kaleido-values__trigger-effect-value').value = '已治好';
+  click($('kaleido-story-editor-save'));
+  const script = ui.getStoryScripts(hostCtx).find((s) => s.name === '好感事件');
+  assert(script && script.effects.length === 2, '应保存 2 个效果');
+  assert(script.effects[0].path === '张三/好感' && script.effects[0].op === 'add' && script.effects[0].value === 30, '效果 1 应正确');
+  assert(script.effects[1].op === 'set' && script.effects[1].value === '已治好', '效果 2 应正确');
+  const effectSpan = rowByName('好感事件').querySelector('.kaleido-story__row-trigger.is-effect');
+  assert(effectSpan && effectSpan.textContent.includes('张三/好感 +30'), '列表应显示效果摘要');
+});
+
+runner.test('编辑事件：回填效果行；效果值留空阻止保存', () => {
+  click(actionButton(rowByName('好感事件'), 'edit-script'));
+  let rows = Array.from($('kaleido-story-script-effects').querySelectorAll('.kaleido-values__trigger-effect'));
+  assert(rows.length === 2, '编辑应回填 2 个效果行');
+  assert(rows[0].querySelector('.kaleido-values__trigger-effect-path').value === '张三/好感', '应回填路径');
+  assert(rows[0].querySelector('.kaleido-values__trigger-effect-op').value === 'add', '应回填类型');
+  assert(rows[0].querySelector('.kaleido-values__trigger-effect-value').value === '30', '应回填值');
+  // 新加一条效果行但值留空 → 保存被阻止
+  click($('kaleido-story-script-effect-add'));
+  rows = Array.from($('kaleido-story-script-effects').querySelectorAll('.kaleido-values__trigger-effect'));
+  rows[2].querySelector('.kaleido-values__trigger-effect-path').value = '张三/好感';
+  const before = ui.getStoryScripts(hostCtx).find((s) => s.name === '好感事件').effects.length;
+  clearToasts();
+  click($('kaleido-story-editor-save'));
+  assert(toasts.at(-1) && toasts.at(-1)[0] === 'warning', '值留空应弹出警告');
+  assert(ui.getStoryScripts(hostCtx).find((s) => s.name === '好感事件').effects.length === before, '不应保存空值效果');
+  click($('kaleido-story-editor-cancel'));
+});
+
 // ---------- 整包：导出 / 导入 ----------
 runner.test('整包导出包含层级与事件', () => {
   clearToasts();

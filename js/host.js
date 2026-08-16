@@ -8,18 +8,6 @@ function getContextSafe() {
   }
 }
 
-// TauriTavern 宿主标记（与 main.js 菜单注册同款判断）。此宿主的 writeExtensionField
-// 对角色卡扩展字段的写入不可靠：失败只 console.error 不抛错，调用方无法感知；
-// 且设置保存走宿主防抖（页面刷新会打断 pending 写入）。变量默认值等数据因此
-// 改走「全局设置 + 聊天文件镜像」双写，避免刷新后旧数据回滚。
-function isTauriTavernHost() {
-  return Boolean(
-    globalThis.__TAURITAVERN__?.ready
-    || globalThis.__TAURITAVERN_MAIN_READY__
-    || globalThis.__TAURITAVERN_IPC__
-  );
-}
-
 // 宿主事件名 → ctx.event_types 键 的映射。
 // TauriTavern 的 eventSource 需要 event_types 的值（如 ctx.event_types.GENERATION_ENDED），
 // 裸字符串名不会触发；标准 SillyTavern 的 event_types 值则是 snake_case。统一经

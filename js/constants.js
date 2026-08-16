@@ -1,7 +1,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.1.1';
+const MODULE_VERSION = '1.2.2';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -157,6 +157,10 @@ const STORY_SCRIPT_TRIGGER_ID = 'kaleido-story-script-trigger';
 const STORY_SCRIPT_DESC_ID = 'kaleido-story-script-desc';
 const STORY_SCRIPT_NODE_SELECT_ID = 'kaleido-story-script-node-select';
 const STORY_SCRIPT_CONTENT_ID = 'kaleido-story-script-content';
+// 剧情脉络 · 事件效果（触发时修改父变量）：行控件 class 复用变量系统的
+// VALUES_TRIGGER_EFFECT_*（同款交互与样式），读取 / 删除委托按容器隔离。
+const STORY_SCRIPT_EFFECTS_ID = 'kaleido-story-script-effects';
+const STORY_SCRIPT_EFFECT_ADD_ID = 'kaleido-story-script-effect-add';
 const STORY_EDITOR_EXPORT_ID = 'kaleido-story-editor-export';
 const STORY_EDITOR_SAVE_ID = 'kaleido-story-editor-save';
 const STORY_EDITOR_CANCEL_ID = 'kaleido-story-editor-cancel';
@@ -172,8 +176,6 @@ const STORY_SCRIPT_FILENAME_PREFIX = '万华镜-事件';
 // 随角色卡导入/导出自动携带；群聊/未选角色时回退全局设置）。
 const STORY_CARD_EXTENSION_KEY = 'kaleidoscope_story';
 const STORY_CARD_DATA_VERSION = 1;
-const STORY_CARD_SAVE_DEBOUNCE_MS = 500;
-const STORY_CARD_SAVE_TIMER_KEY = '__kaleido_story_card_save_timer__';
 // ---------- 变量系统（键注册表 + 默认值 / 游戏值两层）----------
 const VALUES_VIEW_ID = 'kaleido-values-view';
 const VALUES_DIALOG_ID = 'kaleido-values-dialog';
@@ -198,6 +200,9 @@ const VALUES_LAYER_ICON_ID = 'kaleido-values-layer-icon';
 const VALUES_LAYER_TITLE_ID = 'kaleido-values-layer-title';
 const VALUES_LAYER_DEFAULT_ID = 'kaleido-values-layer-default';
 const VALUES_LAYER_GAME_ID = 'kaleido-values-layer-game';
+// 默认数值层「保存」按钮：把当前默认值立即保存到角色卡并从磁盘校验。
+const VALUES_SAVE_NOW_ID = 'kaleido-values-save-now';
+const VALUES_SAVE_ICON_CLASS = 'fa-solid fa-floppy-disk';
 const VALUES_MAINTAIN_STATUS_ID = 'kaleido-values-maintain-status';
 const VALUES_MAINTAIN_NOW_ID = 'kaleido-values-maintain-now';
 const VALUES_RESET_GAME_ID = 'kaleido-values-reset-game';
@@ -242,23 +247,28 @@ const VALUES_KEY_EDITOR_RULE_MIN_CLASS = 'kaleido-values__key-rule-min';
 const VALUES_KEY_EDITOR_RULE_MAX_CLASS = 'kaleido-values__key-rule-max';
 const VALUES_KEY_EDITOR_RULE_VALUE_CLASS = 'kaleido-values__key-rule-value';
 const VALUES_KEY_EDITOR_RULE_REMOVE_CLASS = 'kaleido-values__key-rule-remove';
+// 子变量派生方式：区间（单派生源 + 区间规则，输出文本）/ 公式（引用变量四则
+// 运算，输出数值）。
+const VALUES_KEY_DERIVE_RULES = 'rules';
+const VALUES_KEY_DERIVE_FORMULA = 'formula';
+const VALUES_KEY_EDITOR_DERIVE_ID = 'kaleido-values-key-editor-derive';
+const VALUES_KEY_EDITOR_FORMULA_ID = 'kaleido-values-key-editor-formula';
+const VALUES_KEY_EDITOR_FORMULA_FIELDS_ID = 'kaleido-values-key-editor-formula-fields';
+const VALUES_KEY_EDITOR_RULES_FIELDS_ID = 'kaleido-values-key-editor-rules-fields';
 const VALUES_EDITOR_CHILD_HINT_ID = 'kaleido-values-editor-child-hint';
 // 变量 · 角色卡绑定（与剧情脉络同模式）：数据存角色卡 extensions，
 // 随角色卡导入/导出自动携带；群聊/未选角色时回退全局设置 valuesData。
 const VALUES_CARD_EXTENSION_KEY = 'kaleidoscope_values';
 const VALUES_CARD_DATA_VERSION = 1;
-const VALUES_CARD_SAVE_DEBOUNCE_MS = 500;
-const VALUES_CARD_SAVE_TIMER_KEY = '__kaleido_values_card_save_timer__';
+// 宿主 merge-attributes 是深合并语义：只更新请求里出现的键，请求里没有的键
+// 原样保留。删除键必须用哨兵值显式标记（TauriTavern 与 SillyTavern 同约定），
+// 否则删除操作会被合并语义吞掉：merge 返回 ok:true 但角色卡从未改变。
+const VALUES_UNSET_SENTINEL = '__@@UNSET@@__';
 // 变量 · 聊天文件绑定：游戏值存 chatMetadata[kaleidoscope_values]，
 // 随聊天文件（jsonl 首行 chat_metadata）保存 / 加载自动携带。
 const VALUES_CHAT_KEY = 'kaleidoscope_values';
 const VALUES_CHAT_SAVE_DEBOUNCE_MS = 400;
 const VALUES_CHAT_SAVE_TIMER_KEY = '__kaleido_values_chat_save_timer__';
-// 变量包（键注册表 + 默认值树）的聊天文件镜像：TauriTavern 等宿主写角色卡
-// 不可靠（writeExtensionField 失败只 console.error 不抛错）、全局设置保存是
-// 宿主防抖的（页面刷新会打断 pending 写入）——聊天文件随 saveChat 即时落盘，
-// 用它兜底保证默认值的删除 / 修改在刷新后不回滚。
-const VALUES_CHAT_BUNDLE_KEY = 'kaleidoscope_values_bundle';
 // 整包 YAML 的自描述格式标记与文件名前缀。
 const VALUES_BUNDLE_FORMAT = 'kaleidoscope-values';
 const VALUES_BUNDLE_FILENAME_PREFIX = '万华镜-变量';
@@ -354,6 +364,23 @@ const VALUES_TRIGGER_CONDITION_OP_WRAP_CLASS = 'kaleido-values__trigger-conditio
 const VALUES_TRIGGER_CONDITION_OP_TEXT_CLASS = 'kaleido-values__trigger-condition-op-text';
 const VALUES_TRIGGER_CONDITION_VALUE_CLASS = 'kaleido-values__trigger-condition-value';
 const VALUES_TRIGGER_CONDITION_REMOVE_CLASS = 'kaleido-values__trigger-condition-remove';
+// 剧情触发 · 事件效果（触发时修改父变量）：效果行控件 class 独立命名，
+// 样式与条件行一致（style.css 组选择器），读取 / 删除委托按容器隔离。
+const VALUES_TRIGGER_EDITOR_EFFECTS_ID = 'kaleido-values-trigger-editor-effects';
+const VALUES_TRIGGER_EDITOR_EFFECT_ADD_ID = 'kaleido-values-trigger-editor-effect-add';
+const VALUES_TRIGGER_EFFECT_ROW_CLASS = 'kaleido-values__trigger-effect';
+const VALUES_TRIGGER_EFFECT_PATH_CLASS = 'kaleido-values__trigger-effect-path';
+const VALUES_TRIGGER_EFFECT_OP_CENTER_CLASS = 'kaleido-values__trigger-effect-op-center';
+const VALUES_TRIGGER_EFFECT_OP_WRAP_CLASS = 'kaleido-values__trigger-effect-op-wrap';
+const VALUES_TRIGGER_EFFECT_OP_TEXT_CLASS = 'kaleido-values__trigger-effect-op-text';
+const VALUES_TRIGGER_EFFECT_OP_CLASS = 'kaleido-values__trigger-effect-op';
+const VALUES_TRIGGER_EFFECT_VALUE_CLASS = 'kaleido-values__trigger-effect-value';
+const VALUES_TRIGGER_EFFECT_REMOVE_CLASS = 'kaleido-values__trigger-effect-remove';
+// 效果类型：add = 加减值（正加负减，当前值需可转数字）；set = 覆盖（数字/文本/布尔/null 均可）。
+const VALUES_TRIGGER_EFFECT_OPS = Object.freeze([
+  { value: 'add', display: '+/-', label: '加减值（+/-，正加负减）' },
+  { value: 'set', display: '＝', label: '覆盖（直接设为指定值）' },
+]);
 // 剧情触发 · 注入与轮次记录
 const VALUES_TRIGGER_INJECT_KEY = 'Kaleidoscope_Trigger_Event';
 const VALUES_TRIGGER_LAST_ROUND_KEY = '__kaleido_values_trigger_last_round__';

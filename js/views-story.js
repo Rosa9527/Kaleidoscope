@@ -9,6 +9,7 @@ let storyImportTargetNodeId = '';  // 节点行「导入事件」的目标节点
 let storyEditorSession = 0;        // 编辑器会话号：异步导入完成后若会话已变则放弃接管
 let storyAddMenuContext = null;   // 「＋」菜单上下文：{ root: true } 或 { nodeId }
 let storyImportModeResolve = null;  // 导入方式选择浮层的回调（resolve 'merge' | 'replace' | null）
+let storyScriptEditorEffects = [];  // 事件编辑器中的事件效果草稿
 
 function storyToastr(kind, message) {
   try {
@@ -163,10 +164,12 @@ function buildStoryScriptRow(script, depth) {
   const ctx = getContextSafe();
   const node = script.nodeId ? getStoryNodeById(ctx, script.nodeId) : null;
   const badge = node ? escapeHtml(node.name) : '未分类';
+  const effectsText = formatValuesTriggerEffects(script);
   row.innerHTML = `
     <span class="kaleido-story__row-icon kaleido-story__row-icon--script"><span class="${STORY_SCRIPT_ICON_CLASS}"></span></span>
     <span class="kaleido-story__row-name" title="${escapeHtml(script.name)}">${escapeHtml(script.name)}</span>
     ${script.trigger ? `<span class="kaleido-story__row-trigger" title="${escapeHtml(script.trigger)}">${escapeHtml(script.trigger)}</span>` : ''}
+    ${effectsText ? `<span class="kaleido-story__row-trigger is-effect" title="${escapeHtml(effectsText)}">${escapeHtml(effectsText)}</span>` : ''}
     <span class="kaleido-story__row-badge">${badge}</span>
     <span class="kaleido-story__row-actions">
       <button type="button" class="kaleido-story__icon-btn" data-action="edit-script" data-id="${escapeHtml(script.id)}" title="编辑事件" aria-label="编辑事件"><span class="${STORY_EDIT_ICON_CLASS}"></span></button>
@@ -294,6 +297,10 @@ function openStoryScriptEditor(item, presetNodeId, pending) {
   setStoryInputValue(STORY_SCRIPT_TRIGGER_ID, data.trigger || '');
   setStoryInputValue(STORY_SCRIPT_DESC_ID, data.description || '');
   setStoryInputValue(STORY_SCRIPT_CONTENT_ID, data.content || '');
+  storyScriptEditorEffects = Array.isArray(data.effects)
+    ? data.effects.map((effect) => ({ ...effect }))
+    : [];
+  renderStoryScriptEffectRows();
   populateStoryScriptNodeSelect(storyEditorPresetNodeId || data.nodeId || '');
 }
 
@@ -328,6 +335,7 @@ function closeStoryEditor() {
   storyEditorPresetParentId = '';
   storyEditorPresetNodeId = '';
   storyPendingScript = null;
+  storyScriptEditorEffects = [];
 }
 
 function readStoryScriptForm() {
@@ -339,6 +347,36 @@ function readStoryScriptForm() {
     content: String(document.getElementById(STORY_SCRIPT_CONTENT_ID)?.value || ''),
     nodeId: String(document.getElementById(STORY_SCRIPT_NODE_SELECT_ID)?.value || '').trim(),
   };
+}
+
+// 事件效果行：直接复用变量系统触发编辑器的效果行组件（同一组 class / 交互 /
+// 父变量路径下拉），仅容器与草稿是剧情脉络自己的，两者不会混淆。
+function renderStoryScriptEffectRows() {
+  const container = document.getElementById(STORY_SCRIPT_EFFECTS_ID);
+  if (!container) return;
+  container.innerHTML = '';
+  for (const effect of storyScriptEditorEffects) {
+    container.appendChild(buildValuesTriggerEffectRow(effect));
+  }
+}
+
+function addStoryScriptEffectRow() {
+  storyScriptEditorEffects.push({ path: '', op: 'add', value: null });
+  renderStoryScriptEffectRows();
+}
+
+// 读取事件效果区当前草稿（含用户未保存的修改）。
+function readStoryScriptEffectRows() {
+  const container = document.getElementById(STORY_SCRIPT_EFFECTS_ID);
+  if (!container) return storyScriptEditorEffects.slice();
+  const effects = [];
+  container.querySelectorAll('.' + VALUES_TRIGGER_EFFECT_ROW_CLASS).forEach((row) => {
+    const path = String(row.querySelector('.' + VALUES_TRIGGER_EFFECT_PATH_CLASS)?.value || '').trim();
+    const op = String(row.querySelector('.' + VALUES_TRIGGER_EFFECT_OP_CLASS)?.value || 'add').trim();
+    const valueText = String(row.querySelector('.' + VALUES_TRIGGER_EFFECT_VALUE_CLASS)?.value || '').trim();
+    effects.push({ path, op: op === 'set' ? 'set' : 'add', value: parseValuesEditorText(valueText).value });
+  });
+  return effects;
 }
 
 function saveStoryEditor() {
@@ -376,6 +414,23 @@ function saveStoryEditor() {
       storyToastr('warning', '事件内容不能为空');
       return;
     }
+    const effects = readStoryScriptEffectRows().filter((effect) => effect.path !== '');
+    for (const effect of effects) {
+      if (effect.value === '') {
+        storyToastr('warning', '请填写效果值（要设为无值请填 null）');
+        return;
+      }
+      if (effect.op === 'add') {
+        const delta = typeof effect.value === 'number'
+          ? effect.value
+          : (typeof effect.value === 'string' && String(effect.value).trim() !== '' ? Number(effect.value) : NaN);
+        if (!Number.isFinite(delta)) {
+          storyToastr('warning', '加减值的效果值必须是数字');
+          return;
+        }
+      }
+    }
+    data.effects = effects;
     const requestedId = String(data.id || '').trim();
     let saved;
     if (storyEditorId) {
@@ -589,6 +644,11 @@ function buildStoryContentHTML(editorClass) {
               <span class="kaleido-api__label">触发条件</span>
               <input id="${STORY_SCRIPT_TRIGGER_ID}" class="kaleido-input" type="text" placeholder="如：玩家第一次到达新手村" autocomplete="off" spellcheck="false" />
             </label>
+            <div class="kaleido-api__field">
+              <span class="kaleido-api__label">事件效果（可选 · 触发时修改父变量）</span>
+              <div id="${STORY_SCRIPT_EFFECTS_ID}" class="kaleido-values__trigger-effects"></div>
+              <button type="button" id="${STORY_SCRIPT_EFFECT_ADD_ID}" class="kaleido-btn kaleido-btn--mini">＋ 添加效果</button>
+            </div>
             <label class="kaleido-api__field" for="${STORY_SCRIPT_DESC_ID}">
               <span class="kaleido-api__label">事件说明</span>
               <textarea id="${STORY_SCRIPT_DESC_ID}" class="kaleido-input kaleido-story__textarea kaleido-story__textarea--small" rows="2" placeholder="这个事件的用途（可选）"></textarea>
@@ -749,6 +809,14 @@ function bindStoryContentEvents() {
   document.getElementById(STORY_EDITOR_CANCEL_ID)?.addEventListener('click', closeStoryEditor);
   document.getElementById(STORY_EDITOR_SAVE_ID)?.addEventListener('click', saveStoryEditor);
   document.getElementById(STORY_EDITOR_EXPORT_ID)?.addEventListener('click', handleStoryEditorExport);
+  document.getElementById(STORY_SCRIPT_EFFECT_ADD_ID)?.addEventListener('click', addStoryScriptEffectRow);
+  document.getElementById(STORY_SCRIPT_EFFECTS_ID)?.addEventListener('click', (event) => {
+    const button = event.target instanceof Element ? event.target.closest('.' + VALUES_TRIGGER_EFFECT_REMOVE_CLASS) : null;
+    if (!button) return;
+    const row = button.closest('.' + VALUES_TRIGGER_EFFECT_ROW_CLASS);
+    if (!row) return;
+    row.remove();
+  });
 
   if (!globalThis[STORY_ADD_MENU_KEY]) {
     globalThis[STORY_ADD_MENU_KEY] = (event) => {

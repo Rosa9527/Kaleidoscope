@@ -146,6 +146,105 @@ runner.test('触发判定：无条件恒不触发，停用不触发', () => {
   assert(ctx.evaluateValuesTriggers(c).length === 0, '停用后不应触发');
 });
 
+// ---------- 事件效果 ----------
+runner.test('效果归一化：空路径过滤、非法 op 回退 set、未指定为空数组', () => {
+  const c = fresh();
+  makeValues(c);
+  const t = ctx.createValuesTrigger(c, {
+    name: '带效果',
+    conditions: [{ path: '张三/好感', op: '>=', value: 30 }],
+    effects: [
+      { path: '', op: 'add', value: 10 },
+      { path: '张三/好感', op: 'weird', value: 100 },
+      { path: '张三/好感', op: 'add', value: 30 },
+      { path: '张三/好感', value: 5 },
+    ],
+    content: '内容',
+  });
+  assert(t.effects.length === 3, '空路径效果应被过滤');
+  assert(t.effects[0].op === 'add' && t.effects[0].value === 100, '非法 op 应回退 add 且保留值');
+  assert(t.effects[1].op === 'add' && t.effects[1].value === 30, '合法 add 应保留');
+  assert(t.effects[2].op === 'add' && t.effects[2].value === 5, '未指定 op 应默认为 add');
+  const plain = ctx.createValuesTrigger(c, { name: '无效果', conditions: [{ path: '张三/好感', op: '>=', value: 30 }], content: '内容' });
+  assert(Array.isArray(plain.effects) && plain.effects.length === 0, '未指定效果应为空数组');
+});
+
+runner.test('效果应用：加减值（正加负减）与覆盖（数字 / 文本）', () => {
+  const c = fresh();
+  makeValues(c);
+  ctx.upsertValuesKey(c, '病', '按剧情变化');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['曹操', '病'], '没治好');
+  ctx.saveValuesData(c);
+  ctx.saveValuesChatState(c, { 张三: { 好感: 30, 是否已知真相: false }, 世界: { 战争状态: false }, 曹操: { 病: '没治好' } }, {});
+  const add = ctx.createValuesTrigger(c, { name: '加好感', conditions: [{ path: '张三/好感', op: '>=', value: 30 }], effects: [{ path: '张三/好感', op: 'add', value: 30 }], content: '内容' });
+  const r1 = ctx.applyValuesTriggerEffects(c, [add]);
+  assert(r1.changed.includes('张三/好感'), '应记录变更路径');
+  assert(ctx.getValuesChatState(c).values.张三.好感 === 60, '30 + 30 应为 60');
+  const sub = ctx.createValuesTrigger(c, { name: '减好感', conditions: [{ path: '张三/好感', op: '>=', value: 60 }], effects: [{ path: '张三/好感', op: 'add', value: -10 }], content: '内容' });
+  ctx.applyValuesTriggerEffects(c, [sub]);
+  assert(ctx.getValuesChatState(c).values.张三.好感 === 50, '60 - 10 应为 50');
+  const setNum = ctx.createValuesTrigger(c, { name: '覆盖数字', conditions: [{ path: '张三/好感', op: '>=', value: 50 }], effects: [{ path: '张三/好感', op: 'set', value: 100 }], content: '内容' });
+  ctx.applyValuesTriggerEffects(c, [setNum]);
+  assert(ctx.getValuesChatState(c).values.张三.好感 === 100, '覆盖应直接设为 100');
+  const setText = ctx.createValuesTrigger(c, { name: '覆盖文本', conditions: [{ path: '曹操/病', op: 'exists' }], effects: [{ path: '曹操/病', op: 'set', value: '已治好' }], content: '内容' });
+  ctx.applyValuesTriggerEffects(c, [setText]);
+  assert(ctx.getValuesChatState(c).values.曹操.病 === '已治好', '文本覆盖应为已治好');
+});
+
+runner.test('效果应用：子变量与节点跳过，父变量变更后子变量重新派生', () => {
+  const c = fresh();
+  makeValues(c);
+  ctx.upsertValuesKey(c, '态度', '', { type: 'child', parent: '好感', rules: [{ min: 0, max: 50, value: '冷淡' }, { min: 51, max: 100, value: '热络' }] });
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['张三', '态度'], '冷淡');
+  ctx.saveValuesData(c);
+  ctx.saveValuesChatState(c, { 张三: { 好感: 30, 态度: '冷淡', 是否已知真相: false }, 世界: { 战争状态: false } }, {});
+  const t = ctx.createValuesTrigger(c, {
+    name: '效果',
+    conditions: [{ path: '张三/好感', op: '>=', value: 30 }],
+    effects: [
+      { path: '张三/态度', op: 'set', value: '热络' },
+      { path: '张三', op: 'set', value: '整个节点' },
+      { path: '张三/好感', op: 'add', value: 30 },
+    ],
+    content: '内容',
+  });
+  const result = ctx.applyValuesTriggerEffects(c, [t]);
+  assert(result.skipped.some((s) => s.includes('张三/态度')), '子变量应被跳过');
+  assert(result.skipped.some((s) => s.includes('张三（节点')), '节点应被跳过');
+  assert(result.changed.includes('张三/好感'), '父变量应生效');
+  const values = ctx.getValuesChatState(c).values;
+  assert(values.张三.好感 === 60, '好感 30 + 30 应为 60');
+  assert(values.张三.态度 === '热络', '子变量应按父变量重新派生');
+});
+
+runner.test('效果应用：加减值遇到不可转数字的当前值则跳过且不改值', () => {
+  const c = fresh();
+  makeValues(c);
+  ctx.upsertValuesKey(c, '病', '按剧情变化');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['曹操', '病'], '没治好');
+  ctx.saveValuesData(c);
+  ctx.saveValuesChatState(c, { 张三: { 好感: 30, 是否已知真相: false }, 世界: { 战争状态: false }, 曹操: { 病: '没治好' } }, {});
+  const t = ctx.createValuesTrigger(c, { name: '文本加减', conditions: [{ path: '曹操/病', op: 'exists' }], effects: [{ path: '曹操/病', op: 'add', value: 5 }], content: '内容' });
+  const result = ctx.applyValuesTriggerEffects(c, [t]);
+  assert(result.skipped.some((s) => s.includes('曹操/病')), '文本当前值加减应跳过');
+  assert(ctx.getValuesChatState(c).values.曹操.病 === '没治好', '文本值不应被修改');
+});
+
+runner.test('发送前任务：触发时应用效果并落盘，record 记录 applied', async () => {
+  const c = fresh();
+  makeValues(c);
+  makeTrigger(c, { effects: [{ path: '张三/好感', op: 'add', value: 30 }] });
+  ctx.saveValuesChatState(c, { 张三: { 好感: 80, 是否已知真相: true }, 世界: { 战争状态: false } }, {});
+  c.chat = [{ is_user: true, mes: '你好', id: 1 }];
+  const calls = [];
+  c.setExtensionPrompt = (key, text) => calls.push({ key, text });
+  await ctx.runValuesTriggerBarrierTask(c);
+  assert(calls.some((call) => call.key === INJECT_KEY), '应注入触发事件');
+  assert(ctx.getValuesChatState(c).values.张三.好感 === 110, '效果应把 80 加到 110');
+  const round = sandbox[LAST_ROUND_KEY];
+  assert(round && round.effectsApplied && round.effectsApplied.changed.includes('张三/好感'), '应记录已应用的效果');
+});
+
 // ---------- 注入 ----------
 runner.test('注入文本：<Story_Trigger> 块含事件与条件摘要', () => {
   const c = fresh();
@@ -293,6 +392,23 @@ runner.test('整包解析：triggers 段解析并归一化', () => {
   assert(t.conditions[1].value === true, '布尔值应保持布尔');
   assert(t.once === false, 'once: false 应解析为常驻事件');
   assert(t.content.includes('张三向你表白了。'), '正文应解析');
+});
+
+runner.test('整包导出 / 解析：effects 段随触发往返', () => {
+  const c = fresh();
+  makeValues(c);
+  makeTrigger(c, { effects: [{ path: '张三/好感', op: 'add', value: 30 }, { path: '曹操/病', op: 'set', value: '已治好' }] });
+  const text = ctx.serializeValuesBundle(c);
+  assert(text.includes('effects:'), '应包含 effects 段');
+  assert(text.includes('op: add'), '应导出效果类型 add');
+  assert(text.includes('value: 30'), '应导出数字效果值');
+  assert(text.includes('op: set'), '应导出效果类型 set');
+  assert(text.includes('已治好'), '应导出文本效果值');
+  const parsed = ctx.parseValuesBundle(text);
+  const t = parsed.triggers[0];
+  assert(t.effects.length === 2, '应解析 2 个效果');
+  assert(t.effects[0].path === '张三/好感' && t.effects[0].op === 'add' && t.effects[0].value === 30, '效果 1 应正确');
+  assert(t.effects[1].path === '曹操/病' && t.effects[1].op === 'set' && t.effects[1].value === '已治好', '效果 2 应正确');
 });
 
 runner.test('整包导入：旧数据无 triggers 字段时也能合并', () => {

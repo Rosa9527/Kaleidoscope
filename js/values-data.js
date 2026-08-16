@@ -21,7 +21,7 @@ function getValuesCardData(ctx) {
   return card;
 }
 
-// 把变量包写入角色卡对象（内存态，持久化由 scheduleValuesCardSave 完成）。
+// 把变量包写入角色卡对象（内存态，持久化由 saveValuesCardNow 完成）。
 function setValuesCardData(character, card) {
   if (!character || typeof character !== 'object') return;
   if (!character.data || typeof character.data !== 'object') character.data = {};
@@ -31,10 +31,7 @@ function setValuesCardData(character, card) {
 
 // 确保当前角色卡有变量数据容器：无卡时用旧版全局数据初始化（并清空全局兜底）。
 // 无角色 / 宿主不支持写角色卡时返回 null（保持全局设置路径）。
-// TauriTavern 角色卡扩展字段写入不可靠（见 isTauriTavernHost），直接返回 null，
-// 数据全程走全局设置 + 聊天文件镜像，避免迁移后旧数据从磁盘回滚。
 function ensureValuesCardData(ctx) {
-  if (isTauriTavernHost()) return null;
   const character = getStoryCharacter(ctx);
   if (!character || typeof ctx?.writeExtensionField !== 'function') return null;
   let card = getValuesCardData(ctx);
@@ -82,45 +79,21 @@ function fallbackValuesDataToSettings(ctx, card) {
       ? card.order
       : {},
   };
-  if (isTauriTavernHost()) mirrorValuesBundleToChat(ctx, settings.valuesData);
   saveSettingsImmediate(ctx);
   logApp('warn', '变量写入角色卡失败，已回退全局设置');
 }
 
-// TauriTavern 耐久镜像：把变量包写进聊天元数据并即时保存聊天文件。
-// 全局设置的保存是宿主防抖的（页面刷新会打断 pending 写入），聊天文件随
-// saveChat 即时落盘（与游戏值同机制）——刷新后从聊天文件恢复最新状态，
-// 保证默认值的删除 / 修改不被旧磁盘数据回滚。
-function mirrorValuesBundleToChat(ctx, bundle) {
-  const context = ctx || getContextSafe();
-  if (!context) return false;
-  let metadata = getValuesChatMetadata(context);
-  if (!metadata) {
-    try {
-      context.chatMetadata = {};
-      metadata = context.chatMetadata;
-    } catch (error) {
-      logApp('warn', '聊天元数据不可写', String(error?.message || error));
-      return false;
-    }
-  }
-  metadata[VALUES_CHAT_BUNDLE_KEY] = bundle;
-  scheduleValuesChatSave(context, true);
-  return true;
-}
-
-// 防抖持久化（与剧情脉络同模式）：按 avatar 定位角色，避免防抖期间切换角色写错卡。
-function scheduleValuesCardSave(ctx, character, card) {
+// 立即持久化（不做防抖）：宿主刷新 / 退出会打断 setTimeout 挂起的写入——
+// 500ms 防抖窗口内退出酒馆，删除 / 修改即丢失，旧数据从磁盘回滚（TauriTavern
+// 实测）。本地写卡代价极小，每次变更直接落盘；连续变更按发起顺序落盘，最终
+// 以最后一次为准。返回写入 Promise（保存按钮用 await 等落盘后再校验）。
+function saveValuesCardNow(ctx, character, card) {
   const avatar = String(character?.avatar || '');
-  if (globalThis[VALUES_CARD_SAVE_TIMER_KEY]) {
-    clearTimeout(globalThis[VALUES_CARD_SAVE_TIMER_KEY]);
-  }
-  globalThis[VALUES_CARD_SAVE_TIMER_KEY] = setTimeout(() => {
-    globalThis[VALUES_CARD_SAVE_TIMER_KEY] = null;
-    persistValuesCardData(ctx, avatar, card).catch((error) => {
-      logApp('warn', '写入角色卡失败', String(error?.message || error));
-    });
-  }, VALUES_CARD_SAVE_DEBOUNCE_MS);
+  const promise = persistValuesCardData(ctx, avatar, card);
+  promise.catch((error) => {
+    logApp('warn', '写入角色卡失败', String(error?.message || error));
+  });
+  return promise;
 }
 
 async function persistValuesCardData(ctx, avatar, card) {
@@ -136,39 +109,140 @@ async function persistValuesCardData(ctx, avatar, card) {
     return;
   }
   try {
-    await write.call(ctx, index, VALUES_CARD_EXTENSION_KEY, card);
+    // 宿主 merge-attributes 是深合并语义：只更新请求里出现的键，请求里没有的
+    // 键原样保留。删除操作必须把「磁盘上有、新 bundle 里没有」的键标记为
+    // VALUES_UNSET_SENTINEL 哨兵，宿主合并时才会真正删除；否则删除会被合并
+    // 吞掉：merge 返回 ok:true 但角色卡从未改变（写盘短路跳过）。
+    let payload = card;
+    try {
+      const onDisk = await readValuesCardFromDisk(ctx, avatar);
+      if (onDisk && typeof onDisk === 'object' && !Array.isArray(onDisk)) {
+        payload = buildValuesUnsetPatch(onDisk, card);
+      }
+    } catch (error) {
+      logApp('warn', '写卡前磁盘重读失败，按全量覆盖发送', String(error?.message || error));
+    }
+    await write.call(ctx, index, VALUES_CARD_EXTENSION_KEY, payload);
+    // writeExtensionField 就地写入了带哨兵的补丁：把内存角色恢复为干净的新包，
+    // 避免哨兵值残留在 UI 数据里。
+    const character = characters[index];
+    if (character && character.data && typeof character.data === 'object') {
+      if (!character.data.extensions || typeof character.data.extensions !== 'object') {
+        character.data.extensions = {};
+      }
+      character.data.extensions[VALUES_CARD_EXTENSION_KEY] = card;
+    }
   } catch (error) {
     fallbackValuesDataToSettings(ctx, card);
     throw error;
   }
 }
 
-// 变量包读取：优先角色卡绑定的内容；其次聊天文件里的耐久镜像（TauriTavern 等
-// 宿主写角色卡不可靠时由 saveValuesData 写入，永远是最新状态）；只有群聊 /
-// 未选角色 / 宿主不支持写角色卡时才用全局设置 valuesData 兜底（避免把别的
-// 角色/旧数据串到当前角色卡上）。
-// TauriTavern 下角色卡写入不可靠（见 isTauriTavernHost），卡内可能有历史残留
-// 数据——读取时完全跳过角色卡，只从聊天镜像 / 全局设置取最新状态，避免删除
-// 后从角色卡回滚。
-function getValuesBundle(ctx) {
-  if (!isTauriTavernHost()) {
-    const card = ctx ? getValuesCardData(ctx) : null;
-    if (card) return card;
-  }
-  if (ctx) {
-    const chatBundle = getValuesChatMetadata(ctx)?.[VALUES_CHAT_BUNDLE_KEY];
-    if (chatBundle && typeof chatBundle === 'object' && !Array.isArray(chatBundle)) {
-      if (!Array.isArray(chatBundle.keys)) chatBundle.keys = [];
-      if (!chatBundle.defaults || typeof chatBundle.defaults !== 'object' || Array.isArray(chatBundle.defaults)) {
-        chatBundle.defaults = {};
+// 从磁盘重读当前角色卡的变量包（写卡前对比旧值 / 保存校验用）。
+// 优先独立 fetch（不触碰内存 characters 数组），回退宿主 getOneCharacter。
+// 兼容宿主返回的两种形状：normalizeCharacter 后的嵌套 data.extensions，
+// 以及展平的顶层 extensions。读不到 / 出错返回 null。
+async function readValuesCardFromDisk(context, avatar) {
+  const ctx = context || getContextSafe();
+  if (!ctx || !avatar) return null;
+  const extract = (character) => {
+    const extensions = character?.data?.extensions ?? character?.extensions ?? null;
+    const bundle = extensions && typeof extensions === 'object' ? extensions[VALUES_CARD_EXTENSION_KEY] : null;
+    return bundle && typeof bundle === 'object' && !Array.isArray(bundle) ? bundle : null;
+  };
+  try {
+    if (typeof globalThis.fetch === 'function') {
+      const headers = typeof ctx.getRequestHeaders === 'function'
+        ? ctx.getRequestHeaders()
+        : { 'Content-Type': 'application/json' };
+      const response = await globalThis.fetch('/api/characters/get', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ avatar_url: avatar }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const bundle = extract(data);
+        if (bundle) return bundle;
       }
-      if (!Array.isArray(chatBundle.triggers)) chatBundle.triggers = [];
-      if (!chatBundle.order || typeof chatBundle.order !== 'object' || Array.isArray(chatBundle.order)) {
-        chatBundle.order = {};
-      }
-      return chatBundle;
     }
+    if (typeof ctx.getOneCharacter === 'function') {
+      await ctx.getOneCharacter(avatar);
+      const fresh = Array.isArray(ctx.characters)
+        ? ctx.characters.find((character) => String(character?.avatar || '') === avatar)
+        : null;
+      const bundle = extract(fresh);
+      if (bundle) return bundle;
+    }
+    return null;
+  } catch (error) {
+    logApp('warn', '读取磁盘角色卡失败', String(error?.message || error));
+    return null;
   }
+}
+
+// 构造写卡补丁：宿主 merge-attributes 是深合并语义（只更新请求里出现的键，
+// 请求里没有的键原样保留）。把「磁盘上有、新 bundle 里没有」的键标记为
+// VALUES_UNSET_SENTINEL 哨兵，宿主合并时才会真正删除；新值 / 变化值直接携带；
+// 数组与标量整体替换（宿主对非对象值即整体覆盖）。
+function buildValuesUnsetPatch(oldCard, newCard) {
+  const build = (oldNode, newNode) => {
+    const oldIsMap = valuesIsContainer(oldNode);
+    const newIsMap = valuesIsContainer(newNode);
+    if (oldIsMap && newIsMap) {
+      const merged = {};
+      for (const key of Object.keys(oldNode)) {
+        if (!Object.prototype.hasOwnProperty.call(newNode, key)) {
+          merged[key] = VALUES_UNSET_SENTINEL;
+        } else {
+          merged[key] = build(oldNode[key], newNode[key]);
+        }
+      }
+      for (const key of Object.keys(newNode)) {
+        if (!Object.prototype.hasOwnProperty.call(merged, key)) {
+          merged[key] = cloneValue(newNode[key]);
+        }
+      }
+      return merged;
+    }
+    return cloneValue(newNode);
+  };
+  return build(oldCard, newCard);
+}
+
+// 写卡校验：经宿主接口从磁盘重读角色卡，比对扩展字段是否与期望一致。
+// TauriTavern 的 writeExtensionField 失败只 console.error 不抛错（扩展无法感知），
+// 保存按钮用本函数把静默失败变成可见反馈。返回 true / false；宿主不支持从磁盘
+// 重读（无 fetch / getOneCharacter / getCharacters）或重读失败时返回 null（无法校验）。
+async function verifyValuesCardWrite(ctx, avatar, expected) {
+  const context = ctx || getContextSafe();
+  if (!context || !avatar) return null;
+  try {
+    if (typeof context.getOneCharacter === 'function') {
+      await context.getOneCharacter(avatar);
+    } else if (typeof context.getCharacters === 'function') {
+      await context.getCharacters();
+    } else {
+      return null;
+    }
+    const fresh = Array.isArray(context.characters)
+      ? context.characters.find((character) => String(character?.avatar || '') === avatar)
+      : null;
+    const extensions = fresh?.data?.extensions ?? fresh?.extensions ?? null;
+    const onDisk = extensions && typeof extensions === 'object' ? extensions[VALUES_CARD_EXTENSION_KEY] : null;
+    if (!onDisk || typeof onDisk !== 'object' || Array.isArray(onDisk)) return false;
+    return JSON.stringify(onDisk) === JSON.stringify(expected);
+  } catch (error) {
+    logApp('warn', '保存校验失败', String(error?.message || error));
+    return null;
+  }
+}
+
+// 变量包读取：优先角色卡绑定的内容；只有群聊 / 未选角色 / 宿主不支持写角色卡时
+// 才用全局设置 valuesData 兜底（避免把别的角色/旧数据串到当前角色卡上）。
+function getValuesBundle(ctx) {
+  const card = ctx ? getValuesCardData(ctx) : null;
+  if (card) return card;
   const settings = ctx ? getSettings(ctx) : null;
   if (!settings) return { version: VALUES_CARD_DATA_VERSION, keys: [], defaults: {} };
   // 无角色卡时用全局设置兜底：首次读取即初始化容器，保证后续变更落在活对象上
@@ -187,11 +261,11 @@ function getValuesBundle(ctx) {
   return fallback;
 }
 
-// 保存：有角色且宿主支持写角色卡 → 确保角色卡容器存在后防抖持久化；否则写全局设置。
-// TauriTavern 角色卡写入不可靠（静默失败不抛错），一律走全局设置 + 聊天文件镜像。
+// 保存：有角色且宿主支持写角色卡 → 确保角色卡容器存在后立即持久化；否则写全局设置。
+// 返回落盘 Promise（保存按钮 await 后从磁盘重读校验，避免校验与写入并行读到旧数据）。
 function saveValuesData(ctx) {
   const character = getStoryCharacter(ctx);
-  if (isTauriTavernHost() || !character || typeof ctx?.writeExtensionField !== 'function') {
+  if (!character || typeof ctx?.writeExtensionField !== 'function') {
     const bundle = getValuesBundle(ctx);
     const settings = getSettings(ctx);
     settings.valuesData = {
@@ -206,11 +280,8 @@ function saveValuesData(ctx) {
         ? bundle.order
         : {},
     };
-    // TauriTavern 的全局设置保存是宿主防抖的，刷新会丢 pending 写入；聊天文件
-    // 随 saveChat 即时落盘，镜像过去保证刷新后读到的是最新状态。
-    if (isTauriTavernHost()) mirrorValuesBundleToChat(ctx, settings.valuesData);
     saveSettingsImmediate(ctx);
-    return;
+    return Promise.resolve();
   }
   let card = getValuesCardData(ctx);
   if (!card) {
@@ -239,7 +310,7 @@ function saveValuesData(ctx) {
       } catch {}
     }
   }
-  scheduleValuesCardSave(ctx, character, card);
+  return saveValuesCardNow(ctx, character, card);
 }
 
 // ---------- 键注册表 ----------
@@ -269,6 +340,7 @@ function getValuesKeys(ctx) {
     } else {
       key.parent = String(key.parent || '').trim();
       if (!Array.isArray(key.rules)) key.rules = [];
+      if (typeof key.formula !== 'string') key.formula = '';
     }
   }
   const cardKeyNames = new Set(bundle.keys.map((key) => String(key?.name || '').trim()).filter(Boolean));
@@ -297,8 +369,9 @@ function getValuesTreeOrder(ctx) {
 }
 
 // 注册 / 更新键（以名称为身份）；返回保存后的键对象。
-// extra 可携带 { type, parent, rules }：type 为 child 时按子变量保存（parent 为
-// 父变量名，rules 为区间规则 [{ min, max, value }]），否则按父变量保存。
+// extra 可携带 { type, parent, rules, formula }：type 为 child 时按子变量保存——
+// formula 非空为公式派生（引用变量名写在公式里，不用 parent），否则为区间派生
+// （parent 为派生源变量名，rules 为区间规则 [{ min, max, value }]）；否则按父变量保存。
 function upsertValuesKey(ctx, name, rule, extra = {}) {
   const bundle = getValuesBundle(ctx);
   const target = String(name || '').trim();
@@ -306,22 +379,33 @@ function upsertValuesKey(ctx, name, rule, extra = {}) {
   const type = String(extra?.type || '') === VALUES_KEY_TYPE_CHILD ? VALUES_KEY_TYPE_CHILD : VALUES_KEY_TYPE_PARENT;
   const existing = bundle.keys.find((key) => String(key?.name || '').trim() === target);
   const now = new Date().toISOString();
+  const applyChild = (key) => {
+    const formula = String(extra?.formula || '').trim();
+    if (formula !== '') {
+      key.formula = formula;
+      key.parent = '';
+      key.rules = [];
+    } else {
+      key.parent = String(extra?.parent || '').trim();
+      key.rules = normalizeValuesChildRules(extra?.rules);
+      delete key.formula;
+    }
+  };
   if (existing) {
     existing.rule = String(rule || '').trim();
     existing.type = type;
     if (type === VALUES_KEY_TYPE_CHILD) {
-      existing.parent = String(extra?.parent || '').trim();
-      existing.rules = normalizeValuesChildRules(extra?.rules);
+      applyChild(existing);
     } else {
       delete existing.parent;
       delete existing.rules;
+      delete existing.formula;
     }
     existing.updatedAt = now;
   } else {
     const key = { name: target, rule: String(rule || '').trim(), type, createdAt: now, updatedAt: now };
     if (type === VALUES_KEY_TYPE_CHILD) {
-      key.parent = String(extra?.parent || '').trim();
-      key.rules = normalizeValuesChildRules(extra?.rules);
+      applyChild(key);
     }
     bundle.keys.push(key);
   }
@@ -387,6 +471,22 @@ function getValuesChildKeysByParent(ctx, parentName) {
   );
 }
 
+// 依赖指定变量的全部子变量（删除前的依赖检查用）：区间派生按派生源 parent
+// 匹配，公式派生按公式引用变量匹配；内置子变量不参与检查。
+function getValuesChildKeysByRef(ctx, varName) {
+  const target = String(varName || '').trim();
+  if (!target) return [];
+  return getValuesKeys(ctx).filter((key) => {
+    if (!isValuesChildKey(key) || isValuesBuiltinKey(key)) return false;
+    const formula = String(key.formula || '').trim();
+    if (formula !== '') {
+      const syntax = validateValuesFormulaSyntax(formula);
+      return syntax.ok ? syntax.refs.includes(target) : false;
+    }
+    return String(key.parent || '').trim() === target;
+  });
+}
+
 // 归一化子变量区间规则：{ min?, max?, value }，min / max 可省略（省略 = 不设
 // 边界），value 必填；数字字段只接受有限数值，非法条目丢弃。
 function normalizeValuesChildRules(rules) {
@@ -433,11 +533,210 @@ function validateValuesChildRules(rules) {
   return { invalid, overlaps };
 }
 
-// 单叶子派生：按子变量规则，用同路径父变量值计算子变量值（就地写入）。
-// 规则按顺序匹配，首个满足的生效；父变量缺失 / 非数值 / 无规则命中时保持原值。
+// ---------- 子变量公式派生 ----------
+// 公式 = 四则运算 + 括号 + 变量名（如 0.5*服从值+0.5*美貌值）。自写递归下降
+// 解析器，白名单 token（数字 / + - * / ( ) / 变量名），不使用 eval，任意输入
+// 都只会得到语法错误而非执行代码。变量名 = 不含空白、运算符、括号的连续字符
+// 序列（支持中文）。AST：{ t:'num' } | { t:'var' } | { t:'neg' } | { t:'bin' }。
+function tokenizeValuesFormula(input) {
+  const tokens = [];
+  let i = 0;
+  const text = String(input || '');
+  while (i < text.length) {
+    const ch = text[i];
+    if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') {
+      i += 1;
+      continue;
+    }
+    if (ch === '+' || ch === '-' || ch === '*' || ch === '/' || ch === '(' || ch === ')') {
+      tokens.push({ t: ch });
+      i += 1;
+      continue;
+    }
+    if (ch >= '0' && ch <= '9' || ch === '.') {
+      let j = i;
+      while (j < text.length && (text[j] >= '0' && text[j] <= '9' || text[j] === '.')) j += 1;
+      const raw = text.slice(i, j);
+      const num = Number(raw);
+      if (!Number.isFinite(num)) return { error: `数字「${raw}」不合法` };
+      tokens.push({ t: 'num', v: num });
+      i = j;
+      continue;
+    }
+    let j = i;
+    while (j < text.length && !'+-*/(). \t\n\r'.includes(text[j])) j += 1;
+    const name = text.slice(i, j).trim();
+    if (name === '') return { error: '无法识别的字符' };
+    tokens.push({ t: 'var', name });
+    i = j;
+  }
+  return { tokens };
+}
+
+function parseValuesFormulaNode(tokens, state, minPrec) {
+  let left = null;
+  const first = tokens[state.pos];
+  if (!first) return { error: '表达式不完整' };
+  if (first.t === 'num') {
+    left = { t: 'num', v: first.v };
+    state.pos += 1;
+  } else if (first.t === 'var') {
+    left = { t: 'var', name: first.name };
+    state.pos += 1;
+  } else if (first.t === '(') {
+    state.pos += 1;
+    const inner = parseValuesFormulaNode(tokens, state, 0);
+    if (inner.error) return inner;
+    const close = tokens[state.pos];
+    if (!close || close.t !== ')') return { error: '括号不匹配' };
+    state.pos += 1;
+    left = inner;
+  } else if (first.t === '-') {
+    state.pos += 1;
+    const operand = parseValuesFormulaNode(tokens, state, 4);
+    if (operand.error) return operand;
+    left = { t: 'neg', v: operand };
+  } else {
+    return { error: `「${first.t}」位置缺少数字或变量` };
+  }
+  while (true) {
+    const op = tokens[state.pos];
+    if (!op || op.t === ')' ) break;
+    const prec = op.t === '*' || op.t === '/' ? 2 : (op.t === '+' || op.t === '-' ? 1 : -1);
+    if (prec < 0) return { error: `无法识别的运算符「${op.t}」` };
+    if (prec < minPrec) break;
+    state.pos += 1;
+    const right = parseValuesFormulaNode(tokens, state, prec + 1);
+    if (right.error) return right;
+    left = { t: 'bin', op: op.t, l: left, r: right };
+  }
+  return left;
+}
+
+// 解析公式：成功返回 { ok:true, ast, refs }；失败返回 { ok:false, error }。
+function validateValuesFormulaSyntax(formula) {
+  const text = String(formula || '').trim();
+  if (text === '') return { ok: false, error: '公式不能为空' };
+  const tokenized = tokenizeValuesFormula(text);
+  if (tokenized.error) return { ok: false, error: tokenized.error };
+  const state = { pos: 0 };
+  const ast = parseValuesFormulaNode(tokenized.tokens, state, 0);
+  if (ast.error) return { ok: false, error: ast.error };
+  if (state.pos < tokenized.tokens.length) return { ok: false, error: '公式末尾有多余内容' };
+  const refs = [];
+  const seen = new Set();
+  const collect = (node) => {
+    if (!node || typeof node !== 'object') return;
+    if (node.t === 'var' && !seen.has(node.name)) {
+      seen.add(node.name);
+      refs.push(node.name);
+    } else if (node.t === 'neg') {
+      collect(node.v);
+    } else if (node.t === 'bin') {
+      collect(node.l);
+      collect(node.r);
+    }
+  };
+  collect(ast);
+  return { ok: true, ast, refs };
+}
+
+// 求值公式 AST：lookup(name) 返回数值（数字或可转数字的字符串，缺失 /
+// 非数值返回 null）；除零、结果非有限都视为求值失败返回 null（保持原值）。
+function evalValuesFormula(ast, lookup) {
+  if (!ast || typeof ast !== 'object') return null;
+  if (ast.t === 'num') return ast.v;
+  if (ast.t === 'var') {
+    const value = lookup ? lookup(ast.name) : null;
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+    if (typeof value === 'string' && value.trim() !== '') {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return null;
+  }
+  if (ast.t === 'neg') {
+    const v = evalValuesFormula(ast.v, lookup);
+    return v === null ? null : -v;
+  }
+  if (ast.t === 'bin') {
+    const l = evalValuesFormula(ast.l, lookup);
+    const r = evalValuesFormula(ast.r, lookup);
+    if (l === null || r === null) return null;
+    if (ast.op === '+') return l + r;
+    if (ast.op === '-') return l - r;
+    if (ast.op === '*') return l * r;
+    if (ast.op === '/') return r === 0 ? null : l / r;
+    return null;
+  }
+  return null;
+}
+
+// 子变量引用图环检测：从指定键（name，引用为 refs）出发，沿「区间派生源 /
+// 公式引用」追踪所有已注册子变量，若绕回起点即成环。返回环链（如
+// ['A','B','A']）或 null。
+function findValuesChildCycle(keys, name, refs) {
+  const target = String(name || '').trim();
+  if (!target) return null;
+  const byName = new Map();
+  for (const key of Array.isArray(keys) ? keys : []) {
+    if (isValuesChildKey(key)) byName.set(String(key.name || '').trim(), key);
+  }
+  const refsOf = (key) => {
+    const formula = String(key?.formula || '').trim();
+    if (formula !== '') {
+      const syntax = validateValuesFormulaSyntax(formula);
+      return syntax.ok ? syntax.refs : [];
+    }
+    const parent = String(key?.parent || '').trim();
+    return parent ? [parent] : [];
+  };
+  const path = [target];
+  const stack = new Set([target]);
+  const walk = (currentRefs) => {
+    for (const ref of currentRefs) {
+      if (ref === target) return path.concat(ref);
+      if (stack.has(ref)) continue;
+      const next = byName.get(ref);
+      if (!next) continue;
+      stack.add(ref);
+      path.push(ref);
+      const cycle = walk(refsOf(next));
+      if (cycle) return cycle;
+      path.pop();
+      stack.delete(ref);
+    }
+    return null;
+  };
+  return walk(refs);
+}
+
+// 单叶子派生：按子变量派生方式计算子变量值（就地写入）。
+// 公式模式（formula 非空）：用同路径下各引用变量求值，写数值；
+// 区间模式：按 parent 值顺序匹配规则，写文本。输入缺失 / 非数值 / 求值失败 /
+// 无规则命中时保持原值。
 function deriveValuesChildAt(tree, path, childKey) {
+  if (!Array.isArray(path) || path.length === 0) return false;
+  const formula = String(childKey?.formula || '').trim();
+  if (formula !== '') {
+    const syntax = validateValuesFormulaSyntax(formula);
+    if (!syntax.ok) return false;
+    const lookup = (varName) => {
+      const raw = valuesGetAtPath(tree, path.slice(0, -1).concat(varName));
+      if (typeof raw === 'number') return raw;
+      if (typeof raw === 'string' && raw.trim() !== '') {
+        const parsed = Number(raw);
+        if (Number.isFinite(parsed)) return parsed;
+      }
+      return null;
+    };
+    const result = evalValuesFormula(syntax.ast, lookup);
+    if (result === null || !Number.isFinite(result)) return false;
+    valuesSetAtPath(tree, path, result);
+    return true;
+  }
   const parentName = String(childKey?.parent || '').trim();
-  if (!parentName || !Array.isArray(path) || path.length === 0) return false;
+  if (!parentName) return false;
   const parentValue = valuesGetAtPath(tree, path.slice(0, -1).concat(parentName));
   let numeric = null;
   if (typeof parentValue === 'number') {
@@ -940,16 +1239,21 @@ function serializeValuesBundle(ctx) {
     lines.push(`  - name: ${yamlScalar(String(key?.name || ''))}`);
     if (isValuesChildKey(key)) {
       lines.push('    type: child');
-      lines.push(`    parent: ${yamlScalar(String(key?.parent || ''))}`);
-      lines.push('    rules:');
-      const rules = Array.isArray(key?.rules) ? key.rules : [];
-      if (rules.length === 0) {
-        lines.push('      []');
+      const formula = String(key?.formula || '').trim();
+      if (formula !== '') {
+        lines.push(`    formula: ${yamlScalar(formula)}`);
       } else {
-        for (const rule of rules) {
-          lines.push(`      - min: ${rule?.min !== undefined ? String(rule.min) : 'null'}`);
-          lines.push(`        max: ${rule?.max !== undefined ? String(rule.max) : 'null'}`);
-          lines.push(`        value: ${yamlScalar(String(rule?.value || ''))}`);
+        lines.push(`    parent: ${yamlScalar(String(key?.parent || ''))}`);
+        lines.push('    rules:');
+        const rules = Array.isArray(key?.rules) ? key.rules : [];
+        if (rules.length === 0) {
+          lines.push('      []');
+        } else {
+          for (const rule of rules) {
+            lines.push(`      - min: ${rule?.min !== undefined ? String(rule.min) : 'null'}`);
+            lines.push(`        max: ${rule?.max !== undefined ? String(rule.max) : 'null'}`);
+            lines.push(`        value: ${yamlScalar(String(rule?.value || ''))}`);
+          }
         }
       }
     } else {
@@ -1000,6 +1304,17 @@ function serializeValuesBundle(ctx) {
           lines.push(`        value: ${yamlValueScalar(condition?.value)}`);
         }
       }
+      lines.push('    effects:');
+      const effects = Array.isArray(trigger?.effects) ? trigger.effects : [];
+      if (effects.length === 0) {
+        lines.push('      []');
+      } else {
+        for (const effect of effects) {
+          lines.push(`      - path: ${yamlScalar(String(effect?.path || ''))}`);
+          lines.push(`        op: ${yamlScalar(String(effect?.op || 'set').trim())}`);
+          lines.push(`        value: ${yamlValueScalar(effect?.value)}`);
+        }
+      }
       lines.push(`    content: ${yamlBlockScalarText(String(trigger?.content || ''), '    ')}`);
     }
   }
@@ -1025,8 +1340,15 @@ function parseValuesBundle(text) {
       const type = String(item?.type || '').trim() === VALUES_KEY_TYPE_CHILD ? VALUES_KEY_TYPE_CHILD : VALUES_KEY_TYPE_PARENT;
       const key = { name, type };
       if (type === VALUES_KEY_TYPE_CHILD) {
-        key.parent = String(item?.parent || '').trim();
-        key.rules = normalizeValuesChildRules(item?.rules);
+        const formula = String(item?.formula || '').trim();
+        if (formula !== '') {
+          key.formula = formula;
+          key.parent = '';
+          key.rules = [];
+        } else {
+          key.parent = String(item?.parent || '').trim();
+          key.rules = normalizeValuesChildRules(item?.rules);
+        }
       } else {
         key.rule = String(item?.rule || '').trim();
       }
@@ -1057,6 +1379,20 @@ function parseValuesBundle(text) {
           });
         }
       }
+      const effects = [];
+      if (item.effects !== undefined) {
+        if (!Array.isArray(item.effects)) throw new Error(`触发「${id}」的 effects 必须是列表`);
+        for (const effect of item.effects) {
+          if (!effect || typeof effect !== 'object' || Array.isArray(effect)) continue;
+          const path = String(effect.path || '').trim();
+          if (!path) continue;
+          effects.push({
+            path,
+            op: String(effect.op || '').trim() === 'set' ? 'set' : 'add',
+            value: effect.value !== undefined ? effect.value : null,
+          });
+        }
+      }
       triggers.push({
         id,
         name: String(item.name || '').trim() || '未命名触发',
@@ -1065,6 +1401,7 @@ function parseValuesBundle(text) {
         logic: String(item.logic || 'all').trim() === 'any' ? 'any' : 'all',
         description: String(item.description || '').trim(),
         conditions,
+        effects,
         content: String(item.content || ''),
       });
     }

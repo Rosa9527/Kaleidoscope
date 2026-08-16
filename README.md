@@ -77,8 +77,10 @@ node tests/data.test.js   # 数据层：层级 / 防环 / 删除上移 / YAML �
 node tests/ui.test.js     # UI：打开工作台 / 建节点 / 建事件 / 导入导出 / 删除 / 绑定徽标
 node tests/gate.test.js   # 剧情预筛：目录 / Gate 消息 / 解析 / 注入 / 管线
 node tests/values.test.js # 变量系统：注册表 / 双层存储 / YAML / 注入配置
+node tests/values-trigger.test.js # 剧情触发：CRUD / 条件求值 / 事件效果 / 注入 / YAML
 node tests/values-inject.test.js # 变量注入：文本构建 / 发送前任务 / 清理
 node tests/values-ui.test.js # 变量工作台 UI：树 / 注册 / 层切换 / 注入勾选
+node tests/values-persist.test.js # 变量持久化：默认值删改立即写卡 / 刷新不回滚 / 角色卡绑定
 ```
 
 ## 宿主差异说明

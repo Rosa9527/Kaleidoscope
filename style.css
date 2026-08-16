@@ -2189,6 +2189,11 @@ textarea.kaleido-input {
   text-overflow: ellipsis;
 }
 
+.kaleido-story__row-trigger.is-effect {
+  color: var(--k-green-text);
+  flex-shrink: 0;
+}
+
 .kaleido-story__row-badge {
   flex: none;
   padding: 1px 8px;
@@ -3262,25 +3267,34 @@ textarea.kaleido-input {
   background: rgba(10, 132, 255, 0.13);
 }
 
-/* 条件编辑器 */
-.kaleido-values__trigger-conditions {
+.kaleido-values__row-trigger.is-effect {
+  color: var(--k-green-text);
+  flex-shrink: 0;
+}
+
+/* 条件编辑器 / 效果编辑器（效果行样式与条件行一致） */
+.kaleido-values__trigger-conditions,
+.kaleido-values__trigger-effects {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.kaleido-values__trigger-condition {
+.kaleido-values__trigger-condition,
+.kaleido-values__trigger-effect {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.kaleido-values__trigger-condition-path {
+.kaleido-values__trigger-condition-path,
+.kaleido-values__trigger-effect-path {
   flex: 1;
   min-width: 0;
 }
 
-.kaleido-values__trigger-condition-op-center {
+.kaleido-values__trigger-condition-op-center,
+.kaleido-values__trigger-effect-op-center {
   flex: 0 0 auto;
   min-width: 0;
   display: flex;
@@ -3288,7 +3302,8 @@ textarea.kaleido-input {
   justify-content: center;
 }
 
-.kaleido-values__trigger-condition-op-wrap {
+.kaleido-values__trigger-condition-op-wrap,
+.kaleido-values__trigger-effect-op-wrap {
   position: relative;
   flex: 0 1 auto;
   min-width: 24px;
@@ -3297,7 +3312,8 @@ textarea.kaleido-input {
   justify-content: center;
 }
 
-.kaleido-values__trigger-condition-op {
+.kaleido-values__trigger-condition-op,
+.kaleido-values__trigger-effect-op {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -3306,7 +3322,8 @@ textarea.kaleido-input {
   cursor: pointer;
 }
 
-.kaleido-values__trigger-condition-op-text {
+.kaleido-values__trigger-condition-op-text,
+.kaleido-values__trigger-effect-op-text {
   pointer-events: none;
   display: flex;
   align-items: center;
@@ -3321,16 +3338,20 @@ textarea.kaleido-input {
 }
 
 .kaleido-values__trigger-condition-op-wrap:hover .kaleido-values__trigger-condition-op-text,
-.kaleido-values__trigger-condition-op-wrap:focus-within .kaleido-values__trigger-condition-op-text {
+.kaleido-values__trigger-condition-op-wrap:focus-within .kaleido-values__trigger-condition-op-text,
+.kaleido-values__trigger-effect-op-wrap:hover .kaleido-values__trigger-effect-op-text,
+.kaleido-values__trigger-effect-op-wrap:focus-within .kaleido-values__trigger-effect-op-text {
   color: var(--k-accent);
 }
 
-.kaleido-values__trigger-condition-value {
+.kaleido-values__trigger-condition-value,
+.kaleido-values__trigger-effect-value {
   flex: 1;
   min-width: 0;
 }
 
-.kaleido-values__trigger-condition-remove {
+.kaleido-values__trigger-condition-remove,
+.kaleido-values__trigger-effect-remove {
   flex: none;
   align-self: center;
 }

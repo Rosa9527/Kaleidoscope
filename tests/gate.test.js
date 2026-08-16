@@ -190,6 +190,44 @@ runner.test('runStoryGatePipeline 预筛成功并注入事件', async () => {
   assert(round.injectionText.includes('<Story_Event>') && round.injectionText.includes('雨声渐密'), '应记录注入提示词原文');
 });
 
+runner.test('runStoryGatePipeline 选中事件时应用事件效果并落盘', async () => {
+  const c = fresh();
+  const { rain } = makeStory(c);
+  ctx.updateStoryScript(c, rain.id, {
+    effects: [{ path: '张三/好感', op: 'add', value: 30 }, { path: '曹操/病', op: 'set', value: '已治好' }],
+  });
+  ctx.upsertValuesKey(c, '好感', '规则');
+  ctx.upsertValuesKey(c, '病', '规则');
+  ctx.saveValuesChatState(c, { 张三: { 好感: 30 }, 曹操: { 病: '没治好' } }, {});
+  c.chat = [{ is_user: true, mes: '我推开门' }];
+  setupApi(c);
+  const calls = [];
+  c.setExtensionPrompt = (key, text) => calls.push({ key, text });
+  sandbox.chatCompletion = async () => '{"events":["001"]}';
+  await ctx.runStoryGatePipeline(c, ctx.getSettings(c));
+  assert(calls.length === 2, '应正常注入');
+  const values = ctx.getValuesChatState(c).values;
+  assert(values.张三.好感 === 60, '加减效果应把 30 加到 60');
+  assert(values.曹操.病 === '已治好', '覆盖效果应改为已治好');
+  const round = sandbox[LAST_ROUND_KEY];
+  assert(round && round.effectsApplied && round.effectsApplied.changed.includes('张三/好感'), '应记录已应用的效果');
+});
+
+runner.test('runStoryGatePipeline 0 入选时事件效果不执行', async () => {
+  const c = fresh();
+  const { rain } = makeStory(c);
+  ctx.updateStoryScript(c, rain.id, { effects: [{ path: '张三/好感', op: 'set', value: 100 }] });
+  ctx.saveValuesChatState(c, { 张三: { 好感: 30 } }, {});
+  c.chat = [{ is_user: true, mes: '我推开门' }];
+  setupApi(c);
+  const calls = [];
+  c.setExtensionPrompt = (key, text) => calls.push({ key, text });
+  sandbox.chatCompletion = async () => '{"events":[]}';
+  await ctx.runStoryGatePipeline(c, ctx.getSettings(c));
+  assert(calls.length === 0, '0 入选不应注入');
+  assert(ctx.getValuesChatState(c).values.张三.好感 === 30, '0 入选不应应用效果');
+});
+
 // ---------- 管线：0 入选 ----------
 runner.test('runStoryGatePipeline 0 入选时不注入', async () => {
   const c = fresh();

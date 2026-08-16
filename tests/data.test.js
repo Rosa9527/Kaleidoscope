@@ -167,6 +167,30 @@ runner.test('单事件导出/解析往返', () => {
   assert(parsed.content === '你站在村口，\n远山如黛，\n雨丝斜织。', '正文往返');
 });
 
+runner.test('单事件 frontmatter 带 effects 往返', () => {
+  const script = {
+    id: 'kaleido-s-2',
+    name: '好感事件',
+    trigger: '触发',
+    effects: [
+      { path: '张三/好感', op: 'add', value: 30 },
+      { path: '曹操/病', op: 'set', value: '已治好' },
+    ],
+    content: '正文',
+  };
+  const yaml = ctx.serializeSingleScript(script);
+  assert(yaml.includes('effects:'), '导出应包含 effects 段');
+  assert(yaml.includes('op: add') && yaml.includes('value: 30'), '应导出加减效果');
+  assert(yaml.includes('op: set') && yaml.includes('已治好'), '应导出覆盖效果');
+  const parsed = ctx.parseSingleScriptFile(yaml);
+  assert(parsed.effects.length === 2, '应解析 2 个效果');
+  assert(parsed.effects[0].path === '张三/好感' && parsed.effects[0].op === 'add' && parsed.effects[0].value === 30, '效果 1 应正确');
+  assert(parsed.effects[1].op === 'set' && parsed.effects[1].value === '已治好', '效果 2 应正确');
+  // 无 effects 的旧 frontmatter 解析为空数组
+  const plain = ctx.parseSingleScriptFile('---\nname: 无效果\n---\n正文');
+  assert(Array.isArray(plain.effects) && plain.effects.length === 0, '旧 frontmatter 应解析为空效果');
+});
+
 runner.test('单事件解析错误处理', () => {
   let threw = false;
   try { ctx.parseSingleScriptFile('name: 无头'); } catch { threw = true; }
@@ -234,6 +258,36 @@ runner.test('整包导出/导入往返保留层级与事件归属', () => {
   assert(rainImported.nodeId === nodesByName['第一章'].id, '事件应保持归属第一章');
   const orphan = ctx.getStoryScripts(c2).find((s) => s.name === '无主事件');
   assert(orphan.nodeId === '', '无主事件应保持未分类');
+});
+
+runner.test('整包导出/导入：事件 effects 段往返，合并解析归一化', () => {
+  const c1 = fresh();
+  ctx.createStoryScript(c1, {
+    id: '001', name: '好感事件', content: '正文',
+    effects: [
+      { path: '张三/好感', op: 'add', value: 30 },
+      { path: '', op: 'add', value: 1 },
+      { path: '曹操/病', op: 'set', value: '已治好' },
+      { path: '张三/好感', value: 5 },
+    ],
+  });
+  const yaml = ctx.serializeStoryBundle(c1);
+  assert(yaml.includes('effects:'), '导出应包含 effects 段');
+  assert(yaml.includes('op: add') && yaml.includes('value: 30'), '应导出加减效果');
+  assert(yaml.includes('op: set') && yaml.includes('已治好'), '应导出覆盖效果');
+  const bundle = ctx.parseStoryBundleFile(yaml);
+  const c2 = fresh();
+  ctx.mergeStoryBundleInto(c2, bundle);
+  const imported = ctx.getStoryScripts(c2)[0];
+  assert(imported.effects.length === 3, '空路径效果应被过滤，剩 3 个');
+  assert(imported.effects[0].op === 'add' && imported.effects[0].value === 30, '效果 1 应正确');
+  assert(imported.effects[1].op === 'set' && imported.effects[1].value === '已治好', '效果 2 应正确');
+  assert(imported.effects[2].op === 'add' && imported.effects[2].value === 5, '未指定 op 应默认为 add');
+  // 旧数据无 effects 字段时合并不报错
+  const c3 = fresh();
+  ctx.createStoryScript(c3, { id: '001', name: '旧事件', content: '正文' });
+  ctx.mergeStoryBundleInto(c3, { nodes: [], scripts: [{ id: '001', name: '旧事件（导入版）', content: '正文' }] });
+  assert(Array.isArray(ctx.getStoryScripts(c3)[0].effects) && ctx.getStoryScripts(c3)[0].effects.length === 0, '旧数据导入应补全空 effects');
 });
 
 runner.test('导入悬空父级回落为根', () => {

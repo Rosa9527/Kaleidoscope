@@ -11,6 +11,7 @@ let valuesEditorParentPath = [];     // 新建节点 / 变量时的父路径
 let valuesAddMenuContext = null;    // 「＋」菜单上下文：{ root: true } | { path: [...] }
 let valuesTriggerEditorId = null;        // 正在编辑的触发 id（null = 新建）
 let valuesTriggerEditorConditions = [];  // 编辑器中的条件草稿
+let valuesTriggerEditorEffects = [];     // 编辑器中的事件效果草稿
 
 function valuesToastr(kind, message) {
   try {
@@ -157,11 +158,14 @@ function syncValuesLayerUI() {
   const hint = document.getElementById(VALUES_DEFAULT_HINT_ID);
   const injectBar = document.getElementById(VALUES_INJECT_BAR_ID);
   const addRoot = document.getElementById(VALUES_ADD_ROOT_ID);
+  const saveNow = document.getElementById(VALUES_SAVE_NOW_ID);
   if (maintainNow) maintainNow.hidden = !isGame;
   if (resetBtn) resetBtn.hidden = !isGame;
   if (status) status.hidden = !isGame;
   if (hint) hint.hidden = isGame;
   if (addRoot) addRoot.hidden = isGame;
+  // 保存按钮只属于「默认数值」层（游戏值随聊天文件即时落盘，无需手动保存）。
+  if (saveNow) saveNow.hidden = isGame;
   // 注入提示词条只属于「默认数值」层（勾选配置随角色卡保存）。
   if (injectBar) injectBar.hidden = isGame;
 }
@@ -269,7 +273,7 @@ function buildValuesRow(path, name, node, depth) {
   const isChildLeaf = Boolean(registered && isValuesChildKey(registered));
   const registryTitle = registered
     ? (isChildLeaf
-      ? `子变量 · 由「${registered.parent || ''}」派生：${formatValuesChildRulesSummary(registered)}`
+      ? `子变量 · ${formatValuesChildDeriveSummary(registered)}`
       : `已注册变量 · 变化规则：${registered.rule || '（未填写规则）'}`)
     : '';
   const isNode = valuesIsContainer(node);
@@ -314,7 +318,7 @@ function buildValuesRow(path, name, node, depth) {
   row.className = 'kaleido-values__row kaleido-values__row--leaf' + (isChildLeaf ? ' is-derived' : '');
   row.dataset.kind = 'leaf';
   const derivedBadge = isChildLeaf
-    ? `<span class="kaleido-values__row-derived-badge" title="子变量：值由「${escapeHtml(String(registered.parent || ''))}」自动派生，不可手动编辑">派生</span>`
+    ? `<span class="kaleido-values__row-derived-badge" title="子变量：值由派生规则（区间 / 公式）自动计算，不可手动编辑">派生</span>`
     : '';
   const editButton = isChildLeaf
     ? `<button type="button" class="kaleido-values__icon-btn" disabled title="子变量由父变量自动计算，不可手动编辑" aria-label="子变量不可编辑"><span class="${VALUES_EDIT_ICON_CLASS}"></span></button>`
@@ -848,9 +852,9 @@ function renderValuesKeys() {
     const builtinBadge = isBuiltin
       ? `<span class="kaleido-values__row-type-badge is-builtin" title="内置变量：任何角色卡 / 聊天默认注册，可直接使用；编辑后按当前角色卡覆盖">内置</span>`
       : '';
-    const ruleText = isChild
-      ? `由「${String(key.parent || '')}」派生：${formatValuesChildRulesSummary(key)}`
-      : String(key.rule || '（未填写变化规则）');
+  const ruleText = isChild
+    ? formatValuesChildDeriveSummary(key)
+    : String(key.rule || '（未填写变化规则）');
     const dragHandle = isBuiltin
       ? ''
       : `<button type="button" class="kaleido-values__drag-handle" data-action="drag" title="拖动排序" aria-label="拖动排序"><span class="${VALUES_DRAG_ICON_CLASS}"></span></button>`;
@@ -871,6 +875,13 @@ function renderValuesKeys() {
   }
 }
 
+// 子变量派生方式摘要：公式模式显示公式，区间模式显示派生源 + 区间。
+function formatValuesChildDeriveSummary(key) {
+  const formula = String(key?.formula || '').trim();
+  if (formula !== '') return `由公式派生：${formula}`;
+  return `由「${String(key?.parent || '')}」派生：${formatValuesChildRulesSummary(key)}`;
+}
+
 // 子变量区间规则摘要（列表行 / 树行 title 用）。
 function formatValuesChildRulesSummary(key) {
   const rules = Array.isArray(key?.rules) ? key.rules : [];
@@ -881,7 +892,7 @@ function formatValuesChildRulesSummary(key) {
   }).join('；');
 }
 
-// 父变量下拉：只列已注册的父变量（排除自身），供子变量选择。
+// 派生源下拉：列出所有已注册变量（父 / 子均可，支持链式派生），排除自身。
 function populateValuesKeyParentSelect(selectedParent) {
   const select = document.getElementById(VALUES_KEY_EDITOR_PARENT_ID);
   if (!select) return;
@@ -890,10 +901,9 @@ function populateValuesKeyParentSelect(selectedParent) {
   select.innerHTML = '';
   const placeholder = document.createElement('option');
   placeholder.value = '';
-  placeholder.textContent = '（选择父变量）';
+  placeholder.textContent = '（选择派生源变量）';
   select.appendChild(placeholder);
   for (const key of keys) {
-    if (!isValuesParentKey(key)) continue;
     if (valuesKeyEditorName && String(key.name || '') === valuesKeyEditorName) continue;
     const option = document.createElement('option');
     option.value = String(key.name || '');
@@ -1000,7 +1010,17 @@ function nextValuesChildRuleMinFromRow(row) {
   return String(max + 1);
 }
 
-// 类型切换联动：父变量显示变化规则，子变量显示父变量选择 + 派生区间。
+// 派生方式联动：区间显示派生源 + 区间编辑器，公式显示公式输入。
+function syncValuesKeyDeriveUI() {
+  const deriveSelect = document.getElementById(VALUES_KEY_EDITOR_DERIVE_ID);
+  const formulaFields = document.getElementById(VALUES_KEY_EDITOR_FORMULA_FIELDS_ID);
+  const rulesFields = document.getElementById(VALUES_KEY_EDITOR_RULES_FIELDS_ID);
+  const isFormula = String(deriveSelect?.value || '') === VALUES_KEY_DERIVE_FORMULA;
+  if (formulaFields) formulaFields.hidden = !isFormula;
+  if (rulesFields) rulesFields.hidden = isFormula;
+}
+
+// 类型切换联动：父变量显示变化规则，子变量显示派生方式 + 派生源 / 公式。
 function syncValuesKeyEditorTypeUI() {
   const typeSelect = document.getElementById(VALUES_KEY_EDITOR_TYPE_ID);
   const ruleFields = document.getElementById(VALUES_KEY_EDITOR_RULE_FIELDS_ID);
@@ -1008,6 +1028,7 @@ function syncValuesKeyEditorTypeUI() {
   const isChild = String(typeSelect?.value || '') === VALUES_KEY_TYPE_CHILD;
   if (ruleFields) ruleFields.hidden = isChild;
   if (childFields) childFields.hidden = !isChild;
+  syncValuesKeyDeriveUI();
 }
 
 function openValuesKeyEditor(name) {
@@ -1018,6 +1039,8 @@ function openValuesKeyEditor(name) {
   const nameInput = document.getElementById(VALUES_KEY_EDITOR_NAME_ID);
   const ruleInput = document.getElementById(VALUES_KEY_EDITOR_RULE_ID);
   const typeSelect = document.getElementById(VALUES_KEY_EDITOR_TYPE_ID);
+  const deriveSelect = document.getElementById(VALUES_KEY_EDITOR_DERIVE_ID);
+  const formulaInput = document.getElementById(VALUES_KEY_EDITOR_FORMULA_ID);
   const ctx = getContextSafe();
   if (valuesKeyEditorName) {
     const key = getValuesKeyByName(ctx, valuesKeyEditorName);
@@ -1028,6 +1051,9 @@ function openValuesKeyEditor(name) {
     const isChild = key ? isValuesChildKey(key) : false;
     typeSelect.value = isChild ? VALUES_KEY_TYPE_CHILD : VALUES_KEY_TYPE_PARENT;
     ruleInput.value = isChild ? '' : (key ? String(key.rule || '') : '');
+    const formula = isChild ? String(key?.formula || '').trim() : '';
+    if (deriveSelect) deriveSelect.value = formula !== '' ? VALUES_KEY_DERIVE_FORMULA : VALUES_KEY_DERIVE_RULES;
+    if (formulaInput) formulaInput.value = formula;
     populateValuesKeyParentSelect(isChild ? String(key?.parent || '') : '');
     renderValuesKeyRules(isChild ? key?.rules : []);
   } else {
@@ -1037,6 +1063,8 @@ function openValuesKeyEditor(name) {
     nameInput.title = '';
     typeSelect.value = VALUES_KEY_TYPE_PARENT;
     ruleInput.value = '';
+    if (deriveSelect) deriveSelect.value = VALUES_KEY_DERIVE_RULES;
+    if (formulaInput) formulaInput.value = '';
     populateValuesKeyParentSelect('');
     renderValuesKeyRules([]);
   }
@@ -1064,27 +1092,49 @@ function saveValuesKeyEditor() {
     ? VALUES_KEY_TYPE_CHILD
     : VALUES_KEY_TYPE_PARENT;
   if (type === VALUES_KEY_TYPE_CHILD) {
-    const parent = String(document.getElementById(VALUES_KEY_EDITOR_PARENT_ID)?.value || '').trim();
-    if (!parent) {
-      valuesToastr('warning', '请选择父变量');
-      return;
+    const deriveSelect = document.getElementById(VALUES_KEY_EDITOR_DERIVE_ID);
+    const isFormula = String(deriveSelect?.value || '') === VALUES_KEY_DERIVE_FORMULA;
+    if (isFormula) {
+      const formula = String(document.getElementById(VALUES_KEY_EDITOR_FORMULA_ID)?.value || '').trim();
+      const syntax = validateValuesFormulaSyntax(formula);
+      if (!syntax.ok) {
+        valuesToastr('warning', `派生公式不合法：${syntax.error}`);
+        return;
+      }
+      const cycle = findValuesChildCycle(getValuesKeys(ctx), name, syntax.refs);
+      if (cycle) {
+        valuesToastr('warning', `派生存在循环引用：${cycle.join(' → ')}`);
+        return;
+      }
+      upsertValuesKey(ctx, name, '', { type, formula });
+    } else {
+      const parent = String(document.getElementById(VALUES_KEY_EDITOR_PARENT_ID)?.value || '').trim();
+      if (!parent) {
+        valuesToastr('warning', '请选择派生源变量');
+        return;
+      }
+      const rules = readValuesKeyRules();
+      if (rules.length === 0) {
+        valuesToastr('warning', '请至少添加一个派生区间');
+        return;
+      }
+      const validation = validateValuesChildRules(rules);
+      if (validation.invalid.length > 0) {
+        valuesToastr('warning', `第 ${validation.invalid.map((index) => index + 1).join('、')} 行区间下限大于上限，请检查`);
+        return;
+      }
+      if (validation.overlaps.length > 0) {
+        const pairs = validation.overlaps.map(([i, j]) => `第 ${i + 1} 行与第 ${j + 1} 行`);
+        valuesToastr('warning', `派生区间不能重叠（含边界）：${pairs.join('、')}，如 0~1000 之后只能从 1001 开始`);
+        return;
+      }
+      const cycle = findValuesChildCycle(getValuesKeys(ctx), name, [parent]);
+      if (cycle) {
+        valuesToastr('warning', `派生存在循环引用：${cycle.join(' → ')}`);
+        return;
+      }
+      upsertValuesKey(ctx, name, '', { type, parent, rules });
     }
-    const rules = readValuesKeyRules();
-    if (rules.length === 0) {
-      valuesToastr('warning', '请至少添加一个派生区间');
-      return;
-    }
-    const validation = validateValuesChildRules(rules);
-    if (validation.invalid.length > 0) {
-      valuesToastr('warning', `第 ${validation.invalid.map((index) => index + 1).join('、')} 行区间下限大于上限，请检查`);
-      return;
-    }
-    if (validation.overlaps.length > 0) {
-      const pairs = validation.overlaps.map(([i, j]) => `第 ${i + 1} 行与第 ${j + 1} 行`);
-      valuesToastr('warning', `派生区间不能重叠（含边界）：${pairs.join('、')}，如 0~1000 之后只能从 1001 开始`);
-      return;
-    }
-    upsertValuesKey(ctx, name, '', { type, parent, rules });
   } else {
     const rule = String(document.getElementById(VALUES_KEY_EDITOR_RULE_ID)?.value || '').trim();
     upsertValuesKey(ctx, name, rule, { type });
@@ -1105,7 +1155,7 @@ function saveValuesKeyEditor() {
 async function handleValuesDeleteKey(name) {
   const ctx = getContextSafe();
   if (!ctx) return;
-  const dependents = getValuesChildKeysByParent(ctx, name);
+  const dependents = getValuesChildKeysByRef(ctx, name);
   if (dependents.length > 0) {
     valuesToastr('warning', `请先删除或改绑依赖它的子变量：${dependents.map((key) => key.name).join('、')}`);
     return;
@@ -1154,6 +1204,7 @@ function buildValuesTriggerRow(trigger) {
   row.dataset.id = String(trigger.id || '');
   const enabled = trigger.enabled !== false;
   const conditionsText = formatValuesTriggerConditions(trigger);
+  const effectsText = formatValuesTriggerEffects(trigger);
   const onceBadge = trigger.once === false
     ? '<span class="kaleido-values__row-trigger-type" title="常驻事件：条件满足时可重复触发">常驻</span>'
     : '<span class="kaleido-values__row-trigger-type is-once" title="一次性事件：触发一次后自动关闭">一次性</span>';
@@ -1162,6 +1213,7 @@ function buildValuesTriggerRow(trigger) {
     <span class="kaleido-values__row-name" title="${escapeHtml(trigger.name)}">${escapeHtml(trigger.name)}</span>
     ${onceBadge}
     <span class="kaleido-values__row-trigger" title="${escapeHtml(conditionsText)}">${escapeHtml(conditionsText)}</span>
+    ${effectsText ? `<span class="kaleido-values__row-trigger is-effect" title="${escapeHtml(effectsText)}">${escapeHtml(effectsText)}</span>` : ''}
     <button type="button" class="kaleido-values__inject-switch${enabled ? '' : ' is-off'}" data-action="toggle-trigger" data-id="${escapeHtml(String(trigger.id || ''))}" role="switch" aria-checked="${enabled}" title="${enabled ? '点击关闭：该触发不再参与判定' : '点击激活：该触发重新参与判定'}" aria-label="启用 / 关闭触发"><span class="kaleido-values__inject-switch-thumb"></span></button>
     <span class="kaleido-values__row-actions">
       <button type="button" class="kaleido-values__icon-btn" data-action="edit-trigger" data-id="${escapeHtml(String(trigger.id || ''))}" title="编辑触发" aria-label="编辑触发"><span class="${VALUES_EDIT_ICON_CLASS}"></span></button>
@@ -1207,6 +1259,43 @@ function populateValuesTriggerPathSelect(select, selectedPath) {
       if (valuesIsContainer(child)) {
         walk(child, childPath);
       } else {
+        const option = document.createElement('option');
+        option.value = childPath.join('/');
+        option.textContent = childPath.join(' / ');
+        select.appendChild(option);
+      }
+    }
+  };
+  walk(tree, []);
+  const escapeCss = (typeof CSS !== 'undefined' && typeof CSS.escape === 'function')
+    ? (value) => CSS.escape(value)
+    : (value) => String(value).replace(/["\\]/g, '\\$&');
+  const target = String(selectedPath || '');
+  select.value = select.querySelector(`option[value="${escapeCss(target)}"]`) ? target : '';
+}
+
+// 效果路径下拉：列出变量树全部叶子路径，但过滤注册为子变量的叶子
+// （子变量由父变量派生，效果只能改父变量；未注册的叶子视为父变量）。
+function populateValuesTriggerEffectPathSelect(select, selectedPath) {
+  if (!select) return;
+  const ctx = getContextSafe();
+  const tree = ctx ? getValuesDefaults(ctx) : {};
+  const order = ctx ? getValuesTreeOrder(ctx) : {};
+  select.innerHTML = '';
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = '（选择父变量路径）';
+  select.appendChild(placeholder);
+  const walk = (node, path) => {
+    if (!valuesIsContainer(node)) return;
+    for (const key of valuesOrderedNames(order, path.join('/'), node)) {
+      const childPath = path.concat(key);
+      const child = node[key];
+      if (valuesIsContainer(child)) {
+        walk(child, childPath);
+      } else {
+        const registered = ctx ? getValuesKeyByName(ctx, key) : null;
+        if (registered && isValuesChildKey(registered)) continue;
         const option = document.createElement('option');
         option.value = childPath.join('/');
         option.textContent = childPath.join(' / ');
@@ -1312,12 +1401,93 @@ function readValuesTriggerConditionRows() {
   return conditions;
 }
 
+// 效果行：路径（只列父变量）+ 类型（加减 / 覆盖）+ 值 + 删除。
+function buildValuesTriggerEffectRow(effect) {
+  const row = document.createElement('div');
+  row.className = VALUES_TRIGGER_EFFECT_ROW_CLASS;
+  const pathSelect = document.createElement('select');
+  pathSelect.className = 'kaleido-input ' + VALUES_TRIGGER_EFFECT_PATH_CLASS;
+  populateValuesTriggerEffectPathSelect(pathSelect, effect?.path || '');
+  const opCenter = document.createElement('div');
+  opCenter.className = VALUES_TRIGGER_EFFECT_OP_CENTER_CLASS;
+  const opWrap = document.createElement('div');
+  opWrap.className = VALUES_TRIGGER_EFFECT_OP_WRAP_CLASS;
+  const opText = document.createElement('span');
+  opText.className = VALUES_TRIGGER_EFFECT_OP_TEXT_CLASS;
+  const opSelect = document.createElement('select');
+  opSelect.className = 'kaleido-input ' + VALUES_TRIGGER_EFFECT_OP_CLASS;
+  for (const op of VALUES_TRIGGER_EFFECT_OPS) {
+    const option = document.createElement('option');
+    option.value = op.value;
+    option.textContent = op.label;
+    opSelect.appendChild(option);
+  }
+  opSelect.value = String(effect?.op || '').trim() === 'set' ? 'set' : 'add';
+  const syncOpText = () => {
+    const matched = VALUES_TRIGGER_EFFECT_OPS.find((op) => op.value === String(opSelect.value || '').trim());
+    opText.textContent = matched ? (matched.display || matched.value) : String(opSelect.value || '');
+    opWrap.title = matched ? matched.label : '';
+    valueInput.placeholder = String(opSelect.value || '') === 'add' ? '如：+30 / -5（加减值）' : '如：100 / 已治好 / null';
+  };
+  const valueInput = document.createElement('input');
+  valueInput.className = 'kaleido-input ' + VALUES_TRIGGER_EFFECT_VALUE_CLASS;
+  valueInput.type = 'text';
+  valueInput.autocomplete = 'off';
+  valueInput.spellcheck = false;
+  const value = effect?.value;
+  valueInput.value = value === null || value === undefined ? '' : String(value);
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'kaleido-values__icon-btn kaleido-values__icon-btn--danger ' + VALUES_TRIGGER_EFFECT_REMOVE_CLASS;
+  removeBtn.title = '删除效果';
+  removeBtn.setAttribute('aria-label', '删除效果');
+  removeBtn.innerHTML = `<span class="${VALUES_DELETE_ICON_CLASS}"></span>`;
+  opWrap.append(opText, opSelect);
+  opCenter.append(opWrap);
+  row.append(pathSelect, opCenter, valueInput, removeBtn);
+  opSelect.addEventListener('change', syncOpText);
+  syncOpText();
+  return row;
+}
+
+// 编辑器效果区：按草稿渲染全部效果行。
+function renderValuesTriggerEffectRows() {
+  const container = document.getElementById(VALUES_TRIGGER_EDITOR_EFFECTS_ID);
+  if (!container) return;
+  container.innerHTML = '';
+  for (const effect of valuesTriggerEditorEffects) {
+    container.appendChild(buildValuesTriggerEffectRow(effect));
+  }
+}
+
+function addValuesTriggerEffectRow() {
+  valuesTriggerEditorEffects.push({ path: '', op: 'add', value: null });
+  renderValuesTriggerEffectRows();
+}
+
+// 读取编辑器效果区当前草稿（含用户未保存的修改）。
+function readValuesTriggerEffectRows() {
+  const container = document.getElementById(VALUES_TRIGGER_EDITOR_EFFECTS_ID);
+  if (!container) return valuesTriggerEditorEffects.slice();
+  const effects = [];
+  container.querySelectorAll('.' + VALUES_TRIGGER_EFFECT_ROW_CLASS).forEach((row) => {
+    const path = String(row.querySelector('.' + VALUES_TRIGGER_EFFECT_PATH_CLASS)?.value || '').trim();
+    const op = String(row.querySelector('.' + VALUES_TRIGGER_EFFECT_OP_CLASS)?.value || 'add').trim();
+    const valueText = String(row.querySelector('.' + VALUES_TRIGGER_EFFECT_VALUE_CLASS)?.value || '').trim();
+    effects.push({ path, op: op === 'set' ? 'set' : 'add', value: parseValuesEditorText(valueText).value });
+  });
+  return effects;
+}
+
 function openValuesTriggerEditor(item) {
   const editor = document.getElementById(VALUES_TRIGGER_EDITOR_ID);
   if (!editor) return;
   valuesTriggerEditorId = item && item.id ? item.id : null;
   valuesTriggerEditorConditions = Array.isArray(item?.conditions)
     ? item.conditions.map((condition) => ({ ...condition }))
+    : [];
+  valuesTriggerEditorEffects = Array.isArray(item?.effects)
+    ? item.effects.map((effect) => ({ ...effect }))
     : [];
   const title = document.getElementById(VALUES_TRIGGER_EDITOR_TITLE_ID);
   const nameInput = document.getElementById(VALUES_TRIGGER_EDITOR_NAME_ID);
@@ -1350,6 +1520,7 @@ function openValuesTriggerEditor(item) {
   if (descInput) descInput.value = item?.description || '';
   if (contentInput) contentInput.value = item?.content || '';
   renderValuesTriggerConditionRows();
+  renderValuesTriggerEffectRows();
   editor.hidden = false;
   closeValuesEditor();
   closeValuesKeyEditor();
@@ -1362,6 +1533,7 @@ function closeValuesTriggerEditor() {
   if (editor) editor.hidden = true;
   valuesTriggerEditorId = null;
   valuesTriggerEditorConditions = [];
+  valuesTriggerEditorEffects = [];
 }
 
 function saveValuesTriggerEditor() {
@@ -1384,12 +1556,29 @@ function saveValuesTriggerEditor() {
     valuesToastr('warning', '请至少添加一个变量条件');
     return;
   }
+  const effects = readValuesTriggerEffectRows().filter((effect) => effect.path !== '');
+  for (const effect of effects) {
+    if (effect.value === '') {
+      valuesToastr('warning', '请填写效果值（要设为无值请填 null）');
+      return;
+    }
+    if (effect.op === 'add') {
+      const delta = typeof effect.value === 'number'
+        ? effect.value
+        : (typeof effect.value === 'string' && String(effect.value).trim() !== '' ? Number(effect.value) : NaN);
+      if (!Number.isFinite(delta)) {
+        valuesToastr('warning', '加减值的效果值必须是数字');
+        return;
+      }
+    }
+  }
   const data = {
     name,
     logic: logic === 'any' ? 'any' : 'all',
     once,
     description: String(document.getElementById(VALUES_TRIGGER_EDITOR_DESC_ID)?.value || '').trim(),
     conditions,
+    effects,
     content,
   };
   if (valuesTriggerEditorId) updateValuesTrigger(ctx, valuesTriggerEditorId, data);
@@ -1471,6 +1660,34 @@ async function handleValuesResetGame() {
   valuesToastr('success', saved ? '游戏值已重置为默认值' : '游戏值已重置（写入聊天文件失败）');
   renderValuesTree();
   refreshHomeValuesStatus();
+}
+
+// 默认数值保存：把当前默认值立即保存到绑定位置（角色卡 / 全局设置），
+// 并在支持从磁盘重读的宿主（TauriTavern getOneCharacter）上校验写入是否生效——
+// 该宿主写角色卡失败时只 console.error 不抛错，校验能把静默失败变成可见反馈。
+async function handleValuesSaveNow() {
+  const ctx = getContextSafe();
+  if (!ctx) {
+    valuesToastr('warning', '无法读取宿主上下文');
+    return;
+  }
+  const character = getStoryCharacter(ctx);
+  const boundToCard = Boolean(character && typeof ctx?.writeExtensionField === 'function');
+  const target = boundToCard ? '角色卡' : '全局设置';
+  const bundle = getValuesBundle(ctx);
+  // 先等落盘完成再校验：校验走磁盘重读，与写入并行会读到旧数据误报失败。
+  await saveValuesData(ctx);
+  const verified = await verifyValuesCardWrite(ctx, String(character?.avatar || ''), bundle);
+  if (verified === true) {
+    logApp('info', '默认数值已保存', target);
+    valuesToastr('success', `默认数值已保存到${target}，并已从磁盘校验通过`);
+  } else if (verified === false) {
+    logApp('warn', '默认数值保存未生效', target);
+    valuesToastr('error', `保存未生效：${target}上的数据与修改不一致（写入被宿主拦截或返回旧数据）。请重启酒馆后重试，并检查系统日志`);
+  } else {
+    logApp('info', '默认数值已保存', target);
+    valuesToastr('success', `默认数值已保存到${target}`);
+  }
 }
 // ---------- 导入 / 导出 ----------
 function handleValuesExportBundle() {
@@ -1599,6 +1816,7 @@ function bindValuesContentEvents() {
   });
 
   document.getElementById(VALUES_RESET_GAME_ID)?.addEventListener('click', handleValuesResetGame);
+  document.getElementById(VALUES_SAVE_NOW_ID)?.addEventListener('click', handleValuesSaveNow);
 
   document.getElementById(VALUES_INJECT_TOGGLE_ID)?.addEventListener('click', (event) => {
     const ctx = getContextSafe();
@@ -1619,6 +1837,14 @@ function bindValuesContentEvents() {
     const button = event.target instanceof Element ? event.target.closest('.' + VALUES_TRIGGER_CONDITION_REMOVE_CLASS) : null;
     if (!button) return;
     const row = button.closest('.' + VALUES_TRIGGER_CONDITION_ROW_CLASS);
+    if (!row) return;
+    row.remove();
+  });
+  document.getElementById(VALUES_TRIGGER_EDITOR_EFFECT_ADD_ID)?.addEventListener('click', addValuesTriggerEffectRow);
+  document.getElementById(VALUES_TRIGGER_EDITOR_EFFECTS_ID)?.addEventListener('click', (event) => {
+    const button = event.target instanceof Element ? event.target.closest('.' + VALUES_TRIGGER_EFFECT_REMOVE_CLASS) : null;
+    if (!button) return;
+    const row = button.closest('.' + VALUES_TRIGGER_EFFECT_ROW_CLASS);
     if (!row) return;
     row.remove();
   });
@@ -1760,6 +1986,7 @@ function bindValuesContentEvents() {
   document.getElementById(VALUES_KEY_EDITOR_CANCEL_ID)?.addEventListener('click', closeValuesKeyEditor);
   document.getElementById(VALUES_KEY_EDITOR_SAVE_ID)?.addEventListener('click', saveValuesKeyEditor);
   document.getElementById(VALUES_KEY_EDITOR_TYPE_ID)?.addEventListener('change', syncValuesKeyEditorTypeUI);
+  document.getElementById(VALUES_KEY_EDITOR_DERIVE_ID)?.addEventListener('change', syncValuesKeyDeriveUI);
   document.getElementById(VALUES_KEY_EDITOR_RULES_ADD_ID)?.addEventListener('click', () => {
     const container = document.getElementById(VALUES_KEY_EDITOR_RULES_ID);
     if (!container) return;
@@ -1863,6 +2090,9 @@ function buildValuesContentHTML(editorClass) {
                 <span id="${VALUES_LAYER_ICON_ID}" class="kaleido-values__layer-icon"><span class="${VALUES_LAYER_DEFAULT_ICON_CLASS}"></span></span>
                 <span id="${VALUES_LAYER_TITLE_ID}" class="kaleido-values__layer-title">默认数值</span>
                 <span class="kaleido-values__toolbar-spacer"></span>
+                <button type="button" id="${VALUES_SAVE_NOW_ID}" class="kaleido-btn kaleido-btn--mini" title="把当前默认数值立即保存到角色卡，并从磁盘重读校验写入是否生效">
+                  <span class="${VALUES_SAVE_ICON_CLASS}"></span> 保存
+                </button>
                 <button type="button" id="${VALUES_LAYER_TOGGLE_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--ghost" title="切换到游戏数值（聊天，AI 自动维护）">
                   <span class="${VALUES_LAYER_SWAP_ICON_CLASS}"></span> 切换到游戏数值
                 </button>
@@ -1940,7 +2170,7 @@ function buildValuesContentHTML(editorClass) {
                 <label class="kaleido-api__field" for="${VALUES_EDITOR_VALUE_ID}">
                   <span id="${VALUES_EDITOR_VALUE_LABEL_ID}" class="kaleido-api__label">变量值 *</span>
                   <textarea id="${VALUES_EDITOR_VALUE_ID}" class="kaleido-input kaleido-values__textarea kaleido-values__textarea--small" rows="2" placeholder="如：30 / 1000 / 友好 / true" spellcheck="false"></textarea>
-                  <span id="${VALUES_EDITOR_CHILD_HINT_ID}" class="kaleido-values__editor-hint" hidden>子变量值由父变量自动计算</span>
+                  <span id="${VALUES_EDITOR_CHILD_HINT_ID}" class="kaleido-values__editor-hint" hidden>子变量值由派生规则（区间 / 公式）自动计算</span>
                 </label>
               </div>
               <div class="kaleido-values__editor-actions">
@@ -1960,9 +2190,9 @@ function buildValuesContentHTML(editorClass) {
               </label>
               <label class="kaleido-api__field" for="${VALUES_KEY_EDITOR_TYPE_ID}">
                 <span class="kaleido-api__label">变量类型</span>
-                <select id="${VALUES_KEY_EDITOR_TYPE_ID}" class="kaleido-input" title="父变量：由 AI 按变化规则维护；子变量：值由同路径下的父变量按区间自动派生">
+                <select id="${VALUES_KEY_EDITOR_TYPE_ID}" class="kaleido-input" title="父变量：由 AI 按变化规则维护；子变量：按派生规则（区间 / 公式）由同路径变量自动计算">
                   <option value="${VALUES_KEY_TYPE_PARENT}">父变量（AI 按变化规则维护）</option>
-                  <option value="${VALUES_KEY_TYPE_CHILD}">子变量（由父变量自动派生）</option>
+                  <option value="${VALUES_KEY_TYPE_CHILD}">子变量（按派生规则自动计算）</option>
                 </select>
               </label>
               <div id="${VALUES_KEY_EDITOR_RULE_FIELDS_ID}">
@@ -1972,14 +2202,30 @@ function buildValuesContentHTML(editorClass) {
                 </label>
               </div>
               <div id="${VALUES_KEY_EDITOR_CHILD_FIELDS_ID}" hidden>
-                <label class="kaleido-api__field" for="${VALUES_KEY_EDITOR_PARENT_ID}">
-                  <span class="kaleido-api__label">父变量 *</span>
-                  <select id="${VALUES_KEY_EDITOR_PARENT_ID}" class="kaleido-input" title="子变量的值由同路径下该父变量的值决定（如 张三/态度 ← 张三/好感度）"></select>
+                <label class="kaleido-api__field" for="${VALUES_KEY_EDITOR_DERIVE_ID}">
+                  <span class="kaleido-api__label">派生方式</span>
+                  <select id="${VALUES_KEY_EDITOR_DERIVE_ID}" class="kaleido-input" title="区间：按派生源数值匹配区间输出文本；公式：引用一个或多个同路径变量四则运算输出数值">
+                    <option value="${VALUES_KEY_DERIVE_RULES}">区间（按派生源数值匹配，输出文本）</option>
+                    <option value="${VALUES_KEY_DERIVE_FORMULA}">公式（引用变量计算，输出数值）</option>
+                  </select>
                 </label>
-                <div class="kaleido-api__field">
-                  <span class="kaleido-api__label">派生区间 *</span>
-                  <div id="${VALUES_KEY_EDITOR_RULES_ID}" class="kaleido-values__key-rules"></div>
-                  <button type="button" id="${VALUES_KEY_EDITOR_RULES_ADD_ID}" class="kaleido-btn kaleido-btn--mini">＋ 添加区间</button>
+                <div id="${VALUES_KEY_EDITOR_FORMULA_FIELDS_ID}" hidden>
+                  <label class="kaleido-api__field" for="${VALUES_KEY_EDITOR_FORMULA_ID}">
+                    <span class="kaleido-api__label">派生公式 *</span>
+                    <textarea id="${VALUES_KEY_EDITOR_FORMULA_ID}" class="kaleido-input kaleido-values__textarea kaleido-values__textarea--small" rows="3" placeholder="如：((0.5*友谊+0.5*情欲)+1.2*情欲)/10" title="支持 + - * / 与括号；变量为同路径下的已注册变量（父 / 子均可）" spellcheck="false"></textarea>
+                    <span class="kaleido-api__hint">支持 + - * / 与括号；变量为同路径下的已注册变量（父 / 子均可）。</span>
+                  </label>
+                </div>
+                <div id="${VALUES_KEY_EDITOR_RULES_FIELDS_ID}">
+                  <label class="kaleido-api__field" for="${VALUES_KEY_EDITOR_PARENT_ID}">
+                    <span class="kaleido-api__label">派生源 *</span>
+                    <select id="${VALUES_KEY_EDITOR_PARENT_ID}" class="kaleido-input" title="子变量的值由同路径下该变量的值决定（父 / 子变量均可，如 张三/态度 ← 张三/综合评分）"></select>
+                  </label>
+                  <div class="kaleido-api__field">
+                    <span class="kaleido-api__label">派生区间 *</span>
+                    <div id="${VALUES_KEY_EDITOR_RULES_ID}" class="kaleido-values__key-rules"></div>
+                    <button type="button" id="${VALUES_KEY_EDITOR_RULES_ADD_ID}" class="kaleido-btn kaleido-btn--mini">＋ 添加区间</button>
+                  </div>
                 </div>
               </div>
               <div class="kaleido-values__editor-actions">
@@ -2009,6 +2255,11 @@ function buildValuesContentHTML(editorClass) {
                 <span class="kaleido-api__label">变量条件 *</span>
                 <div id="${VALUES_TRIGGER_EDITOR_CONDITIONS_ID}" class="kaleido-values__trigger-conditions"></div>
                 <button type="button" id="${VALUES_TRIGGER_EDITOR_CONDITION_ADD_ID}" class="kaleido-btn kaleido-btn--mini">＋ 添加条件</button>
+              </div>
+              <div class="kaleido-api__field">
+                <span class="kaleido-api__label">事件效果（可选 · 触发时修改父变量）</span>
+                <div id="${VALUES_TRIGGER_EDITOR_EFFECTS_ID}" class="kaleido-values__trigger-effects"></div>
+                <button type="button" id="${VALUES_TRIGGER_EDITOR_EFFECT_ADD_ID}" class="kaleido-btn kaleido-btn--mini">＋ 添加效果</button>
               </div>
               <label class="kaleido-api__field" for="${VALUES_TRIGGER_EDITOR_DESC_ID}">
                 <span class="kaleido-api__label">事件说明</span>

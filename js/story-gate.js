@@ -257,6 +257,12 @@ async function runStoryGatePipeline(ctx, settings) {
       finish({ skipped: true });
       return;
     }
+    const selected = selectedIds
+      .map((id) => scripts.find((script) => script.id === id))
+      .filter(Boolean);
+    // 事件效果：AI 选中即确定性修改游戏值，不依赖注入能力，先于注入执行
+    // （复用剧情触发的 applyValuesTriggerEffects：加减值 / 覆盖，只改父变量）。
+    record.effectsApplied = applyValuesTriggerEffects(ctx, selected);
     const api = getStoryGateExtensionPromptApi(ctx);
     if (!api) {
       logApp('warn', '剧情预筛：宿主不支持提示词注入，跳过注入');
@@ -264,9 +270,6 @@ async function runStoryGatePipeline(ctx, settings) {
       finish();
       return;
     }
-    const selected = selectedIds
-      .map((id) => scripts.find((script) => script.id === id))
-      .filter(Boolean);
     const injectionText = buildStoryGateInjectionText(ctx, selected);
     record.selectedEvents = selected.map((script) => ({
       id: script.id,

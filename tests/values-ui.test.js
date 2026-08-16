@@ -129,6 +129,7 @@ runner.test('initValuesSection 创建工作台对话框', () => {
   assert($('kaleido-values-export-btn'), '应有导出按钮');
   assert($('kaleido-values-layer-default'), '应有默认值层按钮');
   assert($('kaleido-values-layer-game'), '应有游戏值层按钮');
+  assert($('kaleido-values-save-now'), '应有默认数值保存按钮');
   assert($('kaleido-values-reset-game'), '应有重置为默认值按钮');
   assert($('kaleido-values-default-hint'), '应有默认值手动提示');
 });
@@ -198,8 +199,8 @@ runner.test('键注册：子变量类型 + 父变量 + 派生区间', () => {
   assert(!$('kaleido-values-key-editor-child-fields').hidden, '子变量应显示派生区间');
   const parentSelect = $('kaleido-values-key-editor-parent');
   const parentOptions = Array.from(parentSelect.options).map((option) => option.value);
-  assert(parentOptions.includes('好感度'), '父变量下拉应含好感度');
-  assert(!parentOptions.includes('态度'), '父变量下拉不应含子变量');
+  assert(parentOptions.includes('好感度'), '派生源下拉应含好感度');
+  assert(!parentOptions.includes('态度'), '派生源下拉应排除正在编辑的自身');
   parentSelect.value = '好感度';
   click($('kaleido-values-key-editor-rules-add'));
   click($('kaleido-values-key-editor-rules-add'));
@@ -293,7 +294,7 @@ runner.test('新建变量：选择子变量时不提供值输入、只显示派�
   select.value = '态度';
   select.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
   assert(!$('kaleido-values-editor-child-hint').hidden, '应显示子变量提示');
-  assert($('kaleido-values-editor-child-hint').textContent === '子变量值由父变量自动计算', '提示文字应为「子变量值由父变量自动计算」');
+  assert($('kaleido-values-editor-child-hint').textContent === '子变量值由派生规则（区间 / 公式）自动计算', '提示文字应为派生规则说明');
   assert($('kaleido-values-editor-value').hidden, '子变量不应显示值输入框');
   assert($('kaleido-values-editor-value-label').hidden, '子变量不应显示值标签');
   click($('kaleido-values-editor-cancel'));
@@ -308,6 +309,97 @@ runner.test('删除父变量：有依赖子变量时阻止并提示', () => {
   click(row.querySelector('button[data-action="delete-key"]'));
   assert(ui.getValuesKeys(hostCtx).length === before, '不应删除父变量');
   assert(toasts.some((t) => t[0] === 'warning' && t[1].includes('态度')), '应提示依赖子变量');
+});
+
+// ---------- 键注册：公式派生 ----------
+runner.test('键注册：子变量切换派生方式为公式并保存', () => {
+  click($('kaleido-values-add-key'));
+  setValue('kaleido-values-key-editor-name', '综合评分');
+  const typeSelect = $('kaleido-values-key-editor-type');
+  typeSelect.value = 'child';
+  typeSelect.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+  const deriveSelect = $('kaleido-values-key-editor-derive');
+  assert(deriveSelect, '子变量应显示派生方式下拉');
+  assert(deriveSelect.value === 'rules', '默认应为区间派生');
+  assert(!$('kaleido-values-key-editor-rules-fields').hidden, '区间模式应显示派生源与区间');
+  assert($('kaleido-values-key-editor-formula-fields').hidden, '区间模式应隐藏公式输入');
+  deriveSelect.value = 'formula';
+  deriveSelect.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+  assert(!$('kaleido-values-key-editor-formula-fields').hidden, '公式模式应显示公式输入');
+  assert($('kaleido-values-key-editor-rules-fields').hidden, '公式模式应隐藏派生源与区间');
+  setValue('kaleido-values-key-editor-formula', '0.5*服从值+0.5*美貌值');
+  click($('kaleido-values-key-editor-save'));
+  const key = ui.getValuesKeyByName(hostCtx, '综合评分');
+  assert(key && key.formula === '0.5*服从值+0.5*美貌值', '公式应保存');
+  assert(key.parent === '', '公式模式不应有派生源');
+  assert(key.rules.length === 0, '公式模式不应有区间');
+  const listRows = Array.from($('kaleido-values-keys-body').querySelectorAll('.kaleido-values__row'));
+  const scoreRow = listRows.find((r) => r.dataset.name === '综合评分');
+  assert(scoreRow && scoreRow.querySelector('.kaleido-values__row-rule').textContent.includes('0.5*服从值+0.5*美貌值'), '列表应显示公式摘要');
+});
+
+runner.test('键注册：公式非法语法阻止保存并提示', () => {
+  click($('kaleido-values-add-key'));
+  setValue('kaleido-values-key-editor-name', '评分2');
+  const typeSelect = $('kaleido-values-key-editor-type');
+  typeSelect.value = 'child';
+  typeSelect.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+  const deriveSelect = $('kaleido-values-key-editor-derive');
+  deriveSelect.value = 'formula';
+  deriveSelect.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+  setValue('kaleido-values-key-editor-formula', '2**3');
+  click($('kaleido-values-key-editor-save'));
+  assert(!ui.getValuesKeyByName(hostCtx, '评分2'), '非法公式不应保存');
+  assert(toasts.some((t) => t[0] === 'warning' && t[1].includes('派生公式不合法')), '应提示公式不合法');
+  click($('kaleido-values-key-editor-cancel'));
+});
+
+runner.test('键注册：循环引用阻止保存并提示环链', () => {
+  click($('kaleido-values-add-key'));
+  setValue('kaleido-values-key-editor-name', '环A');
+  let typeSelect = $('kaleido-values-key-editor-type');
+  typeSelect.value = 'child';
+  typeSelect.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+  let deriveSelect = $('kaleido-values-key-editor-derive');
+  deriveSelect.value = 'formula';
+  deriveSelect.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+  setValue('kaleido-values-key-editor-formula', '环B*2');
+  click($('kaleido-values-key-editor-save'));
+  assert(ui.getValuesKeyByName(hostCtx, '环A'), '环A 应先保存');
+  click($('kaleido-values-add-key'));
+  setValue('kaleido-values-key-editor-name', '环B');
+  typeSelect = $('kaleido-values-key-editor-type');
+  typeSelect.value = 'child';
+  typeSelect.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+  $('kaleido-values-key-editor-parent').value = '环A';
+  click($('kaleido-values-key-editor-rules-add'));
+  const row = $('kaleido-values-key-editor-rules').querySelector('.kaleido-values__key-rule-row');
+  row.querySelector('.kaleido-values__key-rule-min').value = '0';
+  row.querySelector('.kaleido-values__key-rule-value').value = 'x';
+  click($('kaleido-values-key-editor-save'));
+  assert(!ui.getValuesKeyByName(hostCtx, '环B'), '成环引用不应保存');
+  assert(toasts.some((t) => t[0] === 'warning' && t[1].includes('循环引用')), '应提示循环引用');
+  click($('kaleido-values-key-editor-cancel'));
+});
+
+runner.test('键注册：派生源可选子变量（链式派生）', () => {
+  click($('kaleido-values-add-key'));
+  setValue('kaleido-values-key-editor-name', 'A级');
+  const typeSelect = $('kaleido-values-key-editor-type');
+  typeSelect.value = 'child';
+  typeSelect.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+  const parentSelect = $('kaleido-values-key-editor-parent');
+  const parentOptions = Array.from(parentSelect.options).map((option) => option.value);
+  assert(parentOptions.includes('综合评分'), '派生源下拉应含子变量 综合评分');
+  parentSelect.value = '综合评分';
+  click($('kaleido-values-key-editor-rules-add'));
+  const row = $('kaleido-values-key-editor-rules').querySelector('.kaleido-values__key-rule-row');
+  row.querySelector('.kaleido-values__key-rule-min').value = '70';
+  row.querySelector('.kaleido-values__key-rule-max').value = '150';
+  row.querySelector('.kaleido-values__key-rule-value').value = 'A级';
+  click($('kaleido-values-key-editor-save'));
+  const key = ui.getValuesKeyByName(hostCtx, 'A级');
+  assert(key && key.parent === '综合评分', '派生源应为子变量 综合评分');
 });
 
 // ---------- 新建键（顶层） ----------
@@ -551,6 +643,27 @@ runner.test('层切换按钮：只显示当前层，点击按钮切换', () => {
   assert($('kaleido-values-layer-row').dataset.layer === (target === '游戏数值' ? 'game' : 'default'), '指示条应更新层标记');
   click(toggle);
   assert(title.textContent === before, '再点应回到原层');
+});
+
+// ---------- 默认数值「保存」按钮 ----------
+runner.test('默认数值保存按钮：仅在默认层显示；点击保存到绑定位置并提示', async () => {
+  // 前置：切到默认数值层
+  click($('kaleido-values-layer-default'));
+  const saveBtn = $('kaleido-values-save-now');
+  assert(saveBtn, '应有保存按钮');
+  assert(!saveBtn.hidden, '默认数值层应显示保存按钮');
+  // 游戏值层隐藏（游戏值随聊天文件即时落盘，无需手动保存）
+  click($('kaleido-values-layer-game'));
+  assert(saveBtn.hidden, '游戏值层应隐藏保存按钮');
+  click($('kaleido-values-layer-default'));
+  // 无角色（测试上下文）：保存落到全局设置
+  toasts.length = 0;
+  click(saveBtn);
+  await flush();
+  assert(
+    toasts.some(([kind, message]) => kind === 'success' && message.includes('全局设置')),
+    `无角色时应提示已保存到全局设置，实际: ${JSON.stringify(toasts)}`,
+  );
 });
 
 // ---------- 打开工作台：总是先展示游戏数值层 ----------
@@ -823,6 +936,79 @@ runner.test('剧情触发：启停滑块与删除', async () => {
   await flush();
   assert(ui.getValuesTriggers(hostCtx).length === 0, '删除后应为空');
   assert(triggerRows().length === 0, '列表应清空');
+});
+
+runner.test('剧情触发：事件效果（加减 / 覆盖）填写与保存，路径只列父变量', () => {
+  ui.getValuesTriggers(hostCtx).slice().forEach((t) => ui.deleteValuesTrigger(hostCtx, t.id));
+  // 注册子变量：效果路径下拉应过滤它
+  ui.upsertValuesKey(hostCtx, '态度', '', { type: 'child', parent: '好感', rules: [{ min: 0, max: 50, value: '冷淡' }, { min: 51, max: 100, value: '热络' }] });
+  const defaults = ui.getValuesDefaults(hostCtx);
+  defaults['张三'] = { '好感': 30, '态度': '冷淡', '是否已知真相': false };
+  ui.saveValuesData(hostCtx);
+  openTriggersTab();
+  click($('kaleido-values-triggers-add'));
+  setValue('kaleido-values-trigger-editor-name', '好感上升');
+  click($('kaleido-values-trigger-editor-condition-add'));
+  const condRow = $('kaleido-values-trigger-editor-conditions').querySelector('.kaleido-values__trigger-condition');
+  condRow.querySelector('.kaleido-values__trigger-condition-path').value = '张三/好感';
+  condRow.querySelector('.kaleido-values__trigger-condition-op').value = '>=';
+  condRow.querySelector('.kaleido-values__trigger-condition-value').value = '30';
+  // 添加两条效果：加减 + 覆盖
+  click($('kaleido-values-trigger-editor-effect-add'));
+  click($('kaleido-values-trigger-editor-effect-add'));
+  const effectRows = Array.from($('kaleido-values-trigger-editor-effects').querySelectorAll('.kaleido-values__trigger-effect'));
+  assert(effectRows.length === 2, '应有 2 个效果行');
+  const pathSelects = effectRows.map((row) => row.querySelector('.kaleido-values__trigger-effect-path'));
+  const opSelects = effectRows.map((row) => row.querySelector('.kaleido-values__trigger-effect-op'));
+  const valueInputs = effectRows.map((row) => row.querySelector('.kaleido-values__trigger-effect-value'));
+  const pathOptions = Array.from(pathSelects[0].options).map((option) => option.value);
+  assert(pathOptions.includes('张三/好感'), '效果路径应包含父变量 张三/好感');
+  assert(!pathOptions.includes('张三/态度'), '效果路径应过滤子变量 张三/态度');
+  pathSelects[0].value = '张三/好感';
+  opSelects[0].value = 'add';
+  valueInputs[0].value = '30';
+  pathSelects[1].value = '张三/好感';
+  opSelects[1].value = 'set';
+  valueInputs[1].value = '100';
+  setValue('kaleido-values-trigger-editor-content', '好感提升。');
+  click($('kaleido-values-trigger-editor-save'));
+  const triggers = ui.getValuesTriggers(hostCtx);
+  assert(triggers.length === 1, '应创建 1 个触发');
+  assert(triggers[0].effects.length === 2, '应保存 2 个效果');
+  assert(triggers[0].effects[0].path === '张三/好感' && triggers[0].effects[0].op === 'add' && triggers[0].effects[0].value === 30, '效果 1 应为 add 30');
+  assert(triggers[0].effects[1].op === 'set' && triggers[0].effects[1].value === 100, '效果 2 应为 set 100');
+  // 列表行显示效果摘要
+  const row = triggerRows()[0];
+  const effectSpan = row.querySelector('.kaleido-values__row-trigger.is-effect');
+  assert(effectSpan && effectSpan.textContent.includes('张三/好感 +30'), '列表应显示效果摘要');
+});
+
+runner.test('剧情触发：编辑回填效果行；效果值留空阻止保存', () => {
+  ui.getValuesTriggers(hostCtx).slice().forEach((t) => ui.deleteValuesTrigger(hostCtx, t.id));
+  ui.createValuesTrigger(hostCtx, { name: '回填', conditions: [{ path: '张三/好感', op: '>=', value: 30 }], effects: [{ path: '张三/好感', op: 'add', value: 10 }], content: '内容' });
+  openTriggersTab();
+  click(triggerRows()[0].querySelector('[data-action="edit-trigger"]'));
+  let effectRows = Array.from($('kaleido-values-trigger-editor-effects').querySelectorAll('.kaleido-values__trigger-effect'));
+  assert(effectRows.length === 1, '编辑时应回填 1 个效果行');
+  assert(effectRows[0].querySelector('.kaleido-values__trigger-effect-path').value === '张三/好感', '应回填路径');
+  assert(effectRows[0].querySelector('.kaleido-values__trigger-effect-op').value === 'add', '应回填类型');
+  assert(effectRows[0].querySelector('.kaleido-values__trigger-effect-value').value === '10', '应回填值');
+  // 新加一条效果行但值留空 → 保存被阻止
+  click($('kaleido-values-trigger-editor-effect-add'));
+  effectRows = Array.from($('kaleido-values-trigger-editor-effects').querySelectorAll('.kaleido-values__trigger-effect'));
+  assert(effectRows[1].querySelector('.kaleido-values__trigger-effect-op').value === 'add', '新效果行默认应为加减值');
+  effectRows[1].querySelector('.kaleido-values__trigger-effect-path').value = '张三/好感';
+  const before = ui.getValuesTriggers(hostCtx)[0].effects.length;
+  click($('kaleido-values-trigger-editor-save'));
+  assert(toasts.at(-1) && toasts.at(-1)[0] === 'warning', '值留空应弹出警告');
+  assert(ui.getValuesTriggers(hostCtx)[0].effects.length === before, '不应保存空值效果');
+  // 覆盖类型下显式填 null 后可保存
+  effectRows[1].querySelector('.kaleido-values__trigger-effect-op').value = 'set';
+  effectRows[1].querySelector('.kaleido-values__trigger-effect-value').value = 'null';
+  click($('kaleido-values-trigger-editor-save'));
+  const triggers = ui.getValuesTriggers(hostCtx);
+  assert(triggers[0].effects.length === 2, '填 null 后应保存 2 个效果');
+  assert(triggers[0].effects[1].value === null, 'null 应解析为 null');
 });
 
 // ---------- 左侧导航收起 / 展开 ----------

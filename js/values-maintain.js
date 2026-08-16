@@ -71,9 +71,14 @@ function buildValuesMaintainMessages(ctx, prompt) {
     .map((key) => `- ${String(key?.name || '')}: ${String(key?.rule || '')}`)
     .join('\n') || '（尚未注册任何父变量）';
   const childKeysInUse = childKeys.filter((key) => !isValuesBuiltinKey(key) || builtinInUse(key));
+  const describeChildSource = (key) => {
+    const formula = String(key?.formula || '').trim();
+    if (formula !== '') return `${String(key?.name || '')} ← 公式 ${formula}`;
+    return `${String(key?.name || '')} ← ${String(key?.parent || '')}`;
+  };
   const childNote = childKeysInUse.length > 0
-    ? '\n\n（子变量为派生变量，由系统按父变量自动计算，禁止修改：' +
-      childKeysInUse.map((key) => `${String(key?.name || '')} ← ${String(key?.parent || '')}`).join('、') +
+    ? '\n\n（子变量为派生变量，由系统按派生规则自动计算，禁止修改：' +
+      childKeysInUse.map(describeChildSource).join('、') +
       '）'
     : '';
   // 子变量是派生变量：发给 AI 的值表只含父变量，子变量不发送（也不允许 AI 改动）。

@@ -73,9 +73,10 @@ function resolveValuesTriggerId(ctx, requested, excludeId) {
   return id;
 }
 
-// 归一化单条触发：补全字段、过滤非法条件（空路径丢弃）。
+// 归一化单条触发：补全字段、过滤非法条件（空路径丢弃）、归一化事件效果。
 function normalizeValuesTrigger(raw) {
   const conditions = Array.isArray(raw?.conditions) ? raw.conditions : [];
+  const effects = Array.isArray(raw?.effects) ? raw.effects : [];
   return {
     id: String(raw?.id || '').trim(),
     name: String(raw?.name || '').trim() || '未命名触发',
@@ -91,6 +92,14 @@ function normalizeValuesTrigger(raw) {
         value: condition?.value !== undefined ? condition.value : null,
       }))
       .filter((condition) => condition.path !== ''),
+    effects: effects
+      .filter((effect) => effect && typeof effect === 'object' && !Array.isArray(effect))
+      .map((effect) => ({
+        path: String(effect?.path || '').trim(),
+        op: String(effect?.op || '').trim() === 'set' ? 'set' : 'add',
+        value: effect?.value !== undefined ? effect.value : null,
+      }))
+      .filter((effect) => effect.path !== ''),
     content: String(raw?.content || ''),
   };
 }
@@ -222,6 +231,80 @@ function formatValuesTriggerConditions(trigger) {
   return parts.join(joiner);
 }
 
+// 效果摘要文本：张三/好感 +30；曹操/病 → 已治好。
+function formatValuesTriggerEffects(trigger) {
+  const effects = Array.isArray(trigger?.effects) ? trigger.effects : [];
+  const parts = effects.map((effect) => {
+    const path = String(effect?.path || '');
+    if (String(effect?.op || 'set').trim() === 'add') {
+      const value = effect?.value;
+      const num = typeof value === 'number' ? value : Number(value);
+      const delta = Number.isFinite(num) ? (num > 0 ? '+' + num : String(num)) : String(value ?? '');
+      return `${path} ${delta}`;
+    }
+    const value = effect?.value;
+    const valueText = value === null || value === undefined ? 'null' : String(value);
+    return `${path} → ${valueText}`;
+  });
+  return parts.length === 0 ? '' : '效果：' + parts.join('；');
+}
+
+// ---------- 事件效果 ----------
+// 触发后确定性修改游戏值：add = 加减（正加负减，当前值与效果值都需可转数字）；
+// set = 覆盖（数字 / 文本 / 布尔 / null 均可）。效果对象只允许父变量叶子——
+// 注册为子变量的叶子（由父变量派生）与树中的节点 / 容器一律跳过。
+// 有改动时重算子变量并落盘（与 AI 维护管线同款收尾）；返回 { changed, skipped }。
+function applyValuesTriggerEffects(ctx, triggered) {
+  const changed = [];
+  const skipped = [];
+  const effects = [];
+  for (const trigger of Array.isArray(triggered) ? triggered : []) {
+    for (const effect of Array.isArray(trigger?.effects) ? trigger.effects : []) {
+      const path = String(effect?.path || '').split('/').filter(Boolean);
+      if (path.length === 0) continue;
+      const leafKey = ctx ? getValuesKeyByName(ctx, path[path.length - 1]) : null;
+      if (leafKey && isValuesChildKey(leafKey)) {
+        skipped.push(`${path.join('/')}（子变量由父变量派生，不可直接修改）`);
+        continue;
+      }
+      effects.push({ triggerId: trigger.id, path, op: String(effect?.op || 'set').trim(), value: effect?.value });
+    }
+  }
+  if (effects.length === 0) return { changed, skipped };
+  const tree = getValuesGameTree(ctx);
+  const toNumber = (value) => {
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string' && String(value).trim() !== '') return Number(value);
+    return NaN;
+  };
+  for (const effect of effects) {
+    const current = valuesGetAtPath(tree, effect.path);
+    if (valuesIsContainer(current)) {
+      skipped.push(`${effect.path.join('/')}（节点不是变量，不可直接修改）`);
+      continue;
+    }
+    let next;
+    if (effect.op === 'add') {
+      const currentNum = toNumber(current);
+      const delta = toNumber(effect.value);
+      if (!Number.isFinite(currentNum) || !Number.isFinite(delta)) {
+        skipped.push(`${effect.path.join('/')}（加减值需要数字，当前值或效果值不可转数字）`);
+        continue;
+      }
+      next = currentNum + delta;
+    } else {
+      next = effect.value;
+    }
+    valuesSetAtPath(tree, effect.path, next);
+    changed.push(effect.path.join('/'));
+  }
+  if (changed.length > 0) {
+    deriveValuesChildren(tree, ctx ? getValuesKeys(ctx) : []);
+    saveValuesChatState(ctx, tree, {});
+  }
+  return { changed, skipped };
+}
+
 // ---------- 注入 ----------
 // 注入块：<Story_Trigger> 块 + 说明 + 每个满足条件的事件（含触发条件 / 说明 / 正文）。
 // 与剧情预筛的 <Story_Event> 同款强制指令，保证主模型真实落地事件内容。
@@ -296,6 +379,8 @@ function runValuesTriggerBarrierTask(ctx, payload) {
       globalThis[VALUES_TRIGGER_LAST_ROUND_KEY] = record;
       return Promise.resolve();
     }
+    // 事件效果：确定性修改游戏值，不依赖注入能力，先于注入执行。
+    record.effectsApplied = applyValuesTriggerEffects(context, triggered);
     const api = getValuesTriggerExtensionPromptApi(context);
     if (!api) {
       logApp('warn', '剧情触发：宿主不支持提示词注入，跳过注入');

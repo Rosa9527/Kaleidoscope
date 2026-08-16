@@ -79,11 +79,12 @@ runner.test('默认值写入角色卡（writeExtensionField）', async () => {
   ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['金钱'], 1000);
   ctx.saveValuesData(c);
   await flushTimers();
-  assert(writes.length === 1, '应写入角色卡一次');
-  assert(writes[0].key === 'kaleidoscope_values', '扩展字段 key 应为 kaleidoscope_values');
-  assert(writes[0].value.defaults['金钱'] === 1000, '默认值应包含金钱');
-  assert(writes[0].value.defaults['张三']['好感'] === 30, '默认值应包含张三→好感');
-  assert(writes[0].value.keys.length === 1, '键注册表应随卡保存');
+  assert(writes.length === 2, '每次变更立即写卡（upsert 键 + 保存默认值各一次，无防抖合并）');
+  const last = writes[writes.length - 1];
+  assert(last.key === 'kaleidoscope_values', '扩展字段 key 应为 kaleidoscope_values');
+  assert(last.value.defaults['金钱'] === 1000, '默认值应包含金钱');
+  assert(last.value.defaults['张三']['好感'] === 30, '默认值应包含张三→好感');
+  assert(last.value.keys.length === 1, '键注册表应随卡保存');
 });
 
 runner.test('无角色时默认值回退全局设置', () => {
@@ -348,9 +349,10 @@ runner.test('注入配置：随角色卡保存', async () => {
   ctx.setValuesInjectEnabled(c, true);
   ctx.setValuesInjectPath(c, ['金钱'], true);
   await flushTimers();
-  assert(writes.length === 1, '应写入角色卡一次');
-  assert(writes[0].value.inject && writes[0].value.inject.enabled === true, '角色卡应保存注入开关');
-  assert(writes[0].value.inject.paths.includes('金钱'), '角色卡应保存勾选路径');
+  assert(writes.length === 2, '每次变更立即写卡（开关注入 + 勾选路径各一次，无防抖合并）');
+  const last = writes[writes.length - 1];
+  assert(last.value.inject && last.value.inject.enabled === true, '角色卡应保存注入开关');
+  assert(last.value.inject.paths.includes('金钱'), '角色卡应保存勾选路径');
 });
 
 // ---------- 父变量 / 子变量 ----------
@@ -694,6 +696,152 @@ runner.test('整包 YAML 往返：order 顺序表', () => {
   const c2 = fresh();
   ctx.applyValuesBundle(c2, parsed, 'merge');
   assert(ctx.getValuesTreeOrder(c2)[''].join(',') === '李四,张三', '合并导入应保留顺序');
+});
+
+// ---------- 公式派生 ----------
+runner.test('公式语法：四则 / 括号 / 中文变量 / 负号 / 非法输入', () => {
+  const ok = (formula, refs) => {
+    const syntax = ctx.validateValuesFormulaSyntax(formula);
+    assert(syntax.ok, `公式「${formula}」应合法：${syntax.error || ''}`);
+    assert(syntax.refs.join(',') === refs, `「${formula}」引用变量应为「${refs}」，实际「${syntax.refs.join(',')}」`);
+  };
+  const bad = (formula) => {
+    const syntax = ctx.validateValuesFormulaSyntax(formula);
+    assert(!syntax.ok, `公式「${formula}」应非法`);
+  };
+  ok('0.5*服从值+0.5*美貌值', '服从值,美貌值');
+  ok('((0.5*友谊+0.5*情欲)+1.2*情欲)/10', '友谊,情欲');
+  ok('2+3*4', '');
+  ok('(2+3)*4', '');
+  ok('(服从值+美貌值)/2', '服从值,美貌值');
+  ok('-服从值+100', '服从值');
+  ok(' 综合评分 *1.5 ', '综合评分');
+  bad('');
+  bad('(2+3');
+  bad('2+3)');
+  bad('2**3');
+  bad('2+');
+  bad('*3');
+  bad('2+3 4');
+  bad('1.2.3');
+  bad('()');
+});
+
+runner.test('公式求值：优先级 / 括号 / 缺失与非数值 / 除零', () => {
+  const evalFormula = (formula, values) => {
+    const syntax = ctx.validateValuesFormulaSyntax(formula);
+    if (!syntax.ok) throw new Error(`公式非法：${syntax.error}`);
+    return ctx.evalValuesFormula(syntax.ast, (name) => (name in values ? values[name] : null));
+  };
+  assert(evalFormula('2+3*4', {}) === 14, '乘法优先');
+  assert(evalFormula('(2+3)*4', {}) === 20, '括号优先');
+  assert(evalFormula('0.5*服从值+0.5*美貌值', { 服从值: 80, 美貌值: 60 }) === 70, '加权求和');
+  assert(evalFormula('10-服从值', { 服从值: 3 }) === 7, '减法');
+  assert(evalFormula('-服从值+100', { 服从值: 30 }) === 70, '负号');
+  assert(evalFormula('服从值/2', { 服从值: '80' }) === 40, '字符串数值可参与');
+  assert(evalFormula('服从值+1', {}) === null, '变量缺失返回 null');
+  assert(evalFormula('服从值+1', { 服从值: '未知' }) === null, '非数值返回 null');
+  assert(evalFormula('1/0', {}) === null, '除零返回 null');
+});
+
+runner.test('子变量派生：公式模式（多变量加权，同路径查找）', () => {
+  const c = fresh();
+  ctx.upsertValuesKey(c, '服从值', '服从值规则');
+  ctx.upsertValuesKey(c, '美貌值', '美貌值规则');
+  ctx.upsertValuesKey(c, '综合评分', '', { type: 'child', formula: '0.5*服从值+0.5*美貌值' });
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['奴隶', '服从值'], 80);
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['奴隶', '美貌值'], 60);
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['奴隶', '综合评分'], '旧值');
+  assert(ctx.getValuesGameTree(c)['奴隶']['综合评分'] === 70, '80/60 应加权为 70');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['奴隶', '服从值'], 100);
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['奴隶', '美貌值'], 0);
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['奴隶', '综合评分'], '旧值');
+  assert(ctx.getValuesGameTree(c)['奴隶']['综合评分'] === 50, '100/0 应加权为 50');
+  // 变量缺失 / 非数值保持原值
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['奴隶', '服从值'], '未知');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['奴隶', '综合评分'], '保持');
+  assert(ctx.getValuesGameTree(c)['奴隶']['综合评分'] === '保持', '非数值输入应保持原值');
+});
+
+runner.test('子变量派生：链式（公式子变量 → 区间子变量）', () => {
+  const c = fresh();
+  ctx.upsertValuesKey(c, '服从值', '规则');
+  ctx.upsertValuesKey(c, '美貌值', '规则');
+  ctx.upsertValuesKey(c, '综合评分', '', { type: 'child', formula: '0.5*服从值+0.5*美貌值' });
+  ctx.upsertValuesKey(c, 'A级', '', { type: 'child', parent: '综合评分', rules: [
+    { max: 69, value: 'B级' },
+    { min: 70, max: 150, value: 'A级' },
+    { min: 151, value: 'S级' },
+  ] });
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['奴隶', '服从值'], 80);
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['奴隶', '美貌值'], 60);
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['奴隶', '综合评分'], 0);
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['奴隶', 'A级'], '未知');
+  let tree = ctx.getValuesGameTree(c);
+  assert(tree['奴隶']['综合评分'] === 70, '公式应算出 70');
+  assert(tree['奴隶']['A级'] === 'A级', '70 应命中 70~150 区间');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['奴隶', '服从值'], 40);
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['奴隶', '美貌值'], 20);
+  tree = ctx.getValuesGameTree(c);
+  assert(tree['奴隶']['综合评分'] === 30, '公式应算出 30');
+  assert(tree['奴隶']['A级'] === 'B级', '30 应命中 ~69 区间');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['奴隶', '服从值'], 200);
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['奴隶', '美貌值'], 200);
+  assert(ctx.getValuesGameTree(c)['奴隶']['A级'] === 'S级', '200 应命中 151~ 区间');
+});
+
+runner.test('派生循环检测：区间互引 / 公式环 / 自引用 / 无环不误报', () => {
+  const only = (c, names) => ctx.getValuesKeys(c).filter((key) => names.includes(key.name));
+  const c1 = fresh();
+  ctx.upsertValuesKey(c1, 'A', '', { type: 'child', parent: 'B', rules: [{ min: 0, max: 100, value: 'x' }] });
+  ctx.upsertValuesKey(c1, 'B', '', { type: 'child', parent: 'A', rules: [{ min: 0, max: 100, value: 'x' }] });
+  const cycleAB = ctx.findValuesChildCycle(only(c1, ['A', 'B']), 'A', ['B']);
+  assert(cycleAB && cycleAB.join(' → ') === 'A → B → A', '区间互引应检出环');
+  const c2 = fresh();
+  ctx.upsertValuesKey(c2, 'A', '', { type: 'child', formula: 'B*2' });
+  ctx.upsertValuesKey(c2, 'B', '', { type: 'child', parent: 'A', rules: [{ min: 0, max: 100, value: 'x' }] });
+  const cycleFormula = ctx.findValuesChildCycle(only(c2, ['A', 'B']), 'A', ['B']);
+  assert(cycleFormula && cycleFormula.join(' → ') === 'A → B → A', '公式引用成环应检出');
+  const c3 = fresh();
+  ctx.upsertValuesKey(c3, 'A', '', { type: 'child', parent: 'A', rules: [{ min: 0, value: 'x' }] });
+  const selfCycle = ctx.findValuesChildCycle(only(c3, ['A']), 'A', ['A']);
+  assert(selfCycle && selfCycle.join(' → ') === 'A → A', '自引用应检出');
+  const c4 = fresh();
+  ctx.upsertValuesKey(c4, '服从值', '规则');
+  ctx.upsertValuesKey(c4, '综合评分', '', { type: 'child', formula: '0.5*服从值' });
+  ctx.upsertValuesKey(c4, 'A级', '', { type: 'child', parent: '综合评分', rules: [{ min: 70, value: 'A' }] });
+  const noCycle = ctx.findValuesChildCycle(only(c4, ['服从值', '综合评分', 'A级']), 'A级', ['综合评分']);
+  assert(noCycle === null, '链式无环不应误报');
+});
+
+runner.test('整包 YAML 往返：公式派生子变量', () => {
+  const character = makeCharacter('测试角色', 'avatar-1');
+  const c = makeContext({ characters: [character], characterId: 0, writeExtensionField: () => Promise.resolve() });
+  ctx.upsertValuesKey(c, '服从值', '规则');
+  ctx.upsertValuesKey(c, '综合评分', '', { type: 'child', formula: '0.5*服从值+0.5*美貌值' });
+  ctx.upsertValuesKey(c, '态度', '', { type: 'child', parent: '服从值', rules: [{ min: 0, max: 50, value: '低' }] });
+  const yaml = ctx.serializeValuesBundle(c);
+  assert(yaml.includes('formula: 0.5*服从值+0.5*美貌值'), '应导出公式');
+  assert(yaml.includes('parent: 服从值'), '区间模式应照旧导出派生源');
+  const parsed = ctx.parseValuesBundle(yaml);
+  const score = parsed.keys.find((key) => key.name === '综合评分');
+  assert(score.formula === '0.5*服从值+0.5*美貌值', '导入应还原公式');
+  assert(score.parent === '', '公式模式不应有派生源');
+  const attitude = parsed.keys.find((key) => key.name === '态度');
+  assert(attitude.parent === '服从值' && attitude.rules.length === 1, '区间模式应还原');
+  const c2 = fresh();
+  ctx.applyValuesBundle(c2, parsed, 'merge');
+  assert(ctx.getValuesKeyByName(c2, '综合评分').formula === '0.5*服从值+0.5*美貌值', '合并导入应保留公式');
+});
+
+runner.test('删除依赖检查：公式引用者被列为依赖', () => {
+  const c = fresh();
+  ctx.upsertValuesKey(c, '服从值', '规则');
+  ctx.upsertValuesKey(c, '综合评分', '', { type: 'child', formula: '0.5*服从值' });
+  ctx.upsertValuesKey(c, '态度', '', { type: 'child', parent: '服从值', rules: [{ min: 0, value: 'x' }] });
+  const refDeps = ctx.getValuesChildKeysByRef(c, '服从值').map((key) => key.name).sort();
+  assert(refDeps.join(',') === '态度,综合评分', '公式引用与区间派生都应列为依赖');
+  assert(ctx.getValuesChildKeysByRef(c, '美貌值').length === 0, '未引用不误报');
 });
 
 runner.run();

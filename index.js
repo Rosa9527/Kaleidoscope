@@ -2,7 +2,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.1.1';
+const MODULE_VERSION = '1.2.2';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -158,6 +158,10 @@ const STORY_SCRIPT_TRIGGER_ID = 'kaleido-story-script-trigger';
 const STORY_SCRIPT_DESC_ID = 'kaleido-story-script-desc';
 const STORY_SCRIPT_NODE_SELECT_ID = 'kaleido-story-script-node-select';
 const STORY_SCRIPT_CONTENT_ID = 'kaleido-story-script-content';
+// 剧情脉络 · 事件效果（触发时修改父变量）：行控件 class 复用变量系统的
+// VALUES_TRIGGER_EFFECT_*（同款交互与样式），读取 / 删除委托按容器隔离。
+const STORY_SCRIPT_EFFECTS_ID = 'kaleido-story-script-effects';
+const STORY_SCRIPT_EFFECT_ADD_ID = 'kaleido-story-script-effect-add';
 const STORY_EDITOR_EXPORT_ID = 'kaleido-story-editor-export';
 const STORY_EDITOR_SAVE_ID = 'kaleido-story-editor-save';
 const STORY_EDITOR_CANCEL_ID = 'kaleido-story-editor-cancel';
@@ -173,8 +177,6 @@ const STORY_SCRIPT_FILENAME_PREFIX = '万华镜-事件';
 // 随角色卡导入/导出自动携带；群聊/未选角色时回退全局设置）。
 const STORY_CARD_EXTENSION_KEY = 'kaleidoscope_story';
 const STORY_CARD_DATA_VERSION = 1;
-const STORY_CARD_SAVE_DEBOUNCE_MS = 500;
-const STORY_CARD_SAVE_TIMER_KEY = '__kaleido_story_card_save_timer__';
 // ---------- 变量系统（键注册表 + 默认值 / 游戏值两层）----------
 const VALUES_VIEW_ID = 'kaleido-values-view';
 const VALUES_DIALOG_ID = 'kaleido-values-dialog';
@@ -199,6 +201,9 @@ const VALUES_LAYER_ICON_ID = 'kaleido-values-layer-icon';
 const VALUES_LAYER_TITLE_ID = 'kaleido-values-layer-title';
 const VALUES_LAYER_DEFAULT_ID = 'kaleido-values-layer-default';
 const VALUES_LAYER_GAME_ID = 'kaleido-values-layer-game';
+// 默认数值层「保存」按钮：把当前默认值立即保存到角色卡并从磁盘校验。
+const VALUES_SAVE_NOW_ID = 'kaleido-values-save-now';
+const VALUES_SAVE_ICON_CLASS = 'fa-solid fa-floppy-disk';
 const VALUES_MAINTAIN_STATUS_ID = 'kaleido-values-maintain-status';
 const VALUES_MAINTAIN_NOW_ID = 'kaleido-values-maintain-now';
 const VALUES_RESET_GAME_ID = 'kaleido-values-reset-game';
@@ -243,23 +248,28 @@ const VALUES_KEY_EDITOR_RULE_MIN_CLASS = 'kaleido-values__key-rule-min';
 const VALUES_KEY_EDITOR_RULE_MAX_CLASS = 'kaleido-values__key-rule-max';
 const VALUES_KEY_EDITOR_RULE_VALUE_CLASS = 'kaleido-values__key-rule-value';
 const VALUES_KEY_EDITOR_RULE_REMOVE_CLASS = 'kaleido-values__key-rule-remove';
+// 子变量派生方式：区间（单派生源 + 区间规则，输出文本）/ 公式（引用变量四则
+// 运算，输出数值）。
+const VALUES_KEY_DERIVE_RULES = 'rules';
+const VALUES_KEY_DERIVE_FORMULA = 'formula';
+const VALUES_KEY_EDITOR_DERIVE_ID = 'kaleido-values-key-editor-derive';
+const VALUES_KEY_EDITOR_FORMULA_ID = 'kaleido-values-key-editor-formula';
+const VALUES_KEY_EDITOR_FORMULA_FIELDS_ID = 'kaleido-values-key-editor-formula-fields';
+const VALUES_KEY_EDITOR_RULES_FIELDS_ID = 'kaleido-values-key-editor-rules-fields';
 const VALUES_EDITOR_CHILD_HINT_ID = 'kaleido-values-editor-child-hint';
 // 变量 · 角色卡绑定（与剧情脉络同模式）：数据存角色卡 extensions，
 // 随角色卡导入/导出自动携带；群聊/未选角色时回退全局设置 valuesData。
 const VALUES_CARD_EXTENSION_KEY = 'kaleidoscope_values';
 const VALUES_CARD_DATA_VERSION = 1;
-const VALUES_CARD_SAVE_DEBOUNCE_MS = 500;
-const VALUES_CARD_SAVE_TIMER_KEY = '__kaleido_values_card_save_timer__';
+// 宿主 merge-attributes 是深合并语义：只更新请求里出现的键，请求里没有的键
+// 原样保留。删除键必须用哨兵值显式标记（TauriTavern 与 SillyTavern 同约定），
+// 否则删除操作会被合并语义吞掉：merge 返回 ok:true 但角色卡从未改变。
+const VALUES_UNSET_SENTINEL = '__@@UNSET@@__';
 // 变量 · 聊天文件绑定：游戏值存 chatMetadata[kaleidoscope_values]，
 // 随聊天文件（jsonl 首行 chat_metadata）保存 / 加载自动携带。
 const VALUES_CHAT_KEY = 'kaleidoscope_values';
 const VALUES_CHAT_SAVE_DEBOUNCE_MS = 400;
 const VALUES_CHAT_SAVE_TIMER_KEY = '__kaleido_values_chat_save_timer__';
-// 变量包（键注册表 + 默认值树）的聊天文件镜像：TauriTavern 等宿主写角色卡
-// 不可靠（writeExtensionField 失败只 console.error 不抛错）、全局设置保存是
-// 宿主防抖的（页面刷新会打断 pending 写入）——聊天文件随 saveChat 即时落盘，
-// 用它兜底保证默认值的删除 / 修改在刷新后不回滚。
-const VALUES_CHAT_BUNDLE_KEY = 'kaleidoscope_values_bundle';
 // 整包 YAML 的自描述格式标记与文件名前缀。
 const VALUES_BUNDLE_FORMAT = 'kaleidoscope-values';
 const VALUES_BUNDLE_FILENAME_PREFIX = '万华镜-变量';
@@ -355,6 +365,23 @@ const VALUES_TRIGGER_CONDITION_OP_WRAP_CLASS = 'kaleido-values__trigger-conditio
 const VALUES_TRIGGER_CONDITION_OP_TEXT_CLASS = 'kaleido-values__trigger-condition-op-text';
 const VALUES_TRIGGER_CONDITION_VALUE_CLASS = 'kaleido-values__trigger-condition-value';
 const VALUES_TRIGGER_CONDITION_REMOVE_CLASS = 'kaleido-values__trigger-condition-remove';
+// 剧情触发 · 事件效果（触发时修改父变量）：效果行控件 class 独立命名，
+// 样式与条件行一致（style.css 组选择器），读取 / 删除委托按容器隔离。
+const VALUES_TRIGGER_EDITOR_EFFECTS_ID = 'kaleido-values-trigger-editor-effects';
+const VALUES_TRIGGER_EDITOR_EFFECT_ADD_ID = 'kaleido-values-trigger-editor-effect-add';
+const VALUES_TRIGGER_EFFECT_ROW_CLASS = 'kaleido-values__trigger-effect';
+const VALUES_TRIGGER_EFFECT_PATH_CLASS = 'kaleido-values__trigger-effect-path';
+const VALUES_TRIGGER_EFFECT_OP_CENTER_CLASS = 'kaleido-values__trigger-effect-op-center';
+const VALUES_TRIGGER_EFFECT_OP_WRAP_CLASS = 'kaleido-values__trigger-effect-op-wrap';
+const VALUES_TRIGGER_EFFECT_OP_TEXT_CLASS = 'kaleido-values__trigger-effect-op-text';
+const VALUES_TRIGGER_EFFECT_OP_CLASS = 'kaleido-values__trigger-effect-op';
+const VALUES_TRIGGER_EFFECT_VALUE_CLASS = 'kaleido-values__trigger-effect-value';
+const VALUES_TRIGGER_EFFECT_REMOVE_CLASS = 'kaleido-values__trigger-effect-remove';
+// 效果类型：add = 加减值（正加负减，当前值需可转数字）；set = 覆盖（数字/文本/布尔/null 均可）。
+const VALUES_TRIGGER_EFFECT_OPS = Object.freeze([
+  { value: 'add', display: '+/-', label: '加减值（+/-，正加负减）' },
+  { value: 'set', display: '＝', label: '覆盖（直接设为指定值）' },
+]);
 // 剧情触发 · 注入与轮次记录
 const VALUES_TRIGGER_INJECT_KEY = 'Kaleidoscope_Trigger_Event';
 const VALUES_TRIGGER_LAST_ROUND_KEY = '__kaleido_values_trigger_last_round__';
@@ -1241,18 +1268,6 @@ function getContextSafe() {
     console.warn(`[${MODULE_DISPLAY_NAME}] unable to read host context`, error);
     return null;
   }
-}
-
-// TauriTavern 宿主标记（与 main.js 菜单注册同款判断）。此宿主的 writeExtensionField
-// 对角色卡扩展字段的写入不可靠：失败只 console.error 不抛错，调用方无法感知；
-// 且设置保存走宿主防抖（页面刷新会打断 pending 写入）。变量默认值等数据因此
-// 改走「全局设置 + 聊天文件镜像」双写，避免刷新后旧数据回滚。
-function isTauriTavernHost() {
-  return Boolean(
-    globalThis.__TAURITAVERN__?.ready
-    || globalThis.__TAURITAVERN_MAIN_READY__
-    || globalThis.__TAURITAVERN_IPC__
-  );
 }
 
 // 宿主事件名 → ctx.event_types 键 的映射。
@@ -4111,19 +4126,14 @@ function fallbackStoryDataToSettings(ctx, card) {
   logApp('warn', '剧情脉络写入角色卡失败，已回退全局设置');
 }
 
-// 防抖持久化：内存态已由调用方（数组引用）更新，这里只负责把整包数据
-// 写回角色卡。按 avatar 定位角色，避免防抖期间切换角色写错卡。
-function scheduleStoryCardSave(ctx, character, card) {
+// 立即持久化（不做防抖）：与变量默认值同款修复——宿主刷新 / 退出会打断
+// setTimeout 挂起的写入，防抖窗口内退出即丢失（剧情脉络在 TauriTavern 下
+// 实测复现）。本地写卡代价极小，每次变更直接落盘。
+function saveStoryCardNow(ctx, character, card) {
   const avatar = String(character?.avatar || '');
-  if (globalThis[STORY_CARD_SAVE_TIMER_KEY]) {
-    clearTimeout(globalThis[STORY_CARD_SAVE_TIMER_KEY]);
-  }
-  globalThis[STORY_CARD_SAVE_TIMER_KEY] = setTimeout(() => {
-    globalThis[STORY_CARD_SAVE_TIMER_KEY] = null;
-    persistStoryCardData(ctx, avatar, card).catch((error) => {
-      logApp('warn', '写入角色卡失败', String(error?.message || error));
-    });
-  }, STORY_CARD_SAVE_DEBOUNCE_MS);
+  persistStoryCardData(ctx, avatar, card).catch((error) => {
+    logApp('warn', '写入角色卡失败', String(error?.message || error));
+  });
 }
 
 async function persistStoryCardData(ctx, avatar, card) {
@@ -4151,34 +4161,25 @@ async function persistStoryCardData(ctx, avatar, card) {
 // 剧情脉络只显示「当前角色卡绑定的内容」：有角色但卡上无数据时返回空数组，
 // 不回退全局设置（避免把别的角色/旧数据串到当前角色卡上）；只有群聊 / 未选
 // 角色 / 宿主不支持写角色卡时才用全局设置兜底。
-// TauriTavern 下角色卡写入不可靠，读取也跳过（卡内可能有历史残留数据），
-// 只从全局设置取最新状态。
 function getStoryNodes(ctx) {
-  if (!isTauriTavernHost()) {
-    const card = ctx ? getStoryCardData(ctx) : null;
-    if (card) return card.nodes;
-    if (ctx && getStoryCharacter(ctx) && typeof ctx?.writeExtensionField === 'function') return [];
-  }
+  const card = ctx ? getStoryCardData(ctx) : null;
+  if (card) return card.nodes;
+  if (ctx && getStoryCharacter(ctx) && typeof ctx?.writeExtensionField === 'function') return [];
   const settings = ctx ? getSettings(ctx) : null;
   return Array.isArray(settings?.storyNodes) ? settings.storyNodes : [];
 }
 
 function getStoryScripts(ctx) {
-  if (!isTauriTavernHost()) {
-    const card = ctx ? getStoryCardData(ctx) : null;
-    if (card) return card.scripts;
-    if (ctx && getStoryCharacter(ctx) && typeof ctx?.writeExtensionField === 'function') return [];
-  }
+  const card = ctx ? getStoryCardData(ctx) : null;
+  if (card) return card.scripts;
+  if (ctx && getStoryCharacter(ctx) && typeof ctx?.writeExtensionField === 'function') return [];
   const settings = ctx ? getSettings(ctx) : null;
   return Array.isArray(settings?.storyScripts) ? settings.storyScripts : [];
 }
 
 // 确保当前角色卡有剧情数据容器：无卡时用旧版全局数据初始化（并清空全局兜底）。
 // 无角色 / 宿主不支持写角色卡时返回 null（保持全局设置路径）。
-// TauriTavern 角色卡扩展字段写入不可靠（见 isTauriTavernHost），直接返回 null，
-// 数据全程走全局设置，避免迁移后旧数据从磁盘回滚。
 function ensureStoryCardData(ctx) {
-  if (isTauriTavernHost()) return null;
   const character = getStoryCharacter(ctx);
   if (!character || typeof ctx?.writeExtensionField !== 'function') return null;
   let card = getStoryCardData(ctx);
@@ -4200,15 +4201,15 @@ function ensureStoryCardData(ctx) {
 }
 
 // 保存：有角色且宿主支持写角色卡 → 确保角色卡容器存在（首次变更时迁入旧版
-// 全局数据），随后防抖持久化；否则写全局设置（TauriTavern 走此路径）。
+// 全局数据），随后立即持久化；否则写全局设置。
 function saveStoryData(ctx) {
   const character = getStoryCharacter(ctx);
-  if (isTauriTavernHost() || !character || typeof ctx?.writeExtensionField !== 'function') {
+  if (!character || typeof ctx?.writeExtensionField !== 'function') {
     saveSettingsImmediate(ctx);
     return;
   }
   const card = ensureStoryCardData(ctx);
-  if (card) scheduleStoryCardSave(ctx, character, card);
+  if (card) saveStoryCardNow(ctx, character, card);
 }
 
 function getStoryNodeById(ctx, id) {
@@ -4384,6 +4385,20 @@ function deleteStoryNode(ctx, id) {
   return { movedChildren, detachedScripts };
 }
 
+// 事件效果归一化（与剧情触发的 effects 同构）：过滤空路径，op 缺省 / 非法回退
+// add（加减值），value 原样保留。触发时的确定性修改由 applyValuesTriggerEffects 执行。
+function normalizeStoryScriptEffects(raw) {
+  const effects = Array.isArray(raw) ? raw : [];
+  return effects
+    .filter((effect) => effect && typeof effect === 'object' && !Array.isArray(effect))
+    .map((effect) => ({
+      path: String(effect?.path || '').trim(),
+      op: String(effect?.op || '').trim() === 'set' ? 'set' : 'add',
+      value: effect?.value !== undefined ? effect.value : null,
+    }))
+    .filter((effect) => effect.path !== '');
+}
+
 function createStoryScript(ctx, data) {
   ensureStoryCardData(ctx);
   const scripts = getStoryScripts(ctx);
@@ -4394,6 +4409,7 @@ function createStoryScript(ctx, data) {
     name: String(data?.name || '').trim() || '未命名事件',
     trigger: String(data?.trigger || '').trim(),
     description: String(data?.description || '').trim(),
+    effects: normalizeStoryScriptEffects(data?.effects),
     content: String(data?.content || ''),
     createdAt: now,
     updatedAt: now,
@@ -4414,6 +4430,7 @@ function updateStoryScript(ctx, id, data) {
     if (data.name !== undefined) script.name = String(data.name).trim() || script.name;
     if (data.trigger !== undefined) script.trigger = String(data.trigger).trim();
     if (data.description !== undefined) script.description = String(data.description).trim();
+    if (data.effects !== undefined) script.effects = normalizeStoryScriptEffects(data.effects);
     if (data.content !== undefined) script.content = String(data.content);
     if (data.nodeId !== undefined) script.nodeId = String(data.nodeId).trim();
   }
@@ -4739,6 +4756,17 @@ function serializeStoryBundle(ctx) {
       lines.push(`    name: ${yamlScalar(script.name)}`);
       lines.push(`    trigger: ${yamlScalar(script.trigger || '')}`);
       lines.push(`    description: ${yamlScalar(script.description || '')}`);
+      lines.push('    effects:');
+      const effects = Array.isArray(script.effects) ? script.effects : [];
+      if (effects.length === 0) {
+        lines.push('      []');
+      } else {
+        for (const effect of effects) {
+          lines.push(`      - path: ${yamlScalar(String(effect?.path || ''))}`);
+          lines.push(`        op: ${yamlScalar(String(effect?.op || 'add').trim())}`);
+          lines.push(`        value: ${yamlValueScalar(effect?.value)}`);
+        }
+      }
       lines.push(`    content: ${yamlBlockScalarText(script.content, '    ')}`);
     }
   }
@@ -4754,7 +4782,7 @@ function buildStoryBundleFilename(ctx) {
   return `${STORY_BUNDLE_FILENAME_PREFIX}-${storyTimestamp()}.yaml`;
 }
 
-// 单事件导出：遵循 frontmatter 格式（name / id / Trigger / description + 正文）。
+// 单事件导出：遵循 frontmatter 格式（name / id / Trigger / description / effects + 正文）。
 function serializeSingleScript(script) {
   const lines = [];
   lines.push('---');
@@ -4762,6 +4790,17 @@ function serializeSingleScript(script) {
   lines.push(`id: ${yamlScalar(script?.id || '')}`);
   lines.push(`Trigger: ${yamlScalar(script?.trigger || '')}`);
   lines.push(`description: ${yamlScalar(script?.description || '')}`);
+  lines.push('effects:');
+  const effects = Array.isArray(script?.effects) ? script.effects : [];
+  if (effects.length === 0) {
+    lines.push('  []');
+  } else {
+    for (const effect of effects) {
+      lines.push(`  - path: ${yamlScalar(String(effect?.path || ''))}`);
+      lines.push(`    op: ${yamlScalar(String(effect?.op || 'add').trim())}`);
+      lines.push(`    value: ${yamlValueScalar(effect?.value)}`);
+    }
+  }
   lines.push('---');
   lines.push(String(script?.content || '').replace(/\n+$/, ''));
   return `${lines.join('\n')}\n`;
@@ -4791,6 +4830,7 @@ function parseSingleScriptFile(text) {
     name,
     trigger: String(meta?.Trigger ?? meta?.trigger ?? '').trim(),
     description: String(meta?.description ?? '').trim(),
+    effects: normalizeStoryScriptEffects(meta?.effects),
     content,
   };
 }
@@ -4896,6 +4936,7 @@ function mergeStoryBundleInto(ctx, bundle, options) {
       name: String(raw.name || '').trim() || '未命名事件',
       trigger: String(raw.trigger ?? '').trim(),
       description: String(raw.description ?? '').trim(),
+      effects: normalizeStoryScriptEffects(raw.effects),
       content: String(raw.content ?? ''),
       nodeId: resolvedNodeId,
     };
@@ -5204,6 +5245,12 @@ async function runStoryGatePipeline(ctx, settings) {
       finish({ skipped: true });
       return;
     }
+    const selected = selectedIds
+      .map((id) => scripts.find((script) => script.id === id))
+      .filter(Boolean);
+    // 事件效果：AI 选中即确定性修改游戏值，不依赖注入能力，先于注入执行
+    // （复用剧情触发的 applyValuesTriggerEffects：加减值 / 覆盖，只改父变量）。
+    record.effectsApplied = applyValuesTriggerEffects(ctx, selected);
     const api = getStoryGateExtensionPromptApi(ctx);
     if (!api) {
       logApp('warn', '剧情预筛：宿主不支持提示词注入，跳过注入');
@@ -5211,9 +5258,6 @@ async function runStoryGatePipeline(ctx, settings) {
       finish();
       return;
     }
-    const selected = selectedIds
-      .map((id) => scripts.find((script) => script.id === id))
-      .filter(Boolean);
     const injectionText = buildStoryGateInjectionText(ctx, selected);
     record.selectedEvents = selected.map((script) => ({
       id: script.id,
@@ -5388,6 +5432,7 @@ let storyImportTargetNodeId = '';  // 节点行「导入事件」的目标节点
 let storyEditorSession = 0;        // 编辑器会话号：异步导入完成后若会话已变则放弃接管
 let storyAddMenuContext = null;   // 「＋」菜单上下文：{ root: true } 或 { nodeId }
 let storyImportModeResolve = null;  // 导入方式选择浮层的回调（resolve 'merge' | 'replace' | null）
+let storyScriptEditorEffects = [];  // 事件编辑器中的事件效果草稿
 
 function storyToastr(kind, message) {
   try {
@@ -5542,10 +5587,12 @@ function buildStoryScriptRow(script, depth) {
   const ctx = getContextSafe();
   const node = script.nodeId ? getStoryNodeById(ctx, script.nodeId) : null;
   const badge = node ? escapeHtml(node.name) : '未分类';
+  const effectsText = formatValuesTriggerEffects(script);
   row.innerHTML = `
     <span class="kaleido-story__row-icon kaleido-story__row-icon--script"><span class="${STORY_SCRIPT_ICON_CLASS}"></span></span>
     <span class="kaleido-story__row-name" title="${escapeHtml(script.name)}">${escapeHtml(script.name)}</span>
     ${script.trigger ? `<span class="kaleido-story__row-trigger" title="${escapeHtml(script.trigger)}">${escapeHtml(script.trigger)}</span>` : ''}
+    ${effectsText ? `<span class="kaleido-story__row-trigger is-effect" title="${escapeHtml(effectsText)}">${escapeHtml(effectsText)}</span>` : ''}
     <span class="kaleido-story__row-badge">${badge}</span>
     <span class="kaleido-story__row-actions">
       <button type="button" class="kaleido-story__icon-btn" data-action="edit-script" data-id="${escapeHtml(script.id)}" title="编辑事件" aria-label="编辑事件"><span class="${STORY_EDIT_ICON_CLASS}"></span></button>
@@ -5673,6 +5720,10 @@ function openStoryScriptEditor(item, presetNodeId, pending) {
   setStoryInputValue(STORY_SCRIPT_TRIGGER_ID, data.trigger || '');
   setStoryInputValue(STORY_SCRIPT_DESC_ID, data.description || '');
   setStoryInputValue(STORY_SCRIPT_CONTENT_ID, data.content || '');
+  storyScriptEditorEffects = Array.isArray(data.effects)
+    ? data.effects.map((effect) => ({ ...effect }))
+    : [];
+  renderStoryScriptEffectRows();
   populateStoryScriptNodeSelect(storyEditorPresetNodeId || data.nodeId || '');
 }
 
@@ -5707,6 +5758,7 @@ function closeStoryEditor() {
   storyEditorPresetParentId = '';
   storyEditorPresetNodeId = '';
   storyPendingScript = null;
+  storyScriptEditorEffects = [];
 }
 
 function readStoryScriptForm() {
@@ -5718,6 +5770,36 @@ function readStoryScriptForm() {
     content: String(document.getElementById(STORY_SCRIPT_CONTENT_ID)?.value || ''),
     nodeId: String(document.getElementById(STORY_SCRIPT_NODE_SELECT_ID)?.value || '').trim(),
   };
+}
+
+// 事件效果行：直接复用变量系统触发编辑器的效果行组件（同一组 class / 交互 /
+// 父变量路径下拉），仅容器与草稿是剧情脉络自己的，两者不会混淆。
+function renderStoryScriptEffectRows() {
+  const container = document.getElementById(STORY_SCRIPT_EFFECTS_ID);
+  if (!container) return;
+  container.innerHTML = '';
+  for (const effect of storyScriptEditorEffects) {
+    container.appendChild(buildValuesTriggerEffectRow(effect));
+  }
+}
+
+function addStoryScriptEffectRow() {
+  storyScriptEditorEffects.push({ path: '', op: 'add', value: null });
+  renderStoryScriptEffectRows();
+}
+
+// 读取事件效果区当前草稿（含用户未保存的修改）。
+function readStoryScriptEffectRows() {
+  const container = document.getElementById(STORY_SCRIPT_EFFECTS_ID);
+  if (!container) return storyScriptEditorEffects.slice();
+  const effects = [];
+  container.querySelectorAll('.' + VALUES_TRIGGER_EFFECT_ROW_CLASS).forEach((row) => {
+    const path = String(row.querySelector('.' + VALUES_TRIGGER_EFFECT_PATH_CLASS)?.value || '').trim();
+    const op = String(row.querySelector('.' + VALUES_TRIGGER_EFFECT_OP_CLASS)?.value || 'add').trim();
+    const valueText = String(row.querySelector('.' + VALUES_TRIGGER_EFFECT_VALUE_CLASS)?.value || '').trim();
+    effects.push({ path, op: op === 'set' ? 'set' : 'add', value: parseValuesEditorText(valueText).value });
+  });
+  return effects;
 }
 
 function saveStoryEditor() {
@@ -5755,6 +5837,23 @@ function saveStoryEditor() {
       storyToastr('warning', '事件内容不能为空');
       return;
     }
+    const effects = readStoryScriptEffectRows().filter((effect) => effect.path !== '');
+    for (const effect of effects) {
+      if (effect.value === '') {
+        storyToastr('warning', '请填写效果值（要设为无值请填 null）');
+        return;
+      }
+      if (effect.op === 'add') {
+        const delta = typeof effect.value === 'number'
+          ? effect.value
+          : (typeof effect.value === 'string' && String(effect.value).trim() !== '' ? Number(effect.value) : NaN);
+        if (!Number.isFinite(delta)) {
+          storyToastr('warning', '加减值的效果值必须是数字');
+          return;
+        }
+      }
+    }
+    data.effects = effects;
     const requestedId = String(data.id || '').trim();
     let saved;
     if (storyEditorId) {
@@ -5968,6 +6067,11 @@ function buildStoryContentHTML(editorClass) {
               <span class="kaleido-api__label">触发条件</span>
               <input id="${STORY_SCRIPT_TRIGGER_ID}" class="kaleido-input" type="text" placeholder="如：玩家第一次到达新手村" autocomplete="off" spellcheck="false" />
             </label>
+            <div class="kaleido-api__field">
+              <span class="kaleido-api__label">事件效果（可选 · 触发时修改父变量）</span>
+              <div id="${STORY_SCRIPT_EFFECTS_ID}" class="kaleido-values__trigger-effects"></div>
+              <button type="button" id="${STORY_SCRIPT_EFFECT_ADD_ID}" class="kaleido-btn kaleido-btn--mini">＋ 添加效果</button>
+            </div>
             <label class="kaleido-api__field" for="${STORY_SCRIPT_DESC_ID}">
               <span class="kaleido-api__label">事件说明</span>
               <textarea id="${STORY_SCRIPT_DESC_ID}" class="kaleido-input kaleido-story__textarea kaleido-story__textarea--small" rows="2" placeholder="这个事件的用途（可选）"></textarea>
@@ -6128,6 +6232,14 @@ function bindStoryContentEvents() {
   document.getElementById(STORY_EDITOR_CANCEL_ID)?.addEventListener('click', closeStoryEditor);
   document.getElementById(STORY_EDITOR_SAVE_ID)?.addEventListener('click', saveStoryEditor);
   document.getElementById(STORY_EDITOR_EXPORT_ID)?.addEventListener('click', handleStoryEditorExport);
+  document.getElementById(STORY_SCRIPT_EFFECT_ADD_ID)?.addEventListener('click', addStoryScriptEffectRow);
+  document.getElementById(STORY_SCRIPT_EFFECTS_ID)?.addEventListener('click', (event) => {
+    const button = event.target instanceof Element ? event.target.closest('.' + VALUES_TRIGGER_EFFECT_REMOVE_CLASS) : null;
+    if (!button) return;
+    const row = button.closest('.' + VALUES_TRIGGER_EFFECT_ROW_CLASS);
+    if (!row) return;
+    row.remove();
+  });
 
   if (!globalThis[STORY_ADD_MENU_KEY]) {
     globalThis[STORY_ADD_MENU_KEY] = (event) => {
@@ -6233,7 +6345,7 @@ function getValuesCardData(ctx) {
   return card;
 }
 
-// 把变量包写入角色卡对象（内存态，持久化由 scheduleValuesCardSave 完成）。
+// 把变量包写入角色卡对象（内存态，持久化由 saveValuesCardNow 完成）。
 function setValuesCardData(character, card) {
   if (!character || typeof character !== 'object') return;
   if (!character.data || typeof character.data !== 'object') character.data = {};
@@ -6243,10 +6355,7 @@ function setValuesCardData(character, card) {
 
 // 确保当前角色卡有变量数据容器：无卡时用旧版全局数据初始化（并清空全局兜底）。
 // 无角色 / 宿主不支持写角色卡时返回 null（保持全局设置路径）。
-// TauriTavern 角色卡扩展字段写入不可靠（见 isTauriTavernHost），直接返回 null，
-// 数据全程走全局设置 + 聊天文件镜像，避免迁移后旧数据从磁盘回滚。
 function ensureValuesCardData(ctx) {
-  if (isTauriTavernHost()) return null;
   const character = getStoryCharacter(ctx);
   if (!character || typeof ctx?.writeExtensionField !== 'function') return null;
   let card = getValuesCardData(ctx);
@@ -6294,45 +6403,21 @@ function fallbackValuesDataToSettings(ctx, card) {
       ? card.order
       : {},
   };
-  if (isTauriTavernHost()) mirrorValuesBundleToChat(ctx, settings.valuesData);
   saveSettingsImmediate(ctx);
   logApp('warn', '变量写入角色卡失败，已回退全局设置');
 }
 
-// TauriTavern 耐久镜像：把变量包写进聊天元数据并即时保存聊天文件。
-// 全局设置的保存是宿主防抖的（页面刷新会打断 pending 写入），聊天文件随
-// saveChat 即时落盘（与游戏值同机制）——刷新后从聊天文件恢复最新状态，
-// 保证默认值的删除 / 修改不被旧磁盘数据回滚。
-function mirrorValuesBundleToChat(ctx, bundle) {
-  const context = ctx || getContextSafe();
-  if (!context) return false;
-  let metadata = getValuesChatMetadata(context);
-  if (!metadata) {
-    try {
-      context.chatMetadata = {};
-      metadata = context.chatMetadata;
-    } catch (error) {
-      logApp('warn', '聊天元数据不可写', String(error?.message || error));
-      return false;
-    }
-  }
-  metadata[VALUES_CHAT_BUNDLE_KEY] = bundle;
-  scheduleValuesChatSave(context, true);
-  return true;
-}
-
-// 防抖持久化（与剧情脉络同模式）：按 avatar 定位角色，避免防抖期间切换角色写错卡。
-function scheduleValuesCardSave(ctx, character, card) {
+// 立即持久化（不做防抖）：宿主刷新 / 退出会打断 setTimeout 挂起的写入——
+// 500ms 防抖窗口内退出酒馆，删除 / 修改即丢失，旧数据从磁盘回滚（TauriTavern
+// 实测）。本地写卡代价极小，每次变更直接落盘；连续变更按发起顺序落盘，最终
+// 以最后一次为准。返回写入 Promise（保存按钮用 await 等落盘后再校验）。
+function saveValuesCardNow(ctx, character, card) {
   const avatar = String(character?.avatar || '');
-  if (globalThis[VALUES_CARD_SAVE_TIMER_KEY]) {
-    clearTimeout(globalThis[VALUES_CARD_SAVE_TIMER_KEY]);
-  }
-  globalThis[VALUES_CARD_SAVE_TIMER_KEY] = setTimeout(() => {
-    globalThis[VALUES_CARD_SAVE_TIMER_KEY] = null;
-    persistValuesCardData(ctx, avatar, card).catch((error) => {
-      logApp('warn', '写入角色卡失败', String(error?.message || error));
-    });
-  }, VALUES_CARD_SAVE_DEBOUNCE_MS);
+  const promise = persistValuesCardData(ctx, avatar, card);
+  promise.catch((error) => {
+    logApp('warn', '写入角色卡失败', String(error?.message || error));
+  });
+  return promise;
 }
 
 async function persistValuesCardData(ctx, avatar, card) {
@@ -6348,39 +6433,140 @@ async function persistValuesCardData(ctx, avatar, card) {
     return;
   }
   try {
-    await write.call(ctx, index, VALUES_CARD_EXTENSION_KEY, card);
+    // 宿主 merge-attributes 是深合并语义：只更新请求里出现的键，请求里没有的
+    // 键原样保留。删除操作必须把「磁盘上有、新 bundle 里没有」的键标记为
+    // VALUES_UNSET_SENTINEL 哨兵，宿主合并时才会真正删除；否则删除会被合并
+    // 吞掉：merge 返回 ok:true 但角色卡从未改变（写盘短路跳过）。
+    let payload = card;
+    try {
+      const onDisk = await readValuesCardFromDisk(ctx, avatar);
+      if (onDisk && typeof onDisk === 'object' && !Array.isArray(onDisk)) {
+        payload = buildValuesUnsetPatch(onDisk, card);
+      }
+    } catch (error) {
+      logApp('warn', '写卡前磁盘重读失败，按全量覆盖发送', String(error?.message || error));
+    }
+    await write.call(ctx, index, VALUES_CARD_EXTENSION_KEY, payload);
+    // writeExtensionField 就地写入了带哨兵的补丁：把内存角色恢复为干净的新包，
+    // 避免哨兵值残留在 UI 数据里。
+    const character = characters[index];
+    if (character && character.data && typeof character.data === 'object') {
+      if (!character.data.extensions || typeof character.data.extensions !== 'object') {
+        character.data.extensions = {};
+      }
+      character.data.extensions[VALUES_CARD_EXTENSION_KEY] = card;
+    }
   } catch (error) {
     fallbackValuesDataToSettings(ctx, card);
     throw error;
   }
 }
 
-// 变量包读取：优先角色卡绑定的内容；其次聊天文件里的耐久镜像（TauriTavern 等
-// 宿主写角色卡不可靠时由 saveValuesData 写入，永远是最新状态）；只有群聊 /
-// 未选角色 / 宿主不支持写角色卡时才用全局设置 valuesData 兜底（避免把别的
-// 角色/旧数据串到当前角色卡上）。
-// TauriTavern 下角色卡写入不可靠（见 isTauriTavernHost），卡内可能有历史残留
-// 数据——读取时完全跳过角色卡，只从聊天镜像 / 全局设置取最新状态，避免删除
-// 后从角色卡回滚。
-function getValuesBundle(ctx) {
-  if (!isTauriTavernHost()) {
-    const card = ctx ? getValuesCardData(ctx) : null;
-    if (card) return card;
-  }
-  if (ctx) {
-    const chatBundle = getValuesChatMetadata(ctx)?.[VALUES_CHAT_BUNDLE_KEY];
-    if (chatBundle && typeof chatBundle === 'object' && !Array.isArray(chatBundle)) {
-      if (!Array.isArray(chatBundle.keys)) chatBundle.keys = [];
-      if (!chatBundle.defaults || typeof chatBundle.defaults !== 'object' || Array.isArray(chatBundle.defaults)) {
-        chatBundle.defaults = {};
+// 从磁盘重读当前角色卡的变量包（写卡前对比旧值 / 保存校验用）。
+// 优先独立 fetch（不触碰内存 characters 数组），回退宿主 getOneCharacter。
+// 兼容宿主返回的两种形状：normalizeCharacter 后的嵌套 data.extensions，
+// 以及展平的顶层 extensions。读不到 / 出错返回 null。
+async function readValuesCardFromDisk(context, avatar) {
+  const ctx = context || getContextSafe();
+  if (!ctx || !avatar) return null;
+  const extract = (character) => {
+    const extensions = character?.data?.extensions ?? character?.extensions ?? null;
+    const bundle = extensions && typeof extensions === 'object' ? extensions[VALUES_CARD_EXTENSION_KEY] : null;
+    return bundle && typeof bundle === 'object' && !Array.isArray(bundle) ? bundle : null;
+  };
+  try {
+    if (typeof globalThis.fetch === 'function') {
+      const headers = typeof ctx.getRequestHeaders === 'function'
+        ? ctx.getRequestHeaders()
+        : { 'Content-Type': 'application/json' };
+      const response = await globalThis.fetch('/api/characters/get', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ avatar_url: avatar }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const bundle = extract(data);
+        if (bundle) return bundle;
       }
-      if (!Array.isArray(chatBundle.triggers)) chatBundle.triggers = [];
-      if (!chatBundle.order || typeof chatBundle.order !== 'object' || Array.isArray(chatBundle.order)) {
-        chatBundle.order = {};
-      }
-      return chatBundle;
     }
+    if (typeof ctx.getOneCharacter === 'function') {
+      await ctx.getOneCharacter(avatar);
+      const fresh = Array.isArray(ctx.characters)
+        ? ctx.characters.find((character) => String(character?.avatar || '') === avatar)
+        : null;
+      const bundle = extract(fresh);
+      if (bundle) return bundle;
+    }
+    return null;
+  } catch (error) {
+    logApp('warn', '读取磁盘角色卡失败', String(error?.message || error));
+    return null;
   }
+}
+
+// 构造写卡补丁：宿主 merge-attributes 是深合并语义（只更新请求里出现的键，
+// 请求里没有的键原样保留）。把「磁盘上有、新 bundle 里没有」的键标记为
+// VALUES_UNSET_SENTINEL 哨兵，宿主合并时才会真正删除；新值 / 变化值直接携带；
+// 数组与标量整体替换（宿主对非对象值即整体覆盖）。
+function buildValuesUnsetPatch(oldCard, newCard) {
+  const build = (oldNode, newNode) => {
+    const oldIsMap = valuesIsContainer(oldNode);
+    const newIsMap = valuesIsContainer(newNode);
+    if (oldIsMap && newIsMap) {
+      const merged = {};
+      for (const key of Object.keys(oldNode)) {
+        if (!Object.prototype.hasOwnProperty.call(newNode, key)) {
+          merged[key] = VALUES_UNSET_SENTINEL;
+        } else {
+          merged[key] = build(oldNode[key], newNode[key]);
+        }
+      }
+      for (const key of Object.keys(newNode)) {
+        if (!Object.prototype.hasOwnProperty.call(merged, key)) {
+          merged[key] = cloneValue(newNode[key]);
+        }
+      }
+      return merged;
+    }
+    return cloneValue(newNode);
+  };
+  return build(oldCard, newCard);
+}
+
+// 写卡校验：经宿主接口从磁盘重读角色卡，比对扩展字段是否与期望一致。
+// TauriTavern 的 writeExtensionField 失败只 console.error 不抛错（扩展无法感知），
+// 保存按钮用本函数把静默失败变成可见反馈。返回 true / false；宿主不支持从磁盘
+// 重读（无 fetch / getOneCharacter / getCharacters）或重读失败时返回 null（无法校验）。
+async function verifyValuesCardWrite(ctx, avatar, expected) {
+  const context = ctx || getContextSafe();
+  if (!context || !avatar) return null;
+  try {
+    if (typeof context.getOneCharacter === 'function') {
+      await context.getOneCharacter(avatar);
+    } else if (typeof context.getCharacters === 'function') {
+      await context.getCharacters();
+    } else {
+      return null;
+    }
+    const fresh = Array.isArray(context.characters)
+      ? context.characters.find((character) => String(character?.avatar || '') === avatar)
+      : null;
+    const extensions = fresh?.data?.extensions ?? fresh?.extensions ?? null;
+    const onDisk = extensions && typeof extensions === 'object' ? extensions[VALUES_CARD_EXTENSION_KEY] : null;
+    if (!onDisk || typeof onDisk !== 'object' || Array.isArray(onDisk)) return false;
+    return JSON.stringify(onDisk) === JSON.stringify(expected);
+  } catch (error) {
+    logApp('warn', '保存校验失败', String(error?.message || error));
+    return null;
+  }
+}
+
+// 变量包读取：优先角色卡绑定的内容；只有群聊 / 未选角色 / 宿主不支持写角色卡时
+// 才用全局设置 valuesData 兜底（避免把别的角色/旧数据串到当前角色卡上）。
+function getValuesBundle(ctx) {
+  const card = ctx ? getValuesCardData(ctx) : null;
+  if (card) return card;
   const settings = ctx ? getSettings(ctx) : null;
   if (!settings) return { version: VALUES_CARD_DATA_VERSION, keys: [], defaults: {} };
   // 无角色卡时用全局设置兜底：首次读取即初始化容器，保证后续变更落在活对象上
@@ -6399,11 +6585,11 @@ function getValuesBundle(ctx) {
   return fallback;
 }
 
-// 保存：有角色且宿主支持写角色卡 → 确保角色卡容器存在后防抖持久化；否则写全局设置。
-// TauriTavern 角色卡写入不可靠（静默失败不抛错），一律走全局设置 + 聊天文件镜像。
+// 保存：有角色且宿主支持写角色卡 → 确保角色卡容器存在后立即持久化；否则写全局设置。
+// 返回落盘 Promise（保存按钮 await 后从磁盘重读校验，避免校验与写入并行读到旧数据）。
 function saveValuesData(ctx) {
   const character = getStoryCharacter(ctx);
-  if (isTauriTavernHost() || !character || typeof ctx?.writeExtensionField !== 'function') {
+  if (!character || typeof ctx?.writeExtensionField !== 'function') {
     const bundle = getValuesBundle(ctx);
     const settings = getSettings(ctx);
     settings.valuesData = {
@@ -6418,11 +6604,8 @@ function saveValuesData(ctx) {
         ? bundle.order
         : {},
     };
-    // TauriTavern 的全局设置保存是宿主防抖的，刷新会丢 pending 写入；聊天文件
-    // 随 saveChat 即时落盘，镜像过去保证刷新后读到的是最新状态。
-    if (isTauriTavernHost()) mirrorValuesBundleToChat(ctx, settings.valuesData);
     saveSettingsImmediate(ctx);
-    return;
+    return Promise.resolve();
   }
   let card = getValuesCardData(ctx);
   if (!card) {
@@ -6451,7 +6634,7 @@ function saveValuesData(ctx) {
       } catch {}
     }
   }
-  scheduleValuesCardSave(ctx, character, card);
+  return saveValuesCardNow(ctx, character, card);
 }
 
 // ---------- 键注册表 ----------
@@ -6481,6 +6664,7 @@ function getValuesKeys(ctx) {
     } else {
       key.parent = String(key.parent || '').trim();
       if (!Array.isArray(key.rules)) key.rules = [];
+      if (typeof key.formula !== 'string') key.formula = '';
     }
   }
   const cardKeyNames = new Set(bundle.keys.map((key) => String(key?.name || '').trim()).filter(Boolean));
@@ -6509,8 +6693,9 @@ function getValuesTreeOrder(ctx) {
 }
 
 // 注册 / 更新键（以名称为身份）；返回保存后的键对象。
-// extra 可携带 { type, parent, rules }：type 为 child 时按子变量保存（parent 为
-// 父变量名，rules 为区间规则 [{ min, max, value }]），否则按父变量保存。
+// extra 可携带 { type, parent, rules, formula }：type 为 child 时按子变量保存——
+// formula 非空为公式派生（引用变量名写在公式里，不用 parent），否则为区间派生
+// （parent 为派生源变量名，rules 为区间规则 [{ min, max, value }]）；否则按父变量保存。
 function upsertValuesKey(ctx, name, rule, extra = {}) {
   const bundle = getValuesBundle(ctx);
   const target = String(name || '').trim();
@@ -6518,22 +6703,33 @@ function upsertValuesKey(ctx, name, rule, extra = {}) {
   const type = String(extra?.type || '') === VALUES_KEY_TYPE_CHILD ? VALUES_KEY_TYPE_CHILD : VALUES_KEY_TYPE_PARENT;
   const existing = bundle.keys.find((key) => String(key?.name || '').trim() === target);
   const now = new Date().toISOString();
+  const applyChild = (key) => {
+    const formula = String(extra?.formula || '').trim();
+    if (formula !== '') {
+      key.formula = formula;
+      key.parent = '';
+      key.rules = [];
+    } else {
+      key.parent = String(extra?.parent || '').trim();
+      key.rules = normalizeValuesChildRules(extra?.rules);
+      delete key.formula;
+    }
+  };
   if (existing) {
     existing.rule = String(rule || '').trim();
     existing.type = type;
     if (type === VALUES_KEY_TYPE_CHILD) {
-      existing.parent = String(extra?.parent || '').trim();
-      existing.rules = normalizeValuesChildRules(extra?.rules);
+      applyChild(existing);
     } else {
       delete existing.parent;
       delete existing.rules;
+      delete existing.formula;
     }
     existing.updatedAt = now;
   } else {
     const key = { name: target, rule: String(rule || '').trim(), type, createdAt: now, updatedAt: now };
     if (type === VALUES_KEY_TYPE_CHILD) {
-      key.parent = String(extra?.parent || '').trim();
-      key.rules = normalizeValuesChildRules(extra?.rules);
+      applyChild(key);
     }
     bundle.keys.push(key);
   }
@@ -6599,6 +6795,22 @@ function getValuesChildKeysByParent(ctx, parentName) {
   );
 }
 
+// 依赖指定变量的全部子变量（删除前的依赖检查用）：区间派生按派生源 parent
+// 匹配，公式派生按公式引用变量匹配；内置子变量不参与检查。
+function getValuesChildKeysByRef(ctx, varName) {
+  const target = String(varName || '').trim();
+  if (!target) return [];
+  return getValuesKeys(ctx).filter((key) => {
+    if (!isValuesChildKey(key) || isValuesBuiltinKey(key)) return false;
+    const formula = String(key.formula || '').trim();
+    if (formula !== '') {
+      const syntax = validateValuesFormulaSyntax(formula);
+      return syntax.ok ? syntax.refs.includes(target) : false;
+    }
+    return String(key.parent || '').trim() === target;
+  });
+}
+
 // 归一化子变量区间规则：{ min?, max?, value }，min / max 可省略（省略 = 不设
 // 边界），value 必填；数字字段只接受有限数值，非法条目丢弃。
 function normalizeValuesChildRules(rules) {
@@ -6645,11 +6857,210 @@ function validateValuesChildRules(rules) {
   return { invalid, overlaps };
 }
 
-// 单叶子派生：按子变量规则，用同路径父变量值计算子变量值（就地写入）。
-// 规则按顺序匹配，首个满足的生效；父变量缺失 / 非数值 / 无规则命中时保持原值。
+// ---------- 子变量公式派生 ----------
+// 公式 = 四则运算 + 括号 + 变量名（如 0.5*服从值+0.5*美貌值）。自写递归下降
+// 解析器，白名单 token（数字 / + - * / ( ) / 变量名），不使用 eval，任意输入
+// 都只会得到语法错误而非执行代码。变量名 = 不含空白、运算符、括号的连续字符
+// 序列（支持中文）。AST：{ t:'num' } | { t:'var' } | { t:'neg' } | { t:'bin' }。
+function tokenizeValuesFormula(input) {
+  const tokens = [];
+  let i = 0;
+  const text = String(input || '');
+  while (i < text.length) {
+    const ch = text[i];
+    if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') {
+      i += 1;
+      continue;
+    }
+    if (ch === '+' || ch === '-' || ch === '*' || ch === '/' || ch === '(' || ch === ')') {
+      tokens.push({ t: ch });
+      i += 1;
+      continue;
+    }
+    if (ch >= '0' && ch <= '9' || ch === '.') {
+      let j = i;
+      while (j < text.length && (text[j] >= '0' && text[j] <= '9' || text[j] === '.')) j += 1;
+      const raw = text.slice(i, j);
+      const num = Number(raw);
+      if (!Number.isFinite(num)) return { error: `数字「${raw}」不合法` };
+      tokens.push({ t: 'num', v: num });
+      i = j;
+      continue;
+    }
+    let j = i;
+    while (j < text.length && !'+-*/(). \t\n\r'.includes(text[j])) j += 1;
+    const name = text.slice(i, j).trim();
+    if (name === '') return { error: '无法识别的字符' };
+    tokens.push({ t: 'var', name });
+    i = j;
+  }
+  return { tokens };
+}
+
+function parseValuesFormulaNode(tokens, state, minPrec) {
+  let left = null;
+  const first = tokens[state.pos];
+  if (!first) return { error: '表达式不完整' };
+  if (first.t === 'num') {
+    left = { t: 'num', v: first.v };
+    state.pos += 1;
+  } else if (first.t === 'var') {
+    left = { t: 'var', name: first.name };
+    state.pos += 1;
+  } else if (first.t === '(') {
+    state.pos += 1;
+    const inner = parseValuesFormulaNode(tokens, state, 0);
+    if (inner.error) return inner;
+    const close = tokens[state.pos];
+    if (!close || close.t !== ')') return { error: '括号不匹配' };
+    state.pos += 1;
+    left = inner;
+  } else if (first.t === '-') {
+    state.pos += 1;
+    const operand = parseValuesFormulaNode(tokens, state, 4);
+    if (operand.error) return operand;
+    left = { t: 'neg', v: operand };
+  } else {
+    return { error: `「${first.t}」位置缺少数字或变量` };
+  }
+  while (true) {
+    const op = tokens[state.pos];
+    if (!op || op.t === ')' ) break;
+    const prec = op.t === '*' || op.t === '/' ? 2 : (op.t === '+' || op.t === '-' ? 1 : -1);
+    if (prec < 0) return { error: `无法识别的运算符「${op.t}」` };
+    if (prec < minPrec) break;
+    state.pos += 1;
+    const right = parseValuesFormulaNode(tokens, state, prec + 1);
+    if (right.error) return right;
+    left = { t: 'bin', op: op.t, l: left, r: right };
+  }
+  return left;
+}
+
+// 解析公式：成功返回 { ok:true, ast, refs }；失败返回 { ok:false, error }。
+function validateValuesFormulaSyntax(formula) {
+  const text = String(formula || '').trim();
+  if (text === '') return { ok: false, error: '公式不能为空' };
+  const tokenized = tokenizeValuesFormula(text);
+  if (tokenized.error) return { ok: false, error: tokenized.error };
+  const state = { pos: 0 };
+  const ast = parseValuesFormulaNode(tokenized.tokens, state, 0);
+  if (ast.error) return { ok: false, error: ast.error };
+  if (state.pos < tokenized.tokens.length) return { ok: false, error: '公式末尾有多余内容' };
+  const refs = [];
+  const seen = new Set();
+  const collect = (node) => {
+    if (!node || typeof node !== 'object') return;
+    if (node.t === 'var' && !seen.has(node.name)) {
+      seen.add(node.name);
+      refs.push(node.name);
+    } else if (node.t === 'neg') {
+      collect(node.v);
+    } else if (node.t === 'bin') {
+      collect(node.l);
+      collect(node.r);
+    }
+  };
+  collect(ast);
+  return { ok: true, ast, refs };
+}
+
+// 求值公式 AST：lookup(name) 返回数值（数字或可转数字的字符串，缺失 /
+// 非数值返回 null）；除零、结果非有限都视为求值失败返回 null（保持原值）。
+function evalValuesFormula(ast, lookup) {
+  if (!ast || typeof ast !== 'object') return null;
+  if (ast.t === 'num') return ast.v;
+  if (ast.t === 'var') {
+    const value = lookup ? lookup(ast.name) : null;
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+    if (typeof value === 'string' && value.trim() !== '') {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return null;
+  }
+  if (ast.t === 'neg') {
+    const v = evalValuesFormula(ast.v, lookup);
+    return v === null ? null : -v;
+  }
+  if (ast.t === 'bin') {
+    const l = evalValuesFormula(ast.l, lookup);
+    const r = evalValuesFormula(ast.r, lookup);
+    if (l === null || r === null) return null;
+    if (ast.op === '+') return l + r;
+    if (ast.op === '-') return l - r;
+    if (ast.op === '*') return l * r;
+    if (ast.op === '/') return r === 0 ? null : l / r;
+    return null;
+  }
+  return null;
+}
+
+// 子变量引用图环检测：从指定键（name，引用为 refs）出发，沿「区间派生源 /
+// 公式引用」追踪所有已注册子变量，若绕回起点即成环。返回环链（如
+// ['A','B','A']）或 null。
+function findValuesChildCycle(keys, name, refs) {
+  const target = String(name || '').trim();
+  if (!target) return null;
+  const byName = new Map();
+  for (const key of Array.isArray(keys) ? keys : []) {
+    if (isValuesChildKey(key)) byName.set(String(key.name || '').trim(), key);
+  }
+  const refsOf = (key) => {
+    const formula = String(key?.formula || '').trim();
+    if (formula !== '') {
+      const syntax = validateValuesFormulaSyntax(formula);
+      return syntax.ok ? syntax.refs : [];
+    }
+    const parent = String(key?.parent || '').trim();
+    return parent ? [parent] : [];
+  };
+  const path = [target];
+  const stack = new Set([target]);
+  const walk = (currentRefs) => {
+    for (const ref of currentRefs) {
+      if (ref === target) return path.concat(ref);
+      if (stack.has(ref)) continue;
+      const next = byName.get(ref);
+      if (!next) continue;
+      stack.add(ref);
+      path.push(ref);
+      const cycle = walk(refsOf(next));
+      if (cycle) return cycle;
+      path.pop();
+      stack.delete(ref);
+    }
+    return null;
+  };
+  return walk(refs);
+}
+
+// 单叶子派生：按子变量派生方式计算子变量值（就地写入）。
+// 公式模式（formula 非空）：用同路径下各引用变量求值，写数值；
+// 区间模式：按 parent 值顺序匹配规则，写文本。输入缺失 / 非数值 / 求值失败 /
+// 无规则命中时保持原值。
 function deriveValuesChildAt(tree, path, childKey) {
+  if (!Array.isArray(path) || path.length === 0) return false;
+  const formula = String(childKey?.formula || '').trim();
+  if (formula !== '') {
+    const syntax = validateValuesFormulaSyntax(formula);
+    if (!syntax.ok) return false;
+    const lookup = (varName) => {
+      const raw = valuesGetAtPath(tree, path.slice(0, -1).concat(varName));
+      if (typeof raw === 'number') return raw;
+      if (typeof raw === 'string' && raw.trim() !== '') {
+        const parsed = Number(raw);
+        if (Number.isFinite(parsed)) return parsed;
+      }
+      return null;
+    };
+    const result = evalValuesFormula(syntax.ast, lookup);
+    if (result === null || !Number.isFinite(result)) return false;
+    valuesSetAtPath(tree, path, result);
+    return true;
+  }
   const parentName = String(childKey?.parent || '').trim();
-  if (!parentName || !Array.isArray(path) || path.length === 0) return false;
+  if (!parentName) return false;
   const parentValue = valuesGetAtPath(tree, path.slice(0, -1).concat(parentName));
   let numeric = null;
   if (typeof parentValue === 'number') {
@@ -7152,16 +7563,21 @@ function serializeValuesBundle(ctx) {
     lines.push(`  - name: ${yamlScalar(String(key?.name || ''))}`);
     if (isValuesChildKey(key)) {
       lines.push('    type: child');
-      lines.push(`    parent: ${yamlScalar(String(key?.parent || ''))}`);
-      lines.push('    rules:');
-      const rules = Array.isArray(key?.rules) ? key.rules : [];
-      if (rules.length === 0) {
-        lines.push('      []');
+      const formula = String(key?.formula || '').trim();
+      if (formula !== '') {
+        lines.push(`    formula: ${yamlScalar(formula)}`);
       } else {
-        for (const rule of rules) {
-          lines.push(`      - min: ${rule?.min !== undefined ? String(rule.min) : 'null'}`);
-          lines.push(`        max: ${rule?.max !== undefined ? String(rule.max) : 'null'}`);
-          lines.push(`        value: ${yamlScalar(String(rule?.value || ''))}`);
+        lines.push(`    parent: ${yamlScalar(String(key?.parent || ''))}`);
+        lines.push('    rules:');
+        const rules = Array.isArray(key?.rules) ? key.rules : [];
+        if (rules.length === 0) {
+          lines.push('      []');
+        } else {
+          for (const rule of rules) {
+            lines.push(`      - min: ${rule?.min !== undefined ? String(rule.min) : 'null'}`);
+            lines.push(`        max: ${rule?.max !== undefined ? String(rule.max) : 'null'}`);
+            lines.push(`        value: ${yamlScalar(String(rule?.value || ''))}`);
+          }
         }
       }
     } else {
@@ -7212,6 +7628,17 @@ function serializeValuesBundle(ctx) {
           lines.push(`        value: ${yamlValueScalar(condition?.value)}`);
         }
       }
+      lines.push('    effects:');
+      const effects = Array.isArray(trigger?.effects) ? trigger.effects : [];
+      if (effects.length === 0) {
+        lines.push('      []');
+      } else {
+        for (const effect of effects) {
+          lines.push(`      - path: ${yamlScalar(String(effect?.path || ''))}`);
+          lines.push(`        op: ${yamlScalar(String(effect?.op || 'set').trim())}`);
+          lines.push(`        value: ${yamlValueScalar(effect?.value)}`);
+        }
+      }
       lines.push(`    content: ${yamlBlockScalarText(String(trigger?.content || ''), '    ')}`);
     }
   }
@@ -7237,8 +7664,15 @@ function parseValuesBundle(text) {
       const type = String(item?.type || '').trim() === VALUES_KEY_TYPE_CHILD ? VALUES_KEY_TYPE_CHILD : VALUES_KEY_TYPE_PARENT;
       const key = { name, type };
       if (type === VALUES_KEY_TYPE_CHILD) {
-        key.parent = String(item?.parent || '').trim();
-        key.rules = normalizeValuesChildRules(item?.rules);
+        const formula = String(item?.formula || '').trim();
+        if (formula !== '') {
+          key.formula = formula;
+          key.parent = '';
+          key.rules = [];
+        } else {
+          key.parent = String(item?.parent || '').trim();
+          key.rules = normalizeValuesChildRules(item?.rules);
+        }
       } else {
         key.rule = String(item?.rule || '').trim();
       }
@@ -7269,6 +7703,20 @@ function parseValuesBundle(text) {
           });
         }
       }
+      const effects = [];
+      if (item.effects !== undefined) {
+        if (!Array.isArray(item.effects)) throw new Error(`触发「${id}」的 effects 必须是列表`);
+        for (const effect of item.effects) {
+          if (!effect || typeof effect !== 'object' || Array.isArray(effect)) continue;
+          const path = String(effect.path || '').trim();
+          if (!path) continue;
+          effects.push({
+            path,
+            op: String(effect.op || '').trim() === 'set' ? 'set' : 'add',
+            value: effect.value !== undefined ? effect.value : null,
+          });
+        }
+      }
       triggers.push({
         id,
         name: String(item.name || '').trim() || '未命名触发',
@@ -7277,6 +7725,7 @@ function parseValuesBundle(text) {
         logic: String(item.logic || 'all').trim() === 'any' ? 'any' : 'all',
         description: String(item.description || '').trim(),
         conditions,
+        effects,
         content: String(item.content || ''),
       });
     }
@@ -7444,9 +7893,14 @@ function buildValuesMaintainMessages(ctx, prompt) {
     .map((key) => `- ${String(key?.name || '')}: ${String(key?.rule || '')}`)
     .join('\n') || '（尚未注册任何父变量）';
   const childKeysInUse = childKeys.filter((key) => !isValuesBuiltinKey(key) || builtinInUse(key));
+  const describeChildSource = (key) => {
+    const formula = String(key?.formula || '').trim();
+    if (formula !== '') return `${String(key?.name || '')} ← 公式 ${formula}`;
+    return `${String(key?.name || '')} ← ${String(key?.parent || '')}`;
+  };
   const childNote = childKeysInUse.length > 0
-    ? '\n\n（子变量为派生变量，由系统按父变量自动计算，禁止修改：' +
-      childKeysInUse.map((key) => `${String(key?.name || '')} ← ${String(key?.parent || '')}`).join('、') +
+    ? '\n\n（子变量为派生变量，由系统按派生规则自动计算，禁止修改：' +
+      childKeysInUse.map(describeChildSource).join('、') +
       '）'
     : '';
   // 子变量是派生变量：发给 AI 的值表只含父变量，子变量不发送（也不允许 AI 改动）。
@@ -7828,9 +8282,10 @@ function resolveValuesTriggerId(ctx, requested, excludeId) {
   return id;
 }
 
-// 归一化单条触发：补全字段、过滤非法条件（空路径丢弃）。
+// 归一化单条触发：补全字段、过滤非法条件（空路径丢弃）、归一化事件效果。
 function normalizeValuesTrigger(raw) {
   const conditions = Array.isArray(raw?.conditions) ? raw.conditions : [];
+  const effects = Array.isArray(raw?.effects) ? raw.effects : [];
   return {
     id: String(raw?.id || '').trim(),
     name: String(raw?.name || '').trim() || '未命名触发',
@@ -7846,6 +8301,14 @@ function normalizeValuesTrigger(raw) {
         value: condition?.value !== undefined ? condition.value : null,
       }))
       .filter((condition) => condition.path !== ''),
+    effects: effects
+      .filter((effect) => effect && typeof effect === 'object' && !Array.isArray(effect))
+      .map((effect) => ({
+        path: String(effect?.path || '').trim(),
+        op: String(effect?.op || '').trim() === 'set' ? 'set' : 'add',
+        value: effect?.value !== undefined ? effect.value : null,
+      }))
+      .filter((effect) => effect.path !== ''),
     content: String(raw?.content || ''),
   };
 }
@@ -7977,6 +8440,80 @@ function formatValuesTriggerConditions(trigger) {
   return parts.join(joiner);
 }
 
+// 效果摘要文本：张三/好感 +30；曹操/病 → 已治好。
+function formatValuesTriggerEffects(trigger) {
+  const effects = Array.isArray(trigger?.effects) ? trigger.effects : [];
+  const parts = effects.map((effect) => {
+    const path = String(effect?.path || '');
+    if (String(effect?.op || 'set').trim() === 'add') {
+      const value = effect?.value;
+      const num = typeof value === 'number' ? value : Number(value);
+      const delta = Number.isFinite(num) ? (num > 0 ? '+' + num : String(num)) : String(value ?? '');
+      return `${path} ${delta}`;
+    }
+    const value = effect?.value;
+    const valueText = value === null || value === undefined ? 'null' : String(value);
+    return `${path} → ${valueText}`;
+  });
+  return parts.length === 0 ? '' : '效果：' + parts.join('；');
+}
+
+// ---------- 事件效果 ----------
+// 触发后确定性修改游戏值：add = 加减（正加负减，当前值与效果值都需可转数字）；
+// set = 覆盖（数字 / 文本 / 布尔 / null 均可）。效果对象只允许父变量叶子——
+// 注册为子变量的叶子（由父变量派生）与树中的节点 / 容器一律跳过。
+// 有改动时重算子变量并落盘（与 AI 维护管线同款收尾）；返回 { changed, skipped }。
+function applyValuesTriggerEffects(ctx, triggered) {
+  const changed = [];
+  const skipped = [];
+  const effects = [];
+  for (const trigger of Array.isArray(triggered) ? triggered : []) {
+    for (const effect of Array.isArray(trigger?.effects) ? trigger.effects : []) {
+      const path = String(effect?.path || '').split('/').filter(Boolean);
+      if (path.length === 0) continue;
+      const leafKey = ctx ? getValuesKeyByName(ctx, path[path.length - 1]) : null;
+      if (leafKey && isValuesChildKey(leafKey)) {
+        skipped.push(`${path.join('/')}（子变量由父变量派生，不可直接修改）`);
+        continue;
+      }
+      effects.push({ triggerId: trigger.id, path, op: String(effect?.op || 'set').trim(), value: effect?.value });
+    }
+  }
+  if (effects.length === 0) return { changed, skipped };
+  const tree = getValuesGameTree(ctx);
+  const toNumber = (value) => {
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string' && String(value).trim() !== '') return Number(value);
+    return NaN;
+  };
+  for (const effect of effects) {
+    const current = valuesGetAtPath(tree, effect.path);
+    if (valuesIsContainer(current)) {
+      skipped.push(`${effect.path.join('/')}（节点不是变量，不可直接修改）`);
+      continue;
+    }
+    let next;
+    if (effect.op === 'add') {
+      const currentNum = toNumber(current);
+      const delta = toNumber(effect.value);
+      if (!Number.isFinite(currentNum) || !Number.isFinite(delta)) {
+        skipped.push(`${effect.path.join('/')}（加减值需要数字，当前值或效果值不可转数字）`);
+        continue;
+      }
+      next = currentNum + delta;
+    } else {
+      next = effect.value;
+    }
+    valuesSetAtPath(tree, effect.path, next);
+    changed.push(effect.path.join('/'));
+  }
+  if (changed.length > 0) {
+    deriveValuesChildren(tree, ctx ? getValuesKeys(ctx) : []);
+    saveValuesChatState(ctx, tree, {});
+  }
+  return { changed, skipped };
+}
+
 // ---------- 注入 ----------
 // 注入块：<Story_Trigger> 块 + 说明 + 每个满足条件的事件（含触发条件 / 说明 / 正文）。
 // 与剧情预筛的 <Story_Event> 同款强制指令，保证主模型真实落地事件内容。
@@ -8051,6 +8588,8 @@ function runValuesTriggerBarrierTask(ctx, payload) {
       globalThis[VALUES_TRIGGER_LAST_ROUND_KEY] = record;
       return Promise.resolve();
     }
+    // 事件效果：确定性修改游戏值，不依赖注入能力，先于注入执行。
+    record.effectsApplied = applyValuesTriggerEffects(context, triggered);
     const api = getValuesTriggerExtensionPromptApi(context);
     if (!api) {
       logApp('warn', '剧情触发：宿主不支持提示词注入，跳过注入');
@@ -8100,6 +8639,7 @@ let valuesEditorParentPath = [];     // 新建节点 / 变量时的父路径
 let valuesAddMenuContext = null;    // 「＋」菜单上下文：{ root: true } | { path: [...] }
 let valuesTriggerEditorId = null;        // 正在编辑的触发 id（null = 新建）
 let valuesTriggerEditorConditions = [];  // 编辑器中的条件草稿
+let valuesTriggerEditorEffects = [];     // 编辑器中的事件效果草稿
 
 function valuesToastr(kind, message) {
   try {
@@ -8246,11 +8786,14 @@ function syncValuesLayerUI() {
   const hint = document.getElementById(VALUES_DEFAULT_HINT_ID);
   const injectBar = document.getElementById(VALUES_INJECT_BAR_ID);
   const addRoot = document.getElementById(VALUES_ADD_ROOT_ID);
+  const saveNow = document.getElementById(VALUES_SAVE_NOW_ID);
   if (maintainNow) maintainNow.hidden = !isGame;
   if (resetBtn) resetBtn.hidden = !isGame;
   if (status) status.hidden = !isGame;
   if (hint) hint.hidden = isGame;
   if (addRoot) addRoot.hidden = isGame;
+  // 保存按钮只属于「默认数值」层（游戏值随聊天文件即时落盘，无需手动保存）。
+  if (saveNow) saveNow.hidden = isGame;
   // 注入提示词条只属于「默认数值」层（勾选配置随角色卡保存）。
   if (injectBar) injectBar.hidden = isGame;
 }
@@ -8358,7 +8901,7 @@ function buildValuesRow(path, name, node, depth) {
   const isChildLeaf = Boolean(registered && isValuesChildKey(registered));
   const registryTitle = registered
     ? (isChildLeaf
-      ? `子变量 · 由「${registered.parent || ''}」派生：${formatValuesChildRulesSummary(registered)}`
+      ? `子变量 · ${formatValuesChildDeriveSummary(registered)}`
       : `已注册变量 · 变化规则：${registered.rule || '（未填写规则）'}`)
     : '';
   const isNode = valuesIsContainer(node);
@@ -8403,7 +8946,7 @@ function buildValuesRow(path, name, node, depth) {
   row.className = 'kaleido-values__row kaleido-values__row--leaf' + (isChildLeaf ? ' is-derived' : '');
   row.dataset.kind = 'leaf';
   const derivedBadge = isChildLeaf
-    ? `<span class="kaleido-values__row-derived-badge" title="子变量：值由「${escapeHtml(String(registered.parent || ''))}」自动派生，不可手动编辑">派生</span>`
+    ? `<span class="kaleido-values__row-derived-badge" title="子变量：值由派生规则（区间 / 公式）自动计算，不可手动编辑">派生</span>`
     : '';
   const editButton = isChildLeaf
     ? `<button type="button" class="kaleido-values__icon-btn" disabled title="子变量由父变量自动计算，不可手动编辑" aria-label="子变量不可编辑"><span class="${VALUES_EDIT_ICON_CLASS}"></span></button>`
@@ -8937,9 +9480,9 @@ function renderValuesKeys() {
     const builtinBadge = isBuiltin
       ? `<span class="kaleido-values__row-type-badge is-builtin" title="内置变量：任何角色卡 / 聊天默认注册，可直接使用；编辑后按当前角色卡覆盖">内置</span>`
       : '';
-    const ruleText = isChild
-      ? `由「${String(key.parent || '')}」派生：${formatValuesChildRulesSummary(key)}`
-      : String(key.rule || '（未填写变化规则）');
+  const ruleText = isChild
+    ? formatValuesChildDeriveSummary(key)
+    : String(key.rule || '（未填写变化规则）');
     const dragHandle = isBuiltin
       ? ''
       : `<button type="button" class="kaleido-values__drag-handle" data-action="drag" title="拖动排序" aria-label="拖动排序"><span class="${VALUES_DRAG_ICON_CLASS}"></span></button>`;
@@ -8960,6 +9503,13 @@ function renderValuesKeys() {
   }
 }
 
+// 子变量派生方式摘要：公式模式显示公式，区间模式显示派生源 + 区间。
+function formatValuesChildDeriveSummary(key) {
+  const formula = String(key?.formula || '').trim();
+  if (formula !== '') return `由公式派生：${formula}`;
+  return `由「${String(key?.parent || '')}」派生：${formatValuesChildRulesSummary(key)}`;
+}
+
 // 子变量区间规则摘要（列表行 / 树行 title 用）。
 function formatValuesChildRulesSummary(key) {
   const rules = Array.isArray(key?.rules) ? key.rules : [];
@@ -8970,7 +9520,7 @@ function formatValuesChildRulesSummary(key) {
   }).join('；');
 }
 
-// 父变量下拉：只列已注册的父变量（排除自身），供子变量选择。
+// 派生源下拉：列出所有已注册变量（父 / 子均可，支持链式派生），排除自身。
 function populateValuesKeyParentSelect(selectedParent) {
   const select = document.getElementById(VALUES_KEY_EDITOR_PARENT_ID);
   if (!select) return;
@@ -8979,10 +9529,9 @@ function populateValuesKeyParentSelect(selectedParent) {
   select.innerHTML = '';
   const placeholder = document.createElement('option');
   placeholder.value = '';
-  placeholder.textContent = '（选择父变量）';
+  placeholder.textContent = '（选择派生源变量）';
   select.appendChild(placeholder);
   for (const key of keys) {
-    if (!isValuesParentKey(key)) continue;
     if (valuesKeyEditorName && String(key.name || '') === valuesKeyEditorName) continue;
     const option = document.createElement('option');
     option.value = String(key.name || '');
@@ -9089,7 +9638,17 @@ function nextValuesChildRuleMinFromRow(row) {
   return String(max + 1);
 }
 
-// 类型切换联动：父变量显示变化规则，子变量显示父变量选择 + 派生区间。
+// 派生方式联动：区间显示派生源 + 区间编辑器，公式显示公式输入。
+function syncValuesKeyDeriveUI() {
+  const deriveSelect = document.getElementById(VALUES_KEY_EDITOR_DERIVE_ID);
+  const formulaFields = document.getElementById(VALUES_KEY_EDITOR_FORMULA_FIELDS_ID);
+  const rulesFields = document.getElementById(VALUES_KEY_EDITOR_RULES_FIELDS_ID);
+  const isFormula = String(deriveSelect?.value || '') === VALUES_KEY_DERIVE_FORMULA;
+  if (formulaFields) formulaFields.hidden = !isFormula;
+  if (rulesFields) rulesFields.hidden = isFormula;
+}
+
+// 类型切换联动：父变量显示变化规则，子变量显示派生方式 + 派生源 / 公式。
 function syncValuesKeyEditorTypeUI() {
   const typeSelect = document.getElementById(VALUES_KEY_EDITOR_TYPE_ID);
   const ruleFields = document.getElementById(VALUES_KEY_EDITOR_RULE_FIELDS_ID);
@@ -9097,6 +9656,7 @@ function syncValuesKeyEditorTypeUI() {
   const isChild = String(typeSelect?.value || '') === VALUES_KEY_TYPE_CHILD;
   if (ruleFields) ruleFields.hidden = isChild;
   if (childFields) childFields.hidden = !isChild;
+  syncValuesKeyDeriveUI();
 }
 
 function openValuesKeyEditor(name) {
@@ -9107,6 +9667,8 @@ function openValuesKeyEditor(name) {
   const nameInput = document.getElementById(VALUES_KEY_EDITOR_NAME_ID);
   const ruleInput = document.getElementById(VALUES_KEY_EDITOR_RULE_ID);
   const typeSelect = document.getElementById(VALUES_KEY_EDITOR_TYPE_ID);
+  const deriveSelect = document.getElementById(VALUES_KEY_EDITOR_DERIVE_ID);
+  const formulaInput = document.getElementById(VALUES_KEY_EDITOR_FORMULA_ID);
   const ctx = getContextSafe();
   if (valuesKeyEditorName) {
     const key = getValuesKeyByName(ctx, valuesKeyEditorName);
@@ -9117,6 +9679,9 @@ function openValuesKeyEditor(name) {
     const isChild = key ? isValuesChildKey(key) : false;
     typeSelect.value = isChild ? VALUES_KEY_TYPE_CHILD : VALUES_KEY_TYPE_PARENT;
     ruleInput.value = isChild ? '' : (key ? String(key.rule || '') : '');
+    const formula = isChild ? String(key?.formula || '').trim() : '';
+    if (deriveSelect) deriveSelect.value = formula !== '' ? VALUES_KEY_DERIVE_FORMULA : VALUES_KEY_DERIVE_RULES;
+    if (formulaInput) formulaInput.value = formula;
     populateValuesKeyParentSelect(isChild ? String(key?.parent || '') : '');
     renderValuesKeyRules(isChild ? key?.rules : []);
   } else {
@@ -9126,6 +9691,8 @@ function openValuesKeyEditor(name) {
     nameInput.title = '';
     typeSelect.value = VALUES_KEY_TYPE_PARENT;
     ruleInput.value = '';
+    if (deriveSelect) deriveSelect.value = VALUES_KEY_DERIVE_RULES;
+    if (formulaInput) formulaInput.value = '';
     populateValuesKeyParentSelect('');
     renderValuesKeyRules([]);
   }
@@ -9153,27 +9720,49 @@ function saveValuesKeyEditor() {
     ? VALUES_KEY_TYPE_CHILD
     : VALUES_KEY_TYPE_PARENT;
   if (type === VALUES_KEY_TYPE_CHILD) {
-    const parent = String(document.getElementById(VALUES_KEY_EDITOR_PARENT_ID)?.value || '').trim();
-    if (!parent) {
-      valuesToastr('warning', '请选择父变量');
-      return;
+    const deriveSelect = document.getElementById(VALUES_KEY_EDITOR_DERIVE_ID);
+    const isFormula = String(deriveSelect?.value || '') === VALUES_KEY_DERIVE_FORMULA;
+    if (isFormula) {
+      const formula = String(document.getElementById(VALUES_KEY_EDITOR_FORMULA_ID)?.value || '').trim();
+      const syntax = validateValuesFormulaSyntax(formula);
+      if (!syntax.ok) {
+        valuesToastr('warning', `派生公式不合法：${syntax.error}`);
+        return;
+      }
+      const cycle = findValuesChildCycle(getValuesKeys(ctx), name, syntax.refs);
+      if (cycle) {
+        valuesToastr('warning', `派生存在循环引用：${cycle.join(' → ')}`);
+        return;
+      }
+      upsertValuesKey(ctx, name, '', { type, formula });
+    } else {
+      const parent = String(document.getElementById(VALUES_KEY_EDITOR_PARENT_ID)?.value || '').trim();
+      if (!parent) {
+        valuesToastr('warning', '请选择派生源变量');
+        return;
+      }
+      const rules = readValuesKeyRules();
+      if (rules.length === 0) {
+        valuesToastr('warning', '请至少添加一个派生区间');
+        return;
+      }
+      const validation = validateValuesChildRules(rules);
+      if (validation.invalid.length > 0) {
+        valuesToastr('warning', `第 ${validation.invalid.map((index) => index + 1).join('、')} 行区间下限大于上限，请检查`);
+        return;
+      }
+      if (validation.overlaps.length > 0) {
+        const pairs = validation.overlaps.map(([i, j]) => `第 ${i + 1} 行与第 ${j + 1} 行`);
+        valuesToastr('warning', `派生区间不能重叠（含边界）：${pairs.join('、')}，如 0~1000 之后只能从 1001 开始`);
+        return;
+      }
+      const cycle = findValuesChildCycle(getValuesKeys(ctx), name, [parent]);
+      if (cycle) {
+        valuesToastr('warning', `派生存在循环引用：${cycle.join(' → ')}`);
+        return;
+      }
+      upsertValuesKey(ctx, name, '', { type, parent, rules });
     }
-    const rules = readValuesKeyRules();
-    if (rules.length === 0) {
-      valuesToastr('warning', '请至少添加一个派生区间');
-      return;
-    }
-    const validation = validateValuesChildRules(rules);
-    if (validation.invalid.length > 0) {
-      valuesToastr('warning', `第 ${validation.invalid.map((index) => index + 1).join('、')} 行区间下限大于上限，请检查`);
-      return;
-    }
-    if (validation.overlaps.length > 0) {
-      const pairs = validation.overlaps.map(([i, j]) => `第 ${i + 1} 行与第 ${j + 1} 行`);
-      valuesToastr('warning', `派生区间不能重叠（含边界）：${pairs.join('、')}，如 0~1000 之后只能从 1001 开始`);
-      return;
-    }
-    upsertValuesKey(ctx, name, '', { type, parent, rules });
   } else {
     const rule = String(document.getElementById(VALUES_KEY_EDITOR_RULE_ID)?.value || '').trim();
     upsertValuesKey(ctx, name, rule, { type });
@@ -9194,7 +9783,7 @@ function saveValuesKeyEditor() {
 async function handleValuesDeleteKey(name) {
   const ctx = getContextSafe();
   if (!ctx) return;
-  const dependents = getValuesChildKeysByParent(ctx, name);
+  const dependents = getValuesChildKeysByRef(ctx, name);
   if (dependents.length > 0) {
     valuesToastr('warning', `请先删除或改绑依赖它的子变量：${dependents.map((key) => key.name).join('、')}`);
     return;
@@ -9243,6 +9832,7 @@ function buildValuesTriggerRow(trigger) {
   row.dataset.id = String(trigger.id || '');
   const enabled = trigger.enabled !== false;
   const conditionsText = formatValuesTriggerConditions(trigger);
+  const effectsText = formatValuesTriggerEffects(trigger);
   const onceBadge = trigger.once === false
     ? '<span class="kaleido-values__row-trigger-type" title="常驻事件：条件满足时可重复触发">常驻</span>'
     : '<span class="kaleido-values__row-trigger-type is-once" title="一次性事件：触发一次后自动关闭">一次性</span>';
@@ -9251,6 +9841,7 @@ function buildValuesTriggerRow(trigger) {
     <span class="kaleido-values__row-name" title="${escapeHtml(trigger.name)}">${escapeHtml(trigger.name)}</span>
     ${onceBadge}
     <span class="kaleido-values__row-trigger" title="${escapeHtml(conditionsText)}">${escapeHtml(conditionsText)}</span>
+    ${effectsText ? `<span class="kaleido-values__row-trigger is-effect" title="${escapeHtml(effectsText)}">${escapeHtml(effectsText)}</span>` : ''}
     <button type="button" class="kaleido-values__inject-switch${enabled ? '' : ' is-off'}" data-action="toggle-trigger" data-id="${escapeHtml(String(trigger.id || ''))}" role="switch" aria-checked="${enabled}" title="${enabled ? '点击关闭：该触发不再参与判定' : '点击激活：该触发重新参与判定'}" aria-label="启用 / 关闭触发"><span class="kaleido-values__inject-switch-thumb"></span></button>
     <span class="kaleido-values__row-actions">
       <button type="button" class="kaleido-values__icon-btn" data-action="edit-trigger" data-id="${escapeHtml(String(trigger.id || ''))}" title="编辑触发" aria-label="编辑触发"><span class="${VALUES_EDIT_ICON_CLASS}"></span></button>
@@ -9296,6 +9887,43 @@ function populateValuesTriggerPathSelect(select, selectedPath) {
       if (valuesIsContainer(child)) {
         walk(child, childPath);
       } else {
+        const option = document.createElement('option');
+        option.value = childPath.join('/');
+        option.textContent = childPath.join(' / ');
+        select.appendChild(option);
+      }
+    }
+  };
+  walk(tree, []);
+  const escapeCss = (typeof CSS !== 'undefined' && typeof CSS.escape === 'function')
+    ? (value) => CSS.escape(value)
+    : (value) => String(value).replace(/["\\]/g, '\\$&');
+  const target = String(selectedPath || '');
+  select.value = select.querySelector(`option[value="${escapeCss(target)}"]`) ? target : '';
+}
+
+// 效果路径下拉：列出变量树全部叶子路径，但过滤注册为子变量的叶子
+// （子变量由父变量派生，效果只能改父变量；未注册的叶子视为父变量）。
+function populateValuesTriggerEffectPathSelect(select, selectedPath) {
+  if (!select) return;
+  const ctx = getContextSafe();
+  const tree = ctx ? getValuesDefaults(ctx) : {};
+  const order = ctx ? getValuesTreeOrder(ctx) : {};
+  select.innerHTML = '';
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = '（选择父变量路径）';
+  select.appendChild(placeholder);
+  const walk = (node, path) => {
+    if (!valuesIsContainer(node)) return;
+    for (const key of valuesOrderedNames(order, path.join('/'), node)) {
+      const childPath = path.concat(key);
+      const child = node[key];
+      if (valuesIsContainer(child)) {
+        walk(child, childPath);
+      } else {
+        const registered = ctx ? getValuesKeyByName(ctx, key) : null;
+        if (registered && isValuesChildKey(registered)) continue;
         const option = document.createElement('option');
         option.value = childPath.join('/');
         option.textContent = childPath.join(' / ');
@@ -9401,12 +10029,93 @@ function readValuesTriggerConditionRows() {
   return conditions;
 }
 
+// 效果行：路径（只列父变量）+ 类型（加减 / 覆盖）+ 值 + 删除。
+function buildValuesTriggerEffectRow(effect) {
+  const row = document.createElement('div');
+  row.className = VALUES_TRIGGER_EFFECT_ROW_CLASS;
+  const pathSelect = document.createElement('select');
+  pathSelect.className = 'kaleido-input ' + VALUES_TRIGGER_EFFECT_PATH_CLASS;
+  populateValuesTriggerEffectPathSelect(pathSelect, effect?.path || '');
+  const opCenter = document.createElement('div');
+  opCenter.className = VALUES_TRIGGER_EFFECT_OP_CENTER_CLASS;
+  const opWrap = document.createElement('div');
+  opWrap.className = VALUES_TRIGGER_EFFECT_OP_WRAP_CLASS;
+  const opText = document.createElement('span');
+  opText.className = VALUES_TRIGGER_EFFECT_OP_TEXT_CLASS;
+  const opSelect = document.createElement('select');
+  opSelect.className = 'kaleido-input ' + VALUES_TRIGGER_EFFECT_OP_CLASS;
+  for (const op of VALUES_TRIGGER_EFFECT_OPS) {
+    const option = document.createElement('option');
+    option.value = op.value;
+    option.textContent = op.label;
+    opSelect.appendChild(option);
+  }
+  opSelect.value = String(effect?.op || '').trim() === 'set' ? 'set' : 'add';
+  const syncOpText = () => {
+    const matched = VALUES_TRIGGER_EFFECT_OPS.find((op) => op.value === String(opSelect.value || '').trim());
+    opText.textContent = matched ? (matched.display || matched.value) : String(opSelect.value || '');
+    opWrap.title = matched ? matched.label : '';
+    valueInput.placeholder = String(opSelect.value || '') === 'add' ? '如：+30 / -5（加减值）' : '如：100 / 已治好 / null';
+  };
+  const valueInput = document.createElement('input');
+  valueInput.className = 'kaleido-input ' + VALUES_TRIGGER_EFFECT_VALUE_CLASS;
+  valueInput.type = 'text';
+  valueInput.autocomplete = 'off';
+  valueInput.spellcheck = false;
+  const value = effect?.value;
+  valueInput.value = value === null || value === undefined ? '' : String(value);
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'kaleido-values__icon-btn kaleido-values__icon-btn--danger ' + VALUES_TRIGGER_EFFECT_REMOVE_CLASS;
+  removeBtn.title = '删除效果';
+  removeBtn.setAttribute('aria-label', '删除效果');
+  removeBtn.innerHTML = `<span class="${VALUES_DELETE_ICON_CLASS}"></span>`;
+  opWrap.append(opText, opSelect);
+  opCenter.append(opWrap);
+  row.append(pathSelect, opCenter, valueInput, removeBtn);
+  opSelect.addEventListener('change', syncOpText);
+  syncOpText();
+  return row;
+}
+
+// 编辑器效果区：按草稿渲染全部效果行。
+function renderValuesTriggerEffectRows() {
+  const container = document.getElementById(VALUES_TRIGGER_EDITOR_EFFECTS_ID);
+  if (!container) return;
+  container.innerHTML = '';
+  for (const effect of valuesTriggerEditorEffects) {
+    container.appendChild(buildValuesTriggerEffectRow(effect));
+  }
+}
+
+function addValuesTriggerEffectRow() {
+  valuesTriggerEditorEffects.push({ path: '', op: 'add', value: null });
+  renderValuesTriggerEffectRows();
+}
+
+// 读取编辑器效果区当前草稿（含用户未保存的修改）。
+function readValuesTriggerEffectRows() {
+  const container = document.getElementById(VALUES_TRIGGER_EDITOR_EFFECTS_ID);
+  if (!container) return valuesTriggerEditorEffects.slice();
+  const effects = [];
+  container.querySelectorAll('.' + VALUES_TRIGGER_EFFECT_ROW_CLASS).forEach((row) => {
+    const path = String(row.querySelector('.' + VALUES_TRIGGER_EFFECT_PATH_CLASS)?.value || '').trim();
+    const op = String(row.querySelector('.' + VALUES_TRIGGER_EFFECT_OP_CLASS)?.value || 'add').trim();
+    const valueText = String(row.querySelector('.' + VALUES_TRIGGER_EFFECT_VALUE_CLASS)?.value || '').trim();
+    effects.push({ path, op: op === 'set' ? 'set' : 'add', value: parseValuesEditorText(valueText).value });
+  });
+  return effects;
+}
+
 function openValuesTriggerEditor(item) {
   const editor = document.getElementById(VALUES_TRIGGER_EDITOR_ID);
   if (!editor) return;
   valuesTriggerEditorId = item && item.id ? item.id : null;
   valuesTriggerEditorConditions = Array.isArray(item?.conditions)
     ? item.conditions.map((condition) => ({ ...condition }))
+    : [];
+  valuesTriggerEditorEffects = Array.isArray(item?.effects)
+    ? item.effects.map((effect) => ({ ...effect }))
     : [];
   const title = document.getElementById(VALUES_TRIGGER_EDITOR_TITLE_ID);
   const nameInput = document.getElementById(VALUES_TRIGGER_EDITOR_NAME_ID);
@@ -9439,6 +10148,7 @@ function openValuesTriggerEditor(item) {
   if (descInput) descInput.value = item?.description || '';
   if (contentInput) contentInput.value = item?.content || '';
   renderValuesTriggerConditionRows();
+  renderValuesTriggerEffectRows();
   editor.hidden = false;
   closeValuesEditor();
   closeValuesKeyEditor();
@@ -9451,6 +10161,7 @@ function closeValuesTriggerEditor() {
   if (editor) editor.hidden = true;
   valuesTriggerEditorId = null;
   valuesTriggerEditorConditions = [];
+  valuesTriggerEditorEffects = [];
 }
 
 function saveValuesTriggerEditor() {
@@ -9473,12 +10184,29 @@ function saveValuesTriggerEditor() {
     valuesToastr('warning', '请至少添加一个变量条件');
     return;
   }
+  const effects = readValuesTriggerEffectRows().filter((effect) => effect.path !== '');
+  for (const effect of effects) {
+    if (effect.value === '') {
+      valuesToastr('warning', '请填写效果值（要设为无值请填 null）');
+      return;
+    }
+    if (effect.op === 'add') {
+      const delta = typeof effect.value === 'number'
+        ? effect.value
+        : (typeof effect.value === 'string' && String(effect.value).trim() !== '' ? Number(effect.value) : NaN);
+      if (!Number.isFinite(delta)) {
+        valuesToastr('warning', '加减值的效果值必须是数字');
+        return;
+      }
+    }
+  }
   const data = {
     name,
     logic: logic === 'any' ? 'any' : 'all',
     once,
     description: String(document.getElementById(VALUES_TRIGGER_EDITOR_DESC_ID)?.value || '').trim(),
     conditions,
+    effects,
     content,
   };
   if (valuesTriggerEditorId) updateValuesTrigger(ctx, valuesTriggerEditorId, data);
@@ -9560,6 +10288,34 @@ async function handleValuesResetGame() {
   valuesToastr('success', saved ? '游戏值已重置为默认值' : '游戏值已重置（写入聊天文件失败）');
   renderValuesTree();
   refreshHomeValuesStatus();
+}
+
+// 默认数值保存：把当前默认值立即保存到绑定位置（角色卡 / 全局设置），
+// 并在支持从磁盘重读的宿主（TauriTavern getOneCharacter）上校验写入是否生效——
+// 该宿主写角色卡失败时只 console.error 不抛错，校验能把静默失败变成可见反馈。
+async function handleValuesSaveNow() {
+  const ctx = getContextSafe();
+  if (!ctx) {
+    valuesToastr('warning', '无法读取宿主上下文');
+    return;
+  }
+  const character = getStoryCharacter(ctx);
+  const boundToCard = Boolean(character && typeof ctx?.writeExtensionField === 'function');
+  const target = boundToCard ? '角色卡' : '全局设置';
+  const bundle = getValuesBundle(ctx);
+  // 先等落盘完成再校验：校验走磁盘重读，与写入并行会读到旧数据误报失败。
+  await saveValuesData(ctx);
+  const verified = await verifyValuesCardWrite(ctx, String(character?.avatar || ''), bundle);
+  if (verified === true) {
+    logApp('info', '默认数值已保存', target);
+    valuesToastr('success', `默认数值已保存到${target}，并已从磁盘校验通过`);
+  } else if (verified === false) {
+    logApp('warn', '默认数值保存未生效', target);
+    valuesToastr('error', `保存未生效：${target}上的数据与修改不一致（写入被宿主拦截或返回旧数据）。请重启酒馆后重试，并检查系统日志`);
+  } else {
+    logApp('info', '默认数值已保存', target);
+    valuesToastr('success', `默认数值已保存到${target}`);
+  }
 }
 // ---------- 导入 / 导出 ----------
 function handleValuesExportBundle() {
@@ -9688,6 +10444,7 @@ function bindValuesContentEvents() {
   });
 
   document.getElementById(VALUES_RESET_GAME_ID)?.addEventListener('click', handleValuesResetGame);
+  document.getElementById(VALUES_SAVE_NOW_ID)?.addEventListener('click', handleValuesSaveNow);
 
   document.getElementById(VALUES_INJECT_TOGGLE_ID)?.addEventListener('click', (event) => {
     const ctx = getContextSafe();
@@ -9708,6 +10465,14 @@ function bindValuesContentEvents() {
     const button = event.target instanceof Element ? event.target.closest('.' + VALUES_TRIGGER_CONDITION_REMOVE_CLASS) : null;
     if (!button) return;
     const row = button.closest('.' + VALUES_TRIGGER_CONDITION_ROW_CLASS);
+    if (!row) return;
+    row.remove();
+  });
+  document.getElementById(VALUES_TRIGGER_EDITOR_EFFECT_ADD_ID)?.addEventListener('click', addValuesTriggerEffectRow);
+  document.getElementById(VALUES_TRIGGER_EDITOR_EFFECTS_ID)?.addEventListener('click', (event) => {
+    const button = event.target instanceof Element ? event.target.closest('.' + VALUES_TRIGGER_EFFECT_REMOVE_CLASS) : null;
+    if (!button) return;
+    const row = button.closest('.' + VALUES_TRIGGER_EFFECT_ROW_CLASS);
     if (!row) return;
     row.remove();
   });
@@ -9849,6 +10614,7 @@ function bindValuesContentEvents() {
   document.getElementById(VALUES_KEY_EDITOR_CANCEL_ID)?.addEventListener('click', closeValuesKeyEditor);
   document.getElementById(VALUES_KEY_EDITOR_SAVE_ID)?.addEventListener('click', saveValuesKeyEditor);
   document.getElementById(VALUES_KEY_EDITOR_TYPE_ID)?.addEventListener('change', syncValuesKeyEditorTypeUI);
+  document.getElementById(VALUES_KEY_EDITOR_DERIVE_ID)?.addEventListener('change', syncValuesKeyDeriveUI);
   document.getElementById(VALUES_KEY_EDITOR_RULES_ADD_ID)?.addEventListener('click', () => {
     const container = document.getElementById(VALUES_KEY_EDITOR_RULES_ID);
     if (!container) return;
@@ -9952,6 +10718,9 @@ function buildValuesContentHTML(editorClass) {
                 <span id="${VALUES_LAYER_ICON_ID}" class="kaleido-values__layer-icon"><span class="${VALUES_LAYER_DEFAULT_ICON_CLASS}"></span></span>
                 <span id="${VALUES_LAYER_TITLE_ID}" class="kaleido-values__layer-title">默认数值</span>
                 <span class="kaleido-values__toolbar-spacer"></span>
+                <button type="button" id="${VALUES_SAVE_NOW_ID}" class="kaleido-btn kaleido-btn--mini" title="把当前默认数值立即保存到角色卡，并从磁盘重读校验写入是否生效">
+                  <span class="${VALUES_SAVE_ICON_CLASS}"></span> 保存
+                </button>
                 <button type="button" id="${VALUES_LAYER_TOGGLE_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--ghost" title="切换到游戏数值（聊天，AI 自动维护）">
                   <span class="${VALUES_LAYER_SWAP_ICON_CLASS}"></span> 切换到游戏数值
                 </button>
@@ -10029,7 +10798,7 @@ function buildValuesContentHTML(editorClass) {
                 <label class="kaleido-api__field" for="${VALUES_EDITOR_VALUE_ID}">
                   <span id="${VALUES_EDITOR_VALUE_LABEL_ID}" class="kaleido-api__label">变量值 *</span>
                   <textarea id="${VALUES_EDITOR_VALUE_ID}" class="kaleido-input kaleido-values__textarea kaleido-values__textarea--small" rows="2" placeholder="如：30 / 1000 / 友好 / true" spellcheck="false"></textarea>
-                  <span id="${VALUES_EDITOR_CHILD_HINT_ID}" class="kaleido-values__editor-hint" hidden>子变量值由父变量自动计算</span>
+                  <span id="${VALUES_EDITOR_CHILD_HINT_ID}" class="kaleido-values__editor-hint" hidden>子变量值由派生规则（区间 / 公式）自动计算</span>
                 </label>
               </div>
               <div class="kaleido-values__editor-actions">
@@ -10049,9 +10818,9 @@ function buildValuesContentHTML(editorClass) {
               </label>
               <label class="kaleido-api__field" for="${VALUES_KEY_EDITOR_TYPE_ID}">
                 <span class="kaleido-api__label">变量类型</span>
-                <select id="${VALUES_KEY_EDITOR_TYPE_ID}" class="kaleido-input" title="父变量：由 AI 按变化规则维护；子变量：值由同路径下的父变量按区间自动派生">
+                <select id="${VALUES_KEY_EDITOR_TYPE_ID}" class="kaleido-input" title="父变量：由 AI 按变化规则维护；子变量：按派生规则（区间 / 公式）由同路径变量自动计算">
                   <option value="${VALUES_KEY_TYPE_PARENT}">父变量（AI 按变化规则维护）</option>
-                  <option value="${VALUES_KEY_TYPE_CHILD}">子变量（由父变量自动派生）</option>
+                  <option value="${VALUES_KEY_TYPE_CHILD}">子变量（按派生规则自动计算）</option>
                 </select>
               </label>
               <div id="${VALUES_KEY_EDITOR_RULE_FIELDS_ID}">
@@ -10061,14 +10830,30 @@ function buildValuesContentHTML(editorClass) {
                 </label>
               </div>
               <div id="${VALUES_KEY_EDITOR_CHILD_FIELDS_ID}" hidden>
-                <label class="kaleido-api__field" for="${VALUES_KEY_EDITOR_PARENT_ID}">
-                  <span class="kaleido-api__label">父变量 *</span>
-                  <select id="${VALUES_KEY_EDITOR_PARENT_ID}" class="kaleido-input" title="子变量的值由同路径下该父变量的值决定（如 张三/态度 ← 张三/好感度）"></select>
+                <label class="kaleido-api__field" for="${VALUES_KEY_EDITOR_DERIVE_ID}">
+                  <span class="kaleido-api__label">派生方式</span>
+                  <select id="${VALUES_KEY_EDITOR_DERIVE_ID}" class="kaleido-input" title="区间：按派生源数值匹配区间输出文本；公式：引用一个或多个同路径变量四则运算输出数值">
+                    <option value="${VALUES_KEY_DERIVE_RULES}">区间（按派生源数值匹配，输出文本）</option>
+                    <option value="${VALUES_KEY_DERIVE_FORMULA}">公式（引用变量计算，输出数值）</option>
+                  </select>
                 </label>
-                <div class="kaleido-api__field">
-                  <span class="kaleido-api__label">派生区间 *</span>
-                  <div id="${VALUES_KEY_EDITOR_RULES_ID}" class="kaleido-values__key-rules"></div>
-                  <button type="button" id="${VALUES_KEY_EDITOR_RULES_ADD_ID}" class="kaleido-btn kaleido-btn--mini">＋ 添加区间</button>
+                <div id="${VALUES_KEY_EDITOR_FORMULA_FIELDS_ID}" hidden>
+                  <label class="kaleido-api__field" for="${VALUES_KEY_EDITOR_FORMULA_ID}">
+                    <span class="kaleido-api__label">派生公式 *</span>
+                    <textarea id="${VALUES_KEY_EDITOR_FORMULA_ID}" class="kaleido-input kaleido-values__textarea kaleido-values__textarea--small" rows="3" placeholder="如：((0.5*友谊+0.5*情欲)+1.2*情欲)/10" title="支持 + - * / 与括号；变量为同路径下的已注册变量（父 / 子均可）" spellcheck="false"></textarea>
+                    <span class="kaleido-api__hint">支持 + - * / 与括号；变量为同路径下的已注册变量（父 / 子均可）。</span>
+                  </label>
+                </div>
+                <div id="${VALUES_KEY_EDITOR_RULES_FIELDS_ID}">
+                  <label class="kaleido-api__field" for="${VALUES_KEY_EDITOR_PARENT_ID}">
+                    <span class="kaleido-api__label">派生源 *</span>
+                    <select id="${VALUES_KEY_EDITOR_PARENT_ID}" class="kaleido-input" title="子变量的值由同路径下该变量的值决定（父 / 子变量均可，如 张三/态度 ← 张三/综合评分）"></select>
+                  </label>
+                  <div class="kaleido-api__field">
+                    <span class="kaleido-api__label">派生区间 *</span>
+                    <div id="${VALUES_KEY_EDITOR_RULES_ID}" class="kaleido-values__key-rules"></div>
+                    <button type="button" id="${VALUES_KEY_EDITOR_RULES_ADD_ID}" class="kaleido-btn kaleido-btn--mini">＋ 添加区间</button>
+                  </div>
                 </div>
               </div>
               <div class="kaleido-values__editor-actions">
@@ -10098,6 +10883,11 @@ function buildValuesContentHTML(editorClass) {
                 <span class="kaleido-api__label">变量条件 *</span>
                 <div id="${VALUES_TRIGGER_EDITOR_CONDITIONS_ID}" class="kaleido-values__trigger-conditions"></div>
                 <button type="button" id="${VALUES_TRIGGER_EDITOR_CONDITION_ADD_ID}" class="kaleido-btn kaleido-btn--mini">＋ 添加条件</button>
+              </div>
+              <div class="kaleido-api__field">
+                <span class="kaleido-api__label">事件效果（可选 · 触发时修改父变量）</span>
+                <div id="${VALUES_TRIGGER_EDITOR_EFFECTS_ID}" class="kaleido-values__trigger-effects"></div>
+                <button type="button" id="${VALUES_TRIGGER_EDITOR_EFFECT_ADD_ID}" class="kaleido-btn kaleido-btn--mini">＋ 添加效果</button>
               </div>
               <label class="kaleido-api__field" for="${VALUES_TRIGGER_EDITOR_DESC_ID}">
                 <span class="kaleido-api__label">事件说明</span>
