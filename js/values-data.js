@@ -231,7 +231,9 @@ async function verifyValuesCardWrite(ctx, avatar, expected) {
     const extensions = fresh?.data?.extensions ?? fresh?.extensions ?? null;
     const onDisk = extensions && typeof extensions === 'object' ? extensions[VALUES_CARD_EXTENSION_KEY] : null;
     if (!onDisk || typeof onDisk !== 'object' || Array.isArray(onDisk)) return false;
-    return JSON.stringify(onDisk) === JSON.stringify(expected);
+    const ok = jsonDeepEqual(onDisk, expected);
+    if (!ok) logApp('warn', '保存校验不一致', `期望:${describeJsonDiff(expected, onDisk)}`);
+    return ok;
   } catch (error) {
     logApp('warn', '保存校验失败', String(error?.message || error));
     return null;

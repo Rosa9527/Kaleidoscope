@@ -2,7 +2,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.2.2';
+const MODULE_VERSION = '1.3.0';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -419,6 +419,59 @@ const GAME_REFRESH_ID = 'kaleido-game-refresh';
 const GAME_GEAR_ID = 'kaleido-game-gear';
 const GAME_TREE_ID = 'kaleido-game-tree';
 const GAME_REFRESH_ENDED_KEY = '__kaleido_game_refresh_ended__';
+// ---------- 地图系统（游戏地图：角色卡绑定）----------
+// 地图数据存角色卡 extensions['kaleidoscope_map']，随角色卡导入/导出自动携带；
+// 群聊 / 未选角色时回退全局设置 mapData。背景图为裁剪后的 base64 PNG，
+// 地点坐标为背景图百分比（0~100），展示与编辑按比例缩放对齐。
+const MAP_CARD_EXTENSION_KEY = 'kaleidoscope_map';
+const MAP_CARD_DATA_VERSION = 1;
+// 裁剪导出最长边上限（px）：超出等比降采样，避免角色卡被超大图片撑爆。
+const MAP_IMAGE_MAX_DIM = 1600;
+// 背景图 dataURL 超过该长度（字符数）时提示体积偏大。
+const MAP_IMAGE_MAX_LEN = 1.5 * 1024 * 1024;
+const MAP_DEFAULT_POINT_NAME = '新地点';
+const MAP_POINT_NAME_MAX = 40;
+// 游戏模式 · 地图展示（游戏地图 / 游戏数据 两个切换图标）
+const GAME_MAP_TAB_ID = 'kaleido-game-map-tab';
+const GAME_DATA_TAB_ID = 'kaleido-game-data-tab';
+const GAME_MAP_PANE_ID = 'kaleido-game-map-pane';
+const MAP_GO_EDIT_ID = 'kaleido-map-go-edit';
+const MAP_ICON_CLASS = 'fa-solid fa-map';
+const MAP_DATA_ICON_CLASS = 'fa-solid fa-chart-simple';
+const MAP_POINT_ICON_CLASS = 'fa-solid fa-location-dot';
+const MAP_CROP_ICON_CLASS = 'fa-solid fa-crop';
+// 变量工作台 · 地图编辑器（第 5 个 tab）
+const VALUES_TAB_MAP_ID = 'kaleido-values-tab-map';
+const VALUES_MAP_PANE_ID = 'kaleido-values-map-pane';
+const MAP_BINDING_ID = 'kaleido-map-binding';
+const MAP_UPLOAD_BTN_ID = 'kaleido-map-upload-btn';
+const MAP_UPLOAD_INPUT_ID = 'kaleido-map-upload-input';
+const MAP_CROP_BTN_ID = 'kaleido-map-crop-btn';
+const MAP_ADD_POINT_ID = 'kaleido-map-add-point';
+const MAP_SAVE_ID = 'kaleido-map-save';
+const MAP_DELETE_ID = 'kaleido-map-delete';
+const MAP_STAGE_ID = 'kaleido-map-stage';
+const MAP_STAGE_IMG_ID = 'kaleido-map-stage-img';
+const MAP_POINTS_ID = 'kaleido-map-points';
+const MAP_EMPTY_ID = 'kaleido-map-empty';
+const MAP_HINT_ID = 'kaleido-map-hint';
+const MAP_POINT_EDITOR_ID = 'kaleido-map-point-editor';
+const MAP_POINT_NAME_ID = 'kaleido-map-point-name';
+const MAP_POINT_REMOVE_ID = 'kaleido-map-point-remove';
+const MAP_POINT_EDITOR_CLOSE_ID = 'kaleido-map-point-editor-close';
+// 裁剪弹层（全屏遮罩，挂在 body；is-open 控制显示）
+const MAP_CROP_DIALOG_ID = 'kaleido-map-crop-dialog';
+const MAP_CROP_STAGE_ID = 'kaleido-map-crop-stage';
+const MAP_CROP_VIEW_ID = 'kaleido-map-crop-view';
+const MAP_CROP_IMG_ID = 'kaleido-map-crop-img';
+const MAP_CROP_BOX_ID = 'kaleido-map-crop-box';
+const MAP_CROP_INFO_ID = 'kaleido-map-crop-info';
+const MAP_CROP_CONFIRM_ID = 'kaleido-map-crop-confirm';
+const MAP_CROP_CANCEL_ID = 'kaleido-map-crop-cancel';
+// 编辑器内存态 / 事件去重 key
+const MAP_EDITOR_KEY = '__kaleido_map_editor__';
+const MAP_CROP_ESC_KEY = '__kaleido_map_crop_esc_key__';
+const MAP_EDITOR_EVENTS_KEY = '__kaleido_map_editor_events__';
 // ---------- 剧情预筛（Story Gate）----------
 const STORY_GATE_INJECT_KEY = 'Kaleidoscope_Story_Event';
 const STORY_GATE_RECENT_COUNT = 4;
@@ -557,6 +610,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   storyGatePrompt: '',
   valuesNavCollapsed: false,
   theme: DEFAULT_THEME,
+  mapData: null,
 });
 
 // 宿主上下文不可扩展时的兜底设置存储（WeakMap 随上下文释放）。
@@ -694,6 +748,51 @@ const HOST_EVENT_WATCHDOG_KEY = '__kaleido_host_event_watchdog__';
 function cloneValue(value) {
   if (typeof globalThis.structuredClone === 'function') return globalThis.structuredClone(value);
   return JSON.parse(JSON.stringify(value));
+}
+
+// 深比较（JSON 语义）：对象忽略键顺序、数组顺序敏感、原始值严格相等。
+// 写卡校验不能用 JSON.stringify 全等——宿主（TauriTavern）反序列化角色卡时
+// 会按自己的序列化器重排对象键序（实测重读回来 background 排在 version 前），
+// 内容一致也会被字符串比较误判为「写入未生效」。
+function jsonDeepEqual(a, b) {
+  if (a === b) return true;
+  if (a === null || b === null || typeof a !== typeof b) return false;
+  if (typeof a !== 'object') return false;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    return a.every((item, index) => jsonDeepEqual(item, b[index]));
+  }
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  return keysA.every((key) => Object.prototype.hasOwnProperty.call(b, key) && jsonDeepEqual(a[key], b[key]));
+}
+
+// 写卡校验失败的差异摘要：指出第一个不一致的字段（增删 / 值变化 / 数组长度），
+// 供系统日志定位「保存未生效」的真实原因（如宿主合并语义吞掉了某字段）。
+function describeJsonDiff(a, b, depth = 0) {
+  if (a === b) return '';
+  if (depth > 2) return ' …';
+  const bothObjects = a !== null && b !== null
+    && typeof a === 'object' && typeof b === 'object'
+    && Array.isArray(a) === Array.isArray(b);
+  if (!bothObjects) return ` ${JSON.stringify(a)} ≠ ${JSON.stringify(b)}`;
+  if (Array.isArray(a)) {
+    if (a.length !== b.length) return ` 长度 ${a.length} ≠ ${b.length}`;
+    for (let i = 0; i < a.length; i++) {
+      const detail = describeJsonDiff(a[i], b[i], depth + 1);
+      if (detail) return ` 第${i + 1}项${detail}`;
+    }
+    return '';
+  }
+  const parts = [];
+  for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    if (!Object.prototype.hasOwnProperty.call(a, key)) { parts.push(`+${key}`); continue; }
+    if (!Object.prototype.hasOwnProperty.call(b, key)) { parts.push(`-${key}`); continue; }
+    const detail = describeJsonDiff(a[key], b[key], depth + 1);
+    if (detail) parts.push(`${key}${detail}`);
+  }
+  return parts.length ? ` {${parts.join(', ')}}` : '';
 }
 
 
@@ -1844,7 +1943,7 @@ function createPanel() {
             <div class="kaleido-home__hero">
               <span class="kaleido-home__logo"><span class="${MENU_ICON_CLASS}"></span></span>
               <p class="kaleido-home__slogan"><span class="kaleido-home__slogan-first" aria-hidden="true">镜</span>中万象</p>
-              <button type="button" id="${HOME_GAME_BUTTON_ID}" class="kaleido-home__log-btn" title="游戏模式：玩家数据档案" aria-label="游戏模式">
+              <button type="button" id="${HOME_GAME_BUTTON_ID}" class="kaleido-home__log-btn" title="游戏模式：游戏地图与玩家数据档案" aria-label="游戏模式">
                 <span class="${GAME_ICON_CLASS}"></span>
               </button>
             </div>
@@ -2081,6 +2180,7 @@ function createPanel() {
   initStorySection(panel);
   initValuesSection(panel);
   initGameSection(panel);
+  initMapSection();
   initLogView(panel);
   initPresetSection(panel);
   initThemeSection(panel);
@@ -6555,7 +6655,9 @@ async function verifyValuesCardWrite(ctx, avatar, expected) {
     const extensions = fresh?.data?.extensions ?? fresh?.extensions ?? null;
     const onDisk = extensions && typeof extensions === 'object' ? extensions[VALUES_CARD_EXTENSION_KEY] : null;
     if (!onDisk || typeof onDisk !== 'object' || Array.isArray(onDisk)) return false;
-    return JSON.stringify(onDisk) === JSON.stringify(expected);
+    const ok = jsonDeepEqual(onDisk, expected);
+    if (!ok) logApp('warn', '保存校验不一致', `期望:${describeJsonDiff(expected, onDisk)}`);
+    return ok;
   } catch (error) {
     logApp('warn', '保存校验失败', String(error?.message || error));
     return null;
@@ -10357,67 +10459,57 @@ function setValuesPaneActive(paneId, active) {
   pane.hidden = !active;
 }
 
+// 统一 tab 切换：5 个 tab 的 is-active 与 5 个 pane 的显隐一次到位，
+// 并收尾打开中的编辑器 / 新建菜单。
+function setValuesTabActive(tabId) {
+  const tabs = [VALUES_TAB_TREE_ID, VALUES_TAB_KEYS_ID, VALUES_TAB_TRIGGERS_ID, VALUES_TAB_INJECT_ID, VALUES_TAB_MAP_ID];
+  for (const id of tabs) {
+    const tab = document.getElementById(id);
+    if (tab) tab.classList.toggle('is-active', id === tabId);
+  }
+  setValuesPaneActive(VALUES_TREE_PANE_ID, tabId === VALUES_TAB_TREE_ID);
+  setValuesPaneActive(VALUES_KEYS_PANE_ID, tabId === VALUES_TAB_KEYS_ID);
+  setValuesPaneActive(VALUES_TRIGGERS_PANE_ID, tabId === VALUES_TAB_TRIGGERS_ID);
+  setValuesPaneActive(VALUES_INJECT_PANE_ID, tabId === VALUES_TAB_INJECT_ID);
+  setValuesPaneActive(VALUES_MAP_PANE_ID, tabId === VALUES_TAB_MAP_ID);
+  closeValuesEditor();
+  closeValuesKeyEditor();
+  closeValuesTriggerEditor();
+  closeValuesAddMenu();
+}
+
+// 打开「游戏地图」编辑器：桌面开工作台 / 手机切面板视图，并激活地图 tab。
+// （游戏模式空态「去编辑地图」按钮也走这里。）
+function openValuesMapTab() {
+  if (isNarrowViewport()) {
+    showPanelView(VALUES_VIEW_ID);
+  } else {
+    openValuesWorkbench();
+  }
+  setValuesTabActive(VALUES_TAB_MAP_ID);
+  renderMapEditor();
+}
+
 function bindValuesContentEvents() {
   document.getElementById(VALUES_TAB_TREE_ID)?.addEventListener('click', () => {
-    document.getElementById(VALUES_TAB_TREE_ID)?.classList.add('is-active');
-    document.getElementById(VALUES_TAB_KEYS_ID)?.classList.remove('is-active');
-    document.getElementById(VALUES_TAB_TRIGGERS_ID)?.classList.remove('is-active');
-    document.getElementById(VALUES_TAB_INJECT_ID)?.classList.remove('is-active');
-    setValuesPaneActive(VALUES_TREE_PANE_ID, true);
-    setValuesPaneActive(VALUES_KEYS_PANE_ID, false);
-    setValuesPaneActive(VALUES_TRIGGERS_PANE_ID, false);
-    setValuesPaneActive(VALUES_INJECT_PANE_ID, false);
-    closeValuesEditor();
-    closeValuesKeyEditor();
-    closeValuesTriggerEditor();
-    closeValuesAddMenu();
+    setValuesTabActive(VALUES_TAB_TREE_ID);
     renderValuesTree();
   });
   document.getElementById(VALUES_TAB_KEYS_ID)?.addEventListener('click', () => {
-    document.getElementById(VALUES_TAB_TREE_ID)?.classList.remove('is-active');
-    document.getElementById(VALUES_TAB_KEYS_ID)?.classList.add('is-active');
-    document.getElementById(VALUES_TAB_TRIGGERS_ID)?.classList.remove('is-active');
-    document.getElementById(VALUES_TAB_INJECT_ID)?.classList.remove('is-active');
-    setValuesPaneActive(VALUES_TREE_PANE_ID, false);
-    setValuesPaneActive(VALUES_KEYS_PANE_ID, true);
-    setValuesPaneActive(VALUES_TRIGGERS_PANE_ID, false);
-    setValuesPaneActive(VALUES_INJECT_PANE_ID, false);
-    closeValuesEditor();
-    closeValuesKeyEditor();
-    closeValuesTriggerEditor();
-    closeValuesAddMenu();
+    setValuesTabActive(VALUES_TAB_KEYS_ID);
     renderValuesKeys();
   });
   document.getElementById(VALUES_TAB_TRIGGERS_ID)?.addEventListener('click', () => {
-    document.getElementById(VALUES_TAB_TREE_ID)?.classList.remove('is-active');
-    document.getElementById(VALUES_TAB_KEYS_ID)?.classList.remove('is-active');
-    document.getElementById(VALUES_TAB_TRIGGERS_ID)?.classList.add('is-active');
-    document.getElementById(VALUES_TAB_INJECT_ID)?.classList.remove('is-active');
-    setValuesPaneActive(VALUES_TREE_PANE_ID, false);
-    setValuesPaneActive(VALUES_KEYS_PANE_ID, false);
-    setValuesPaneActive(VALUES_TRIGGERS_PANE_ID, true);
-    setValuesPaneActive(VALUES_INJECT_PANE_ID, false);
-    closeValuesEditor();
-    closeValuesKeyEditor();
-    closeValuesTriggerEditor();
-    closeValuesAddMenu();
+    setValuesTabActive(VALUES_TAB_TRIGGERS_ID);
     renderValuesTriggers();
   });
-
   document.getElementById(VALUES_TAB_INJECT_ID)?.addEventListener('click', () => {
-    document.getElementById(VALUES_TAB_TREE_ID)?.classList.remove('is-active');
-    document.getElementById(VALUES_TAB_KEYS_ID)?.classList.remove('is-active');
-    document.getElementById(VALUES_TAB_TRIGGERS_ID)?.classList.remove('is-active');
-    document.getElementById(VALUES_TAB_INJECT_ID)?.classList.add('is-active');
-    setValuesPaneActive(VALUES_TREE_PANE_ID, false);
-    setValuesPaneActive(VALUES_KEYS_PANE_ID, false);
-    setValuesPaneActive(VALUES_TRIGGERS_PANE_ID, false);
-    setValuesPaneActive(VALUES_INJECT_PANE_ID, true);
-    closeValuesEditor();
-    closeValuesKeyEditor();
-    closeValuesTriggerEditor();
-    closeValuesAddMenu();
+    setValuesTabActive(VALUES_TAB_INJECT_ID);
     renderValuesInjectPreview();
+  });
+  document.getElementById(VALUES_TAB_MAP_ID)?.addEventListener('click', () => {
+    setValuesTabActive(VALUES_TAB_MAP_ID);
+    renderMapEditor();
   });
   document.getElementById(VALUES_LAYER_DEFAULT_ID)?.addEventListener('click', () => setValuesLayer('default'));
   document.getElementById(VALUES_LAYER_GAME_ID)?.addEventListener('click', () => setValuesLayer('game'));
@@ -10711,6 +10803,10 @@ function buildValuesContentHTML(editorClass) {
               <span class="kaleido-values__nav-icon"><span class="${VALUES_INJECT_PREVIEW_ICON_CLASS}"></span></span>
               <span class="kaleido-values__nav-label">注入预览</span>
             </button>
+            <button type="button" id="${VALUES_TAB_MAP_ID}" class="kaleido-values__nav-item" role="tab" aria-selected="false" title="游戏地图：为当前角色卡上传背景图、添加地点，供游戏模式展示">
+              <span class="kaleido-values__nav-icon"><span class="${MAP_ICON_CLASS}"></span></span>
+              <span class="kaleido-values__nav-label">游戏地图</span>
+            </button>
           </nav>
           <div class="kaleido-values__main">
             <div id="${VALUES_TREE_PANE_ID}" class="kaleido-values__pane is-active">
@@ -10771,6 +10867,7 @@ function buildValuesContentHTML(editorClass) {
               </div>
               <pre id="${VALUES_INJECT_TEXT_ID}" class="kaleido-values__inject-text" spellcheck="false"></pre>
             </div>
+            <div id="${VALUES_MAP_PANE_ID}" class="kaleido-values__pane" hidden></div>
             <div id="${VALUES_EDITOR_ID}" class="${editorClass}" hidden>
               <div class="kaleido-values__editor-head">
                 <span id="${VALUES_EDITOR_TITLE_ID}" class="kaleido-values__editor-title">新建节点</span>
@@ -10941,6 +11038,8 @@ ${buildValuesContentHTML('kaleido-values-dialog__editor')}
   if (!globalThis[VALUES_DIALOG_KEY]) {
     globalThis[VALUES_DIALOG_KEY] = (event) => {
       if (event.key !== 'Escape') return;
+      // 裁剪弹层开着时先由地图模块自己的 Esc 处理器关闭，这里不抢。
+      if (isMapCropDialogOpen()) return;
       const editor = document.getElementById(VALUES_EDITOR_ID);
       const keyEditor = document.getElementById(VALUES_KEY_EDITOR_ID);
       const triggerEditor = document.getElementById(VALUES_TRIGGER_EDITOR_ID);
@@ -10992,13 +11091,1033 @@ function initValuesSection(panel) {
 }
 
 
+// ===== js/map-data.js =====
+// ===== 万华镜（Kaleidoscope）地图系统：数据模型 / 角色卡绑定 / 设置兜底 =====
+// 地图数据：一张背景图（裁剪后的 base64 PNG）+ 若干地点（名称 + 百分比坐标）。
+// 与变量系统同款双层存储：
+// - 主存：角色卡 extensions['kaleidoscope_map']，随角色卡导入/导出自动携带；
+// - 兜底：群聊 / 未选角色 / 宿主不支持写角色卡时落全局设置 mapData。
+// 写卡遵循宿主深合并语义：删除字段必须用哨兵值显式标记（同 VALUES_UNSET_SENTINEL），
+// 否则删除操作会被合并吞掉（TauriTavern 实测）。地点坐标一律按背景图百分比
+// （0~100）存取，展示与编辑按比例缩放对齐，换背景图不丢坐标。
+
+// ---------- 数据归一化 ----------
+function mapClampCoord(value) {
+  const v = Number(value);
+  if (!Number.isFinite(v)) return 0;
+  return Math.min(100, Math.max(0, v));
+}
+
+function mapIsPoint(value) {
+  return Boolean(
+    value && typeof value === 'object' && !Array.isArray(value)
+    && Number.isFinite(Number(value.x)) && Number.isFinite(Number(value.y))
+  );
+}
+
+function mapGenPointId() {
+  return `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// 就地归一化：缺省字段补齐，非法地点丢弃，坐标收敛到 [0,100]。
+function normalizeMapCard(card) {
+  if (!card || typeof card !== 'object' || Array.isArray(card)) return card;
+  if (typeof card.background !== 'string') card.background = '';
+  if (!Array.isArray(card.points)) card.points = [];
+  card.points = card.points.filter(mapIsPoint).map((point) => ({
+    id: String(point.id || mapGenPointId()),
+    name: String(point.name || MAP_DEFAULT_POINT_NAME).slice(0, MAP_POINT_NAME_MAX),
+    x: mapClampCoord(point.x),
+    y: mapClampCoord(point.y),
+  }));
+  return card;
+}
+
+// 空地图：无背景图且无地点（保存时按「删除整个字段」处理）。
+function isEmptyMapCard(card) {
+  return Boolean(card) && !card.background && !(Array.isArray(card.points) && card.points.length > 0);
+}
+
+// 全新空地图包（编辑器 / 删除地图后的底稿）。
+function createEmptyMapCard() {
+  return {
+    version: MAP_CARD_DATA_VERSION,
+    background: '',
+    points: [],
+    updatedAt: '',
+  };
+}
+
+// ---------- 读取 ----------
+// 当前角色卡里的地图包（无角色 / 卡上无数据时返回 null）；返回前就地归一化。
+function getMapCardData(ctx) {
+  const character = ctx ? getStoryCharacter(ctx) : null;
+  if (!character) return null;
+  const extensions = character?.data?.extensions;
+  if (!extensions || typeof extensions !== 'object') return null;
+  const card = extensions[MAP_CARD_EXTENSION_KEY];
+  if (!card || typeof card !== 'object' || Array.isArray(card)) return null;
+  return normalizeMapCard(card);
+}
+
+// 有效地图包：角色卡优先；群聊 / 未选角色 / 卡上无数据时回退全局设置 mapData。
+// 返回 null 表示当前没有可用地图（展示空态）。
+function getMapBundle(ctx) {
+  const card = ctx ? getMapCardData(ctx) : null;
+  if (card) return card;
+  const settings = ctx ? getSettings(ctx) : null;
+  const legacy = settings?.mapData;
+  if (legacy && typeof legacy === 'object' && !Array.isArray(legacy)) {
+    return normalizeMapCard(cloneValue(legacy));
+  }
+  return null;
+}
+
+// 把地图包写入角色卡对象（内存态，持久化由 saveMapNow 完成）。
+function setMapCardData(character, card) {
+  if (!character || typeof character !== 'object') return;
+  if (!character.data || typeof character.data !== 'object') character.data = {};
+  if (!character.data.extensions || typeof character.data.extensions !== 'object') character.data.extensions = {};
+  character.data.extensions[MAP_CARD_EXTENSION_KEY] = card;
+}
+
+// ---------- 写入 ----------
+// 立即持久化（不做防抖）：宿主刷新 / 退出会打断 setTimeout 挂起的写入——
+// 防抖窗口内退出酒馆，修改即丢失（同变量系统实测）。返回写入 Promise。
+function saveMapNow(ctx, card) {
+  const character = ctx ? getStoryCharacter(ctx) : null;
+  const avatar = String(character?.avatar || '');
+  const promise = persistMapCardData(ctx, avatar, card);
+  promise.catch((error) => {
+    logApp('warn', '写入角色卡失败', String(error?.message || error));
+  });
+  return promise;
+}
+
+async function persistMapCardData(ctx, avatar, card) {
+  const characters = Array.isArray(ctx?.characters) ? ctx.characters : [];
+  const index = characters.findIndex((character) => String(character?.avatar || '') === avatar);
+  if (index < 0) {
+    fallbackMapDataToSettings(ctx, card);
+    return;
+  }
+  const write = ctx?.writeExtensionField;
+  if (typeof write !== 'function') {
+    fallbackMapDataToSettings(ctx, card);
+    return;
+  }
+  try {
+    let payload = card;
+    if (isEmptyMapCard(card)) {
+      // 空地图 = 删除整个字段：整键哨兵（宿主深合并语义下删除扩展键）。
+      payload = VALUES_UNSET_SENTINEL;
+    } else {
+      try {
+        const onDisk = await readMapCardFromDisk(ctx, avatar);
+        if (onDisk && typeof onDisk === 'object' && !Array.isArray(onDisk)) {
+          payload = buildMapUnsetPatch(onDisk, card);
+        }
+      } catch (error) {
+        logApp('warn', '写卡前磁盘重读失败，按全量覆盖发送', String(error?.message || error));
+      }
+    }
+    await write.call(ctx, index, MAP_CARD_EXTENSION_KEY, payload);
+    // writeExtensionField 就地写入了带哨兵的补丁：把内存角色恢复为干净状态，
+    // 避免哨兵值残留在 UI 数据里。
+    const character = characters[index];
+    if (character && character.data && typeof character.data === 'object') {
+      if (isEmptyMapCard(card)) {
+        delete character.data.extensions?.[MAP_CARD_EXTENSION_KEY];
+      } else {
+        setMapCardData(character, card);
+      }
+    }
+  } catch (error) {
+    fallbackMapDataToSettings(ctx, card);
+    throw error;
+  }
+}
+
+// 从磁盘重读当前角色卡的地图包（写卡前对比旧值 / 保存校验用）。
+// 优先独立 fetch（不触碰内存 characters 数组），回退宿主 getOneCharacter。
+// 兼容宿主返回的两种形状：normalizeCharacter 后的嵌套 data.extensions，
+// 以及展平的顶层 extensions。读不到 / 出错返回 null。
+async function readMapCardFromDisk(context, avatar) {
+  const ctx = context || getContextSafe();
+  if (!ctx || !avatar) return null;
+  const extract = (character) => {
+    const extensions = character?.data?.extensions ?? character?.extensions ?? null;
+    const bundle = extensions && typeof extensions === 'object' ? extensions[MAP_CARD_EXTENSION_KEY] : null;
+    return bundle && typeof bundle === 'object' && !Array.isArray(bundle) ? bundle : null;
+  };
+  try {
+    if (typeof globalThis.fetch === 'function') {
+      const headers = typeof ctx.getRequestHeaders === 'function'
+        ? ctx.getRequestHeaders()
+        : { 'Content-Type': 'application/json' };
+      const response = await globalThis.fetch('/api/characters/get', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ avatar_url: avatar }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const bundle = extract(data);
+        if (bundle) return bundle;
+      }
+    }
+    if (typeof ctx.getOneCharacter === 'function') {
+      await ctx.getOneCharacter(avatar);
+      const fresh = Array.isArray(ctx.characters)
+        ? ctx.characters.find((character) => String(character?.avatar || '') === avatar)
+        : null;
+      const bundle = extract(fresh);
+      if (bundle) return bundle;
+    }
+    return null;
+  } catch (error) {
+    logApp('warn', '读取磁盘角色卡失败', String(error?.message || error));
+    return null;
+  }
+}
+
+// 构造写卡补丁：宿主 merge-attributes 是深合并语义（只更新请求里出现的键，
+// 请求里没有的键原样保留）。地图包除 background 外的字段（version / points /
+// updatedAt）要么保留原值要么整体替换，只有 background 可能被删（清空背景），
+// 因此只需把「磁盘有、新包没有」的 background 标记为哨兵；points 为数组整体覆盖。
+function buildMapUnsetPatch(oldCard, newCard) {
+  const patch = cloneValue(newCard);
+  if (typeof oldCard?.background === 'string' && !newCard?.background) {
+    patch.background = VALUES_UNSET_SENTINEL;
+  }
+  return patch;
+}
+
+// 写卡校验：经宿主接口从磁盘重读角色卡，比对扩展字段是否与期望一致。
+// TauriTavern 的 writeExtensionField 失败只 console.error 不抛错（扩展无法感知），
+// 保存按钮用本函数把静默失败变成可见反馈。返回 true / false；宿主不支持从磁盘
+// 重读（无 fetch / getOneCharacter / getCharacters）或重读失败时返回 null（无法校验）。
+async function verifyMapCardWrite(ctx, avatar, expected) {
+  const context = ctx || getContextSafe();
+  if (!context || !avatar) return null;
+  try {
+    if (typeof context.getOneCharacter === 'function') {
+      await context.getOneCharacter(avatar);
+    } else if (typeof context.getCharacters === 'function') {
+      await context.getCharacters();
+    } else {
+      return null;
+    }
+    const fresh = Array.isArray(context.characters)
+      ? context.characters.find((character) => String(character?.avatar || '') === avatar)
+      : null;
+    const extensions = fresh?.data?.extensions ?? fresh?.extensions ?? null;
+    const onDisk = extensions && typeof extensions === 'object' ? extensions[MAP_CARD_EXTENSION_KEY] : null;
+    if (expected === VALUES_UNSET_SENTINEL) {
+      // 删除地图：磁盘上字段应已不存在；若宿主只存下了哨兵串（未真正删除），
+      // 读取路径也会把它当作「无地图」，同样视为成功。
+      return onDisk === null || onDisk === undefined || onDisk === VALUES_UNSET_SENTINEL;
+    }
+    if (!onDisk || typeof onDisk !== 'object' || Array.isArray(onDisk)) return false;
+    const ok = jsonDeepEqual(onDisk, expected);
+    if (!ok) logApp('warn', '保存校验不一致', `期望:${describeJsonDiff(expected, onDisk)}`);
+    return ok;
+  } catch (error) {
+    logApp('warn', '保存校验失败', String(error?.message || error));
+    return null;
+  }
+}
+
+// 写入角色卡失败 / 角色已删除 / 宿主不支持时的兜底：数据落回全局设置，避免丢失。
+function fallbackMapDataToSettings(ctx, card) {
+  const settings = ctx ? getSettings(ctx) : null;
+  if (settings) {
+    settings.mapData = cloneValue(card);
+    saveSettingsImmediate(ctx);
+    logApp('warn', '地图写入角色卡失败，已回退全局设置');
+  }
+}
+
+
+// ===== js/map-image.js =====
+// ===== 万华镜（Kaleidoscope）地图系统：图片工具（读取 / 裁剪 / 降采样导出）=====
+// 仅在用户交互（上传 / 裁剪）时触碰 FileReader / Image / canvas，顶层只定义函数，
+// 因此 jsdom 测试环境加载本文件不会因缺 canvas 报错。
+
+// 读取图片文件为 dataURL（Promise）。非图片类型直接拒绝。
+function mapReadFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      reject(new Error('未选择文件'));
+      return;
+    }
+    if (typeof file.type === 'string' && file.type && !file.type.startsWith('image/')) {
+      reject(new Error('请选择图片文件（PNG / JPG / WebP 等）'));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('图片读取失败'));
+    reader.readAsDataURL(file);
+  });
+}
+
+// 加载图片（Promise<HTMLImageElement>），解码失败拒绝。
+function mapLoadImage(dataURL) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('图片解码失败，请换一张'));
+    image.src = dataURL;
+  });
+}
+
+// 按源图自然像素矩形裁剪，等比降采样到最长边 ≤ maxDim，导出 PNG dataURL。
+// rect = { x, y, width, height }，单位与 image.naturalWidth/Height 一致。
+function mapCropImageToDataURL(image, rect, maxDim) {
+  const max = Math.max(1, maxDim);
+  const sx = Math.max(0, Math.min(image.naturalWidth - 1, rect.x));
+  const sy = Math.max(0, Math.min(image.naturalHeight - 1, rect.y));
+  const sw = Math.max(1, Math.min(image.naturalWidth - sx, rect.width));
+  const sh = Math.max(1, Math.min(image.naturalHeight - sy, rect.height));
+  const scale = Math.min(1, max / Math.max(sw, sh));
+  const outWidth = Math.max(1, Math.round(sw * scale));
+  const outHeight = Math.max(1, Math.round(sh * scale));
+  const source = document.createElement('canvas');
+  source.width = sw;
+  source.height = sh;
+  const sctx = source.getContext('2d');
+  if (!sctx) throw new Error('当前环境不支持 canvas 裁剪');
+  sctx.drawImage(image, sx, sy, sw, sh, 0, 0, sw, sh);
+  if (scale >= 1) return source.toDataURL('image/png');
+  const out = document.createElement('canvas');
+  out.width = outWidth;
+  out.height = outHeight;
+  const octx = out.getContext('2d');
+  if (!octx) throw new Error('当前环境不支持 canvas 裁剪');
+  octx.drawImage(source, 0, 0, outWidth, outHeight);
+  return out.toDataURL('image/png');
+}
+
+
+// ===== js/views-map.js =====
+// ===== 万华镜（Kaleidoscope）地图系统：游戏模式地图展示 + 变量工作台地图编辑器 =====
+// 两个入口：
+// - 游戏模式（视图内切换）：背景图 + 地点标记的只读展示，数据源与编辑器一致
+//   （getMapBundle：角色卡优先、全局设置兜底）。
+// - 变量工作台「游戏地图」tab：上传图片 → 裁剪成背景 → 双击建点 / 拖动移动 /
+//   选中改名，全部编辑先落内存（mapEditorState），点「保存」才写角色卡。
+// 地点坐标一律按背景图百分比（0~100）存取，展示与编辑按比例缩放对齐。
+
+// ---------- 编辑器内存态 ----------
+// { card, dirty, selectedId, rawDataURL, rawImage }
+// card：工作副本（克隆自角色卡 / 设置兜底）；dirty：有未保存修改；
+// rawImage：原始上传图（裁剪前），「重新裁剪」时复用，不落盘。
+let mapEditorState = null;
+// 地点拖动中的状态（pointer 事件期间有效）。
+let mapPointDrag = null;
+// 裁剪弹层状态：{ image, rect, drag }
+let mapCropState = null;
+
+function ensureMapEditorState() {
+  if (!mapEditorState) {
+    const ctx = getContextSafe();
+    const bundle = ctx ? getMapBundle(ctx) : null;
+    mapEditorState = {
+      card: bundle ? cloneValue(bundle) : createEmptyMapCard(),
+      dirty: false,
+      selectedId: null,
+      rawDataURL: '',
+      rawImage: null,
+    };
+  }
+  return mapEditorState;
+}
+
+function findMapPoint(id) {
+  const state = ensureMapEditorState();
+  return state.card.points.find((point) => point.id === id) || null;
+}
+
+function mapClampRange(value, lo, hi) {
+  return Math.min(hi, Math.max(lo, value));
+}
+
+// =========================================================
+// 游戏模式 · 地图展示
+// =========================================================
+function renderGameMap(ctx) {
+  const pane = document.getElementById(GAME_MAP_PANE_ID);
+  if (!pane) return;
+  const map = ctx ? getMapBundle(ctx) : null;
+  pane.innerHTML = '';
+  if (!map || !map.background) {
+    const empty = document.createElement('div');
+    empty.className = 'kaleido-game-map__empty';
+    empty.innerHTML = `
+      <span class="kaleido-game-map__empty-icon"><span class="${MAP_ICON_CLASS}"></span></span>
+      <p class="kaleido-game-map__empty-title">暂无地图</p>
+      <p class="kaleido-game-map__empty-text">到「变量系统 → 游戏地图」上传背景图、双击添加地点，<br/>保存后这里就能看到当前角色的地图。</p>
+      <button type="button" id="${MAP_GO_EDIT_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--primary">去编辑地图</button>
+    `;
+    pane.appendChild(empty);
+    document.getElementById(MAP_GO_EDIT_ID)?.addEventListener('click', () => openValuesMapTab());
+    return;
+  }
+  const frame = document.createElement('div');
+  frame.className = 'kaleido-game-map__frame';
+  frame.innerHTML = `
+    <img class="kaleido-game-map__img" src="${escapeHtml(map.background)}" alt="游戏地图" />
+    <div class="kaleido-game-map__points">
+      ${map.points.map((point) => `
+        <button type="button" class="kaleido-game-map__point" data-id="${escapeHtml(point.id)}" title="${escapeHtml(point.name)}" style="left:${point.x}%;top:${point.y}%">
+          <span class="kaleido-game-map__pin"><span class="${MAP_POINT_ICON_CLASS}"></span></span>
+          <span class="kaleido-game-map__name">${escapeHtml(point.name)}</span>
+        </button>`).join('')}
+    </div>
+  `;
+  pane.appendChild(frame);
+  if (map.updatedAt) {
+    const meta = document.createElement('div');
+    meta.className = 'kaleido-game-map__meta';
+    meta.textContent = `最近更新 · ${new Date(map.updatedAt).toLocaleString()}`;
+    pane.appendChild(meta);
+  }
+  // 点击地点：高亮当前点（点击空白处取消高亮）。
+  frame.querySelectorAll('.kaleido-game-map__point').forEach((el) => {
+    el.addEventListener('click', () => {
+      const was = el.classList.contains('is-selected');
+      frame.querySelectorAll('.kaleido-game-map__point.is-selected').forEach((other) => other.classList.remove('is-selected'));
+      if (!was) el.classList.add('is-selected');
+    });
+  });
+  frame.addEventListener('click', (event) => {
+    if (event.target.closest('.kaleido-game-map__point')) return;
+    frame.querySelectorAll('.kaleido-game-map__point.is-selected').forEach((other) => other.classList.remove('is-selected'));
+  });
+}
+
+// =========================================================
+// 变量工作台 · 地图编辑器
+// =========================================================
+function buildMapEditorHTML() {
+  return `
+    <div class="kaleido-map-editor">
+      <div class="kaleido-map-editor__toolbar">
+        <span id="${MAP_BINDING_ID}" class="kaleido-values__binding" data-state="idle" title="地图存储绑定状态">未绑定角色</span>
+        <span class="kaleido-values__toolbar-spacer"></span>
+        <button type="button" id="${MAP_UPLOAD_BTN_ID}" class="kaleido-btn kaleido-btn--mini" title="上传图片作为地图背景，上传后可裁剪">
+          <span class="${MAP_ICON_CLASS}"></span> 上传图片
+        </button>
+        <button type="button" id="${MAP_CROP_BTN_ID}" class="kaleido-btn kaleido-btn--mini" title="用原始图片重新裁剪背景" hidden>
+          <span class="${MAP_CROP_ICON_CLASS}"></span> 重新裁剪
+        </button>
+        <button type="button" id="${MAP_ADD_POINT_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--primary" title="在背景图中央添加一个地点（也可双击地图任意处添加）">＋ 新地点</button>
+        <button type="button" id="${MAP_SAVE_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--primary" title="保存地图到当前角色卡">
+          <span class="${VALUES_SAVE_ICON_CLASS}"></span> 保存
+        </button>
+        <button type="button" id="${MAP_DELETE_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--ghost" title="删除整张地图（背景图与全部地点），保存后生效">🗑 删除地图</button>
+      </div>
+      <div id="${MAP_HINT_ID}" class="kaleido-map-editor__hint">双击地图添加地点 · 拖动地点调整位置 · 点击选中后改名</div>
+      <div class="kaleido-map-editor__stage-wrap">
+        <div id="${MAP_STAGE_ID}" class="kaleido-map-editor__stage">
+          <div id="${MAP_EMPTY_ID}" class="kaleido-map-editor__empty">
+            <span class="kaleido-map-editor__empty-icon"><span class="${MAP_ICON_CLASS}"></span></span>
+            <p class="kaleido-map-editor__empty-title">还没有地图背景</p>
+            <p class="kaleido-map-editor__empty-text">点击「上传图片」，裁剪出想要的区域后，<br/>即可双击地图添加地点。</p>
+          </div>
+          <img id="${MAP_STAGE_IMG_ID}" class="kaleido-map-editor__img" alt="地图背景" hidden />
+          <div id="${MAP_POINTS_ID}" class="kaleido-map-editor__points" hidden></div>
+        </div>
+        <div id="${MAP_POINT_EDITOR_ID}" class="kaleido-map-editor__point-editor" hidden>
+          <span class="kaleido-map-editor__point-editor-label"><span class="${MAP_POINT_ICON_CLASS}"></span> 地点名称</span>
+          <input id="${MAP_POINT_NAME_ID}" class="kaleido-input" type="text" maxlength="${MAP_POINT_NAME_MAX}" placeholder="如：学校 / 森林 / 城镇" autocomplete="off" spellcheck="false" />
+          <button type="button" id="${MAP_POINT_REMOVE_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--ghost" title="删除该地点">删除</button>
+          <button type="button" id="${MAP_POINT_EDITOR_CLOSE_ID}" class="kaleido-icon-btn" title="取消选中" aria-label="取消选中">✕</button>
+        </div>
+      </div>
+      <input id="${MAP_UPLOAD_INPUT_ID}" type="file" accept="image/*" hidden />
+    </div>
+  `;
+}
+
+// 渲染入口：tab 激活 / 首次打开时调用；内容只建一次，之后按状态刷新。
+function renderMapEditor() {
+  const pane = document.getElementById(VALUES_MAP_PANE_ID);
+  if (!pane) return;
+  ensureMapEditorState();
+  if (!pane.dataset.ready) {
+    pane.innerHTML = buildMapEditorHTML();
+    pane.dataset.ready = 'true';
+    bindMapEditorEvents();
+  }
+  refreshMapBindingStatus();
+  refreshMapToolbar();
+  renderMapStage();
+  renderMapPointEditor();
+  refreshMapDirty();
+}
+
+function refreshMapBindingStatus() {
+  const badge = document.getElementById(MAP_BINDING_ID);
+  if (!badge) return;
+  const ctx = getContextSafe();
+  const character = ctx ? getStoryCharacter(ctx) : null;
+  if (!character) {
+    badge.textContent = '未绑定角色 · 保存到全局设置';
+    badge.dataset.state = 'idle';
+    return;
+  }
+  const hasCard = Boolean(getMapCardData(ctx));
+  badge.textContent = hasCard ? `已绑定 · ${character.name}` : `待绑定 · ${character.name}`;
+  badge.dataset.state = hasCard ? 'ok' : 'warn';
+}
+
+function refreshMapToolbar() {
+  const state = ensureMapEditorState();
+  const cropBtn = document.getElementById(MAP_CROP_BTN_ID);
+  const addBtn = document.getElementById(MAP_ADD_POINT_ID);
+  if (cropBtn) cropBtn.hidden = !state.rawImage;
+  if (addBtn) addBtn.disabled = !state.card.background;
+}
+
+function refreshMapDirty() {
+  const state = ensureMapEditorState();
+  const save = document.getElementById(MAP_SAVE_ID);
+  const hint = document.getElementById(MAP_HINT_ID);
+  if (save) {
+    save.classList.toggle('is-dirty', state.dirty);
+    save.title = state.dirty ? '有未保存的修改，点击保存到角色卡' : '保存地图到当前角色卡';
+  }
+  if (hint) {
+    hint.textContent = state.dirty
+      ? '✎ 有未保存的修改 · 双击添加地点 · 拖动调整位置 · 点击选中后改名'
+      : '双击地图添加地点 · 拖动地点调整位置 · 点击选中后改名';
+  }
+}
+
+// ---------- 编辑舞台 ----------
+function renderMapStage() {
+  const state = ensureMapEditorState();
+  const img = document.getElementById(MAP_STAGE_IMG_ID);
+  const points = document.getElementById(MAP_POINTS_ID);
+  const empty = document.getElementById(MAP_EMPTY_ID);
+  if (!img || !points || !empty) return;
+  const hasBg = Boolean(state.card.background);
+  img.hidden = !hasBg;
+  points.hidden = !hasBg;
+  empty.hidden = hasBg;
+  if (hasBg) {
+    img.src = state.card.background;
+    renderMapEditorPoints(points, state);
+  }
+}
+
+function renderMapEditorPoints(container, state) {
+  container.innerHTML = '';
+  for (const point of state.card.points) {
+    const el = document.createElement('div');
+    el.className = 'kaleido-map-editor__point';
+    el.dataset.id = point.id;
+    el.classList.toggle('is-selected', point.id === state.selectedId);
+    el.style.left = `${point.x}%`;
+    el.style.top = `${point.y}%`;
+    el.setAttribute('title', point.name);
+    el.innerHTML = `
+      <span class="kaleido-map-editor__pin"><span class="${MAP_POINT_ICON_CLASS}"></span></span>
+      <span class="kaleido-map-editor__name">${escapeHtml(point.name)}</span>
+    `;
+    container.appendChild(el);
+  }
+}
+
+// ---------- 选中地点编辑条 ----------
+function renderMapPointEditor() {
+  const state = ensureMapEditorState();
+  const editor = document.getElementById(MAP_POINT_EDITOR_ID);
+  const nameInput = document.getElementById(MAP_POINT_NAME_ID);
+  if (!editor || !nameInput) return;
+  const point = state.selectedId ? findMapPoint(state.selectedId) : null;
+  editor.hidden = !point;
+  if (point && document.activeElement !== nameInput) {
+    nameInput.value = point.name;
+  }
+}
+
+function selectMapPoint(id) {
+  const state = ensureMapEditorState();
+  state.selectedId = id || null;
+  const container = document.getElementById(MAP_POINTS_ID);
+  if (container) {
+    container.querySelectorAll('.kaleido-map-editor__point').forEach((el) => {
+      el.classList.toggle('is-selected', el.dataset.id === state.selectedId);
+    });
+  }
+  renderMapPointEditor();
+}
+
+function addMapPoint(x, y) {
+  const state = ensureMapEditorState();
+  const point = {
+    id: mapGenPointId(),
+    name: MAP_DEFAULT_POINT_NAME,
+    x: mapClampCoord(x),
+    y: mapClampCoord(y),
+  };
+  state.card.points.push(point);
+  state.selectedId = point.id;
+  state.dirty = true;
+  renderMapStage();
+  renderMapPointEditor();
+  refreshMapDirty();
+  const nameInput = document.getElementById(MAP_POINT_NAME_ID);
+  if (nameInput) {
+    nameInput.focus();
+    nameInput.select();
+  }
+}
+
+// ---------- 保存 / 删除 ----------
+async function handleMapSave() {
+  const state = ensureMapEditorState();
+  const ctx = getContextSafe();
+  const character = ctx ? getStoryCharacter(ctx) : null;
+  if (!character || typeof ctx?.writeExtensionField !== 'function') {
+    // 无角色卡：落全局设置兜底，保证展示界面仍能用（不随角色卡导入/导出）。
+    fallbackMapDataToSettings(ctx, state.card);
+    state.dirty = false;
+    refreshMapDirty();
+    valuesToastr('success', '已保存到全局设置（当前未绑定角色卡，不随角色卡导入/导出）');
+    return;
+  }
+  state.card.updatedAt = new Date().toISOString();
+  try {
+    await saveMapNow(ctx, state.card);
+  } catch (error) {
+    valuesToastr('error', `保存失败：${String(error?.message || error).slice(0, 160)}`);
+    return;
+  }
+  const expected = isEmptyMapCard(state.card) ? VALUES_UNSET_SENTINEL : state.card;
+  const ok = await verifyMapCardWrite(ctx, String(character.avatar), expected);
+  if (ok === false) {
+    valuesToastr('error', '保存未生效：角色卡写入被宿主忽略，请重试');
+    return;
+  }
+  state.dirty = false;
+  refreshMapDirty();
+  refreshMapBindingStatus();
+  valuesToastr('success', isEmptyMapCard(state.card) ? '地图已删除' : `已保存地图（${state.card.points.length} 个地点）`);
+}
+
+async function handleMapDelete() {
+  const state = ensureMapEditorState();
+  const hasData = Boolean(state.card.background) || state.card.points.length > 0;
+  if (!hasData) return;
+  const ok = await kaleidoConfirm('删除整张地图？\n背景图与全部地点都会被移除，保存后生效。');
+  if (!ok) return;
+  state.card = createEmptyMapCard();
+  state.selectedId = null;
+  state.dirty = true;
+  renderMapStage();
+  renderMapPointEditor();
+  refreshMapToolbar();
+  refreshMapDirty();
+}
+
+// ---------- 编辑器事件 ----------
+function bindMapEditorEvents() {
+  if (globalThis[MAP_EDITOR_EVENTS_KEY]) return;
+  globalThis[MAP_EDITOR_EVENTS_KEY] = true;
+  const uploadBtn = document.getElementById(MAP_UPLOAD_BTN_ID);
+  const uploadInput = document.getElementById(MAP_UPLOAD_INPUT_ID);
+  uploadBtn?.addEventListener('click', () => uploadInput?.click());
+  uploadInput?.addEventListener('change', handleMapUpload);
+  document.getElementById(MAP_CROP_BTN_ID)?.addEventListener('click', handleMapRecrop);
+  document.getElementById(MAP_ADD_POINT_ID)?.addEventListener('click', () => addMapPoint(50, 50));
+  document.getElementById(MAP_SAVE_ID)?.addEventListener('click', handleMapSave);
+  document.getElementById(MAP_DELETE_ID)?.addEventListener('click', handleMapDelete);
+  document.getElementById(MAP_STAGE_ID)?.addEventListener('dblclick', handleMapStageDblClick);
+  document.getElementById(MAP_POINTS_ID)?.addEventListener('pointerdown', handleMapPointsPointerDown);
+  document.getElementById(MAP_POINTS_ID)?.addEventListener('pointermove', handleMapPointsPointerMove);
+  document.getElementById(MAP_POINTS_ID)?.addEventListener('pointerup', handleMapPointsPointerUp);
+  document.getElementById(MAP_POINTS_ID)?.addEventListener('pointercancel', handleMapPointsPointerUp);
+  const nameInput = document.getElementById(MAP_POINT_NAME_ID);
+  nameInput?.addEventListener('input', () => {
+    const state = ensureMapEditorState();
+    const point = state.selectedId ? findMapPoint(state.selectedId) : null;
+    if (!point) return;
+    point.name = nameInput.value.slice(0, MAP_POINT_NAME_MAX);
+    state.dirty = true;
+    refreshMapDirty();
+  });
+  nameInput?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') nameInput.blur();
+  });
+  nameInput?.addEventListener('change', () => {
+    const state = ensureMapEditorState();
+    const point = state.selectedId ? findMapPoint(state.selectedId) : null;
+    if (!point) return;
+    const name = nameInput.value.trim() || MAP_DEFAULT_POINT_NAME;
+    point.name = name.slice(0, MAP_POINT_NAME_MAX);
+    renderMapStage();
+  });
+  document.getElementById(MAP_POINT_REMOVE_ID)?.addEventListener('click', async () => {
+    const state = ensureMapEditorState();
+    const point = state.selectedId ? findMapPoint(state.selectedId) : null;
+    if (!point) return;
+    const ok = await kaleidoConfirm(`删除地点「${point.name}」？`);
+    if (!ok) return;
+    state.card.points = state.card.points.filter((item) => item.id !== point.id);
+    state.selectedId = null;
+    state.dirty = true;
+    renderMapStage();
+    renderMapPointEditor();
+    refreshMapDirty();
+  });
+  document.getElementById(MAP_POINT_EDITOR_CLOSE_ID)?.addEventListener('click', () => selectMapPoint(null));
+}
+
+async function handleMapUpload(event) {
+  const input = event.target;
+  const file = input?.files?.[0];
+  input.value = ''; // 允许再次选择同一文件
+  if (!file) return;
+  try {
+    const dataURL = await mapReadFileAsDataURL(file);
+    const image = await mapLoadImage(dataURL);
+    const state = ensureMapEditorState();
+    state.rawDataURL = dataURL;
+    state.rawImage = image;
+    openMapCropDialog(image);
+  } catch (error) {
+    valuesToastr('error', String(error?.message || error));
+  }
+}
+
+function handleMapRecrop() {
+  const state = ensureMapEditorState();
+  if (!state.rawImage) return;
+  openMapCropDialog(state.rawImage);
+}
+
+function handleMapStageDblClick(event) {
+  if (event.target.closest(`#${MAP_POINTS_ID} .kaleido-map-editor__point`)) return;
+  const state = ensureMapEditorState();
+  if (!state.card.background) return;
+  const stage = document.getElementById(MAP_STAGE_ID);
+  const rect = stage.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  addMapPoint(
+    mapClampCoord(((event.clientX - rect.left) / rect.width) * 100),
+    mapClampCoord(((event.clientY - rect.top) / rect.height) * 100)
+  );
+}
+
+// 地点拖动：按下即选中；位移超过阈值才算拖动，抬起时提交坐标。
+function handleMapPointsPointerDown(event) {
+  const pointEl = event.target.closest('.kaleido-map-editor__point');
+  if (!pointEl) return;
+  const state = ensureMapEditorState();
+  const id = pointEl.dataset.id;
+  if (state.selectedId !== id) selectMapPoint(id);
+  const stage = document.getElementById(MAP_STAGE_ID);
+  const rect = stage.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  mapPointDrag = {
+    id,
+    el: pointEl,
+    startX: event.clientX,
+    startY: event.clientY,
+    stageLeft: rect.left,
+    stageTop: rect.top,
+    stageW: rect.width,
+    stageH: rect.height,
+    moved: false,
+  };
+  pointEl.setPointerCapture?.(event.pointerId);
+  event.preventDefault();
+}
+
+function handleMapPointsPointerMove(event) {
+  const drag = mapPointDrag;
+  if (!drag) return;
+  const dx = event.clientX - drag.startX;
+  const dy = event.clientY - drag.startY;
+  if (!drag.moved && Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
+  drag.moved = true;
+  const x = mapClampCoord(((event.clientX - drag.stageLeft) / drag.stageW) * 100);
+  const y = mapClampCoord(((event.clientY - drag.stageTop) / drag.stageH) * 100);
+  const point = findMapPoint(drag.id);
+  if (!point) return;
+  point.x = x;
+  point.y = y;
+  drag.el.style.left = `${x}%`;
+  drag.el.style.top = `${y}%`;
+}
+
+function handleMapPointsPointerUp(event) {
+  const drag = mapPointDrag;
+  if (!drag) return;
+  mapPointDrag = null;
+  try {
+    drag.el.releasePointerCapture?.(event.pointerId);
+  } catch {}
+  if (drag.moved) {
+    const state = ensureMapEditorState();
+    state.dirty = true;
+    refreshMapDirty();
+  }
+}
+
+// =========================================================
+// 裁剪弹层（全屏遮罩，挂在 body；is-open 控制显示）
+// =========================================================
+// 舞台内图片等比缩放铺出「视图层」（kaleido-map-crop-view，含留白居中），
+// 裁剪框只在该视图层内移动 / 缩放；换算到自然像素时用视图层尺寸做比例。
+function initMapCropDialog() {
+  if (getMapCropDialog()) return;
+  const dialog = document.createElement('div');
+  dialog.id = MAP_CROP_DIALOG_ID;
+  dialog.className = 'kaleido-map-dialog';
+  dialog.setAttribute('aria-hidden', 'true');
+  dialog.innerHTML = `
+    <div class="kaleido-map-dialog__inner" role="dialog" aria-label="裁剪地图背景">
+      <div class="kaleido-map-dialog__header">
+        <span class="kaleido-map-dialog__title"><span class="${MAP_CROP_ICON_CLASS}"></span> 裁剪背景图</span>
+        <span class="kaleido-map-dialog__spacer"></span>
+        <span id="${MAP_CROP_INFO_ID}" class="kaleido-map-dialog__info"></span>
+        <button type="button" class="kaleido-map-dialog__cancel kaleido-icon-btn" title="取消裁剪" aria-label="取消裁剪">✕</button>
+      </div>
+      <div class="kaleido-map-dialog__body">
+        <div id="${MAP_CROP_STAGE_ID}" class="kaleido-map-dialog__stage">
+          <div id="${MAP_CROP_VIEW_ID}" class="kaleido-map-dialog__view">
+            <img id="${MAP_CROP_IMG_ID}" class="kaleido-map-dialog__img" alt="待裁剪的背景图" />
+            <div id="${MAP_CROP_BOX_ID}" class="kaleido-map-dialog__box">
+              <span class="kaleido-map-dialog__handle" data-handle="nw" aria-hidden="true"></span>
+              <span class="kaleido-map-dialog__handle" data-handle="ne" aria-hidden="true"></span>
+              <span class="kaleido-map-dialog__handle" data-handle="sw" aria-hidden="true"></span>
+              <span class="kaleido-map-dialog__handle" data-handle="se" aria-hidden="true"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="kaleido-map-dialog__footer">
+        <button type="button" id="${MAP_CROP_CONFIRM_ID}" class="kaleido-btn kaleido-btn--primary">确定裁剪</button>
+        <button type="button" class="kaleido-map-dialog__cancel kaleido-btn kaleido-btn--ghost">取消</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(dialog);
+  document.querySelectorAll(`#${MAP_CROP_DIALOG_ID} .kaleido-map-dialog__cancel`).forEach((btn) => {
+    btn.addEventListener('click', closeMapCropDialog);
+  });
+  document.getElementById(MAP_CROP_CONFIRM_ID)?.addEventListener('click', handleMapCropConfirm);
+  // 点遮罩空白处关闭。
+  dialog.addEventListener('click', (event) => {
+    if (event.target === dialog) closeMapCropDialog();
+  });
+  bindMapCropBoxEvents();
+  if (!globalThis[MAP_CROP_ESC_KEY]) {
+    globalThis[MAP_CROP_ESC_KEY] = (event) => {
+      if (event.key !== 'Escape') return;
+      const dialogEl = getMapCropDialog();
+      if (dialogEl && dialogEl.classList.contains('is-open')) closeMapCropDialog();
+    };
+    document.addEventListener('keydown', globalThis[MAP_CROP_ESC_KEY]);
+  }
+}
+
+function getMapCropDialog() {
+  return document.getElementById(MAP_CROP_DIALOG_ID);
+}
+
+function isMapCropDialogOpen() {
+  const dialog = getMapCropDialog();
+  return Boolean(dialog && dialog.classList.contains('is-open'));
+}
+
+function openMapCropDialog(image) {
+  const dialog = getMapCropDialog();
+  if (!dialog) return;
+  const img = document.getElementById(MAP_CROP_IMG_ID);
+  mapCropState = { image, view: null, rect: null, drag: null };
+  // 先挂 onload / onerror 再赋 src（dataURL 解码可能同步完成，避免错过事件）。
+  img.onload = () => {
+    dialog.classList.add('is-open');
+    dialog.setAttribute('aria-hidden', 'false');
+    layoutMapCropView();
+  };
+  img.onerror = () => {
+    closeMapCropDialog();
+    valuesToastr('error', '图片加载失败，请重新上传');
+  };
+  img.src = image.src;
+}
+
+// 舞台内把图片等比缩放居中铺出视图层，裁剪框默认取视图层 70%。
+function layoutMapCropView() {
+  const state = mapCropState;
+  if (!state?.image) return;
+  const stage = document.getElementById(MAP_CROP_STAGE_ID);
+  const view = document.getElementById(MAP_CROP_VIEW_ID);
+  if (!stage || !view) return;
+  const stageRect = stage.getBoundingClientRect();
+  if (!stageRect.width || !stageRect.height) return;
+  const scale = Math.min(stageRect.width / state.image.naturalWidth, stageRect.height / state.image.naturalHeight);
+  const width = Math.max(1, Math.round(state.image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(state.image.naturalHeight * scale));
+  const x = Math.round((stageRect.width - width) / 2);
+  const y = Math.round((stageRect.height - height) / 2);
+  state.view = { x, y, width, height };
+  view.style.display = 'block';
+  view.style.left = `${x}px`;
+  view.style.top = `${y}px`;
+  view.style.width = `${width}px`;
+  view.style.height = `${height}px`;
+  const boxW = Math.max(60, Math.round(width * 0.7));
+  const boxH = Math.max(60, Math.round(height * 0.7));
+  state.rect = {
+    x: Math.round((width - boxW) / 2),
+    y: Math.round((height - boxH) / 2),
+    width: boxW,
+    height: boxH,
+  };
+  applyMapCropBox();
+  updateMapCropInfo();
+}
+
+function closeMapCropDialog() {
+  const dialog = getMapCropDialog();
+  if (!dialog) return;
+  mapCropState = null;
+  dialog.classList.remove('is-open');
+  dialog.setAttribute('aria-hidden', 'true');
+}
+
+function applyMapCropBox() {
+  const box = document.getElementById(MAP_CROP_BOX_ID);
+  const state = mapCropState;
+  if (!box || !state?.rect) return;
+  box.style.left = `${state.rect.x}px`;
+  box.style.top = `${state.rect.y}px`;
+  box.style.width = `${state.rect.width}px`;
+  box.style.height = `${state.rect.height}px`;
+}
+
+function updateMapCropInfo() {
+  const info = document.getElementById(MAP_CROP_INFO_ID);
+  const state = mapCropState;
+  if (!info || !state?.rect || !state.image || !state.view?.width) return;
+  const scaleX = state.image.naturalWidth / state.view.width;
+  const scaleY = state.image.naturalHeight / state.view.height;
+  const w = Math.round(state.rect.width * scaleX);
+  const h = Math.round(state.rect.height * scaleY);
+  info.textContent = `选中 ${w} × ${h} px · 拖动裁剪框 / 拖四角调整`;
+}
+
+function handleMapCropConfirm() {
+  const state = mapCropState;
+  if (!state?.rect || !state.image || !state.view?.width) return;
+  const scaleX = state.image.naturalWidth / state.view.width;
+  const scaleY = state.image.naturalHeight / state.view.height;
+  const rect = {
+    x: Math.round(state.rect.x * scaleX),
+    y: Math.round(state.rect.y * scaleY),
+    width: Math.round(state.rect.width * scaleX),
+    height: Math.round(state.rect.height * scaleY),
+  };
+  try {
+    const dataURL = mapCropImageToDataURL(state.image, rect, MAP_IMAGE_MAX_DIM);
+    const editor = ensureMapEditorState();
+    editor.card.background = dataURL;
+    editor.dirty = true;
+    closeMapCropDialog();
+    renderMapStage();
+    refreshMapToolbar();
+    refreshMapDirty();
+    if (dataURL.length > MAP_IMAGE_MAX_LEN) {
+      valuesToastr('warning', '图片体积较大，角色卡文件会明显变大；建议换用尺寸更小的图片');
+    }
+  } catch (error) {
+    valuesToastr('error', `裁剪失败：${String(error?.message || error)}`);
+  }
+}
+
+// 裁剪框交互：框体拖动移位，四角手柄缩放（最小 60px，不越出图片视图层）。
+function bindMapCropBoxEvents() {
+  const box = document.getElementById(MAP_CROP_BOX_ID);
+  if (!box) return;
+  box.addEventListener('pointerdown', (event) => {
+    const state = mapCropState;
+    if (!state?.rect) return;
+    const handle = event.target.closest('[data-handle]');
+    state.drag = {
+      mode: handle ? handle.dataset.handle : 'move',
+      startX: event.clientX,
+      startY: event.clientY,
+      rect: { ...state.rect },
+    };
+    event.preventDefault();
+    box.setPointerCapture?.(event.pointerId);
+  });
+  box.addEventListener('pointermove', (event) => {
+    const state = mapCropState;
+    const drag = state?.drag;
+    if (!drag || !state.view) return;
+    const dx = event.clientX - drag.startX;
+    const dy = event.clientY - drag.startY;
+    const min = 60;
+    const maxX = state.view.width;
+    const maxY = state.view.height;
+    let { x, y, width, height } = drag.rect;
+    if (drag.mode === 'move') {
+      x = mapClampRange(x + dx, 0, maxX - width);
+      y = mapClampRange(y + dy, 0, maxY - height);
+    } else {
+      if (drag.mode.includes('w')) {
+        const nx = mapClampRange(x + dx, 0, x + width - min);
+        width += x - nx;
+        x = nx;
+      }
+      if (drag.mode.includes('e')) width = mapClampRange(width + dx, min, maxX - x);
+      if (drag.mode.includes('n')) {
+        const ny = mapClampRange(y + dy, 0, y + height - min);
+        height += y - ny;
+        y = ny;
+      }
+      if (drag.mode.includes('s')) height = mapClampRange(height + dy, min, maxY - y);
+    }
+    state.rect = { x, y, width, height };
+    applyMapCropBox();
+    updateMapCropInfo();
+  });
+  const end = (event) => {
+    const state = mapCropState;
+    if (!state?.drag) return;
+    state.drag = null;
+    try {
+      box.releasePointerCapture?.(event.pointerId);
+    } catch {}
+  };
+  box.addEventListener('pointerup', end);
+  box.addEventListener('pointercancel', end);
+}
+
+// ---------- 装配入口（ui-shell createPanel 调用） ----------
+function initMapSection() {
+  initMapCropDialog();
+}
+
+
 // ===== js/views-game.js =====
-// ===== 万华镜（Kaleidoscope）游戏模式：玩家数据档案 =====
-// 只读展示「变量系统」注入提示词的那些变量：当前游戏值总览，
-// 让玩家随时看到当前游戏中的各种数据（角色属性、资源、好感、状态等）。
-// 数据源与「变量注入」完全一致（getValuesGameTree），
-// 展示的就是主模型实际看到的内容；本视图不提供任何编辑入口。
+// ===== 万华镜（Kaleidoscope）游戏模式：玩家档案 + 游戏地图 =====
+// 视图内两个切换图标：左边「游戏地图」（当前角色绑定的地图展示），
+// 右边「游戏数据」（「变量系统」注入提示词的那些变量：当前游戏值总览，
+// 展示的就是主模型实际看到的内容）。两个区块均只读，无编辑入口；
+// 地图编辑在「变量系统 → 游戏地图」tab 里完成。
 // 视觉：档案体例——朱砂印章节 + 点线目次，只呈现数值本身，不做工作台式标注。
+
+let gameActivePane = 'map'; // 'map'（游戏地图） | 'data'（游戏数据）
 
 function getGameView() {
   return document.getElementById(GAME_VIEW_ID);
@@ -11016,6 +12135,8 @@ function renderGameView() {
   const ctx = getContextSafe();
   renderGameMeta(ctx);
   renderGameTree(ctx);
+  renderGameMap(ctx);
+  applyGamePane();
 }
 
 // 视图正打开时刷新（变量维护完成 / 生成结束后调用，让面板数据保持最新）。
@@ -11024,7 +12145,25 @@ function refreshGameViewIfActive() {
   renderGameView();
 }
 
-
+// 两个切换图标对应的内容区显隐：地图区 / 数据区二选一。
+function applyGamePane() {
+  const mapPane = document.getElementById(GAME_MAP_PANE_ID);
+  const tree = document.getElementById(GAME_TREE_ID);
+  const mapTab = document.getElementById(GAME_MAP_TAB_ID);
+  const dataTab = document.getElementById(GAME_DATA_TAB_ID);
+  if (!mapPane || !tree) return;
+  const isMap = gameActivePane === 'map';
+  mapPane.hidden = !isMap;
+  tree.hidden = isMap;
+  if (mapTab) {
+    mapTab.classList.toggle('is-active', isMap);
+    mapTab.setAttribute('aria-selected', String(isMap));
+  }
+  if (dataTab) {
+    dataTab.classList.toggle('is-active', !isMap);
+    dataTab.setAttribute('aria-selected', String(!isMap));
+  }
+}
 
 // 封面副题：只保留最近更新时间（注入 / 自动维护等工程信息不面向玩家）。
 function renderGameMeta(ctx) {
@@ -11124,7 +12263,7 @@ function initGameSection(panel) {
       <div class="kaleido-game__cover">
         <span class="kaleido-game__cover-seal" aria-hidden="true"><span class="${GAME_ICON_CLASS}"></span></span>
         <span class="kaleido-game__cover-text">
-          <span class="kaleido-game__cover-title">游戏档案</span>
+          <span class="kaleido-game__cover-title">游戏模式</span>
           <span id="${GAME_UPDATED_ID}" class="kaleido-game__cover-updated" hidden title="最近一次游戏值写入时间"></span>
         </span>
         <span class="kaleido-game__cover-spacer"></span>
@@ -11135,8 +12274,21 @@ function initGameSection(panel) {
           <span class="fa-solid fa-house"></span>
         </button>
       </div>
+      <!-- 双入口切换：游戏地图 / 游戏数据 -->
+      <div class="kaleido-game__switch" role="tablist" aria-label="游戏模式入口">
+        <button type="button" id="${GAME_MAP_TAB_ID}" class="kaleido-game__switch-btn is-active" role="tab" aria-selected="true" title="当前角色绑定的游戏地图（在「变量系统 → 游戏地图」编辑）">
+          <span class="kaleido-game__switch-icon"><span class="${MAP_ICON_CLASS}"></span></span>
+          <span class="kaleido-game__switch-label">游戏地图</span>
+        </button>
+        <button type="button" id="${GAME_DATA_TAB_ID}" class="kaleido-game__switch-btn" role="tab" aria-selected="false" title="当前游戏数据总览">
+          <span class="kaleido-game__switch-icon"><span class="${MAP_DATA_ICON_CLASS}"></span></span>
+          <span class="kaleido-game__switch-label">游戏数据</span>
+        </button>
+      </div>
+      <!-- 地图展示（渲染函数见 views-map.js） -->
+      <div id="${GAME_MAP_PANE_ID}" class="kaleido-game__map"></div>
       <!-- 档案正文：游戏值总览 -->
-      <div id="${GAME_TREE_ID}" class="kaleido-game__tree"></div>
+      <div id="${GAME_TREE_ID}" class="kaleido-game__tree" hidden></div>
     </div>
   `;
   panel.querySelector('.kaleido-panel__body')?.appendChild(section);
@@ -11144,6 +12296,14 @@ function initGameSection(panel) {
     renderGameView();
   });
   document.getElementById(GAME_GEAR_ID)?.addEventListener('click', () => showPanelView(HOME_VIEW_ID));
+  document.getElementById(GAME_MAP_TAB_ID)?.addEventListener('click', () => {
+    gameActivePane = 'map';
+    applyGamePane();
+  });
+  document.getElementById(GAME_DATA_TAB_ID)?.addEventListener('click', () => {
+    gameActivePane = 'data';
+    applyGamePane();
+  });
 }
 
 

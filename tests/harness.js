@@ -24,6 +24,9 @@ const SOURCE_FILES = [
   'js/values-inject.js',
   'js/values-trigger.js',
   'js/views-values.js',
+  'js/map-data.js',
+  'js/map-image.js',
+  'js/views-map.js',
   'js/views-game.js',
 ];
 // main.js 单独列出：含 bootstrap 副作用（定时器、菜单注入），仅数据测试不加载。

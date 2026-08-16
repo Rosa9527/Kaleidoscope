@@ -4,6 +4,51 @@ function cloneValue(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+// 深比较（JSON 语义）：对象忽略键顺序、数组顺序敏感、原始值严格相等。
+// 写卡校验不能用 JSON.stringify 全等——宿主（TauriTavern）反序列化角色卡时
+// 会按自己的序列化器重排对象键序（实测重读回来 background 排在 version 前），
+// 内容一致也会被字符串比较误判为「写入未生效」。
+function jsonDeepEqual(a, b) {
+  if (a === b) return true;
+  if (a === null || b === null || typeof a !== typeof b) return false;
+  if (typeof a !== 'object') return false;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    return a.every((item, index) => jsonDeepEqual(item, b[index]));
+  }
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  return keysA.every((key) => Object.prototype.hasOwnProperty.call(b, key) && jsonDeepEqual(a[key], b[key]));
+}
+
+// 写卡校验失败的差异摘要：指出第一个不一致的字段（增删 / 值变化 / 数组长度），
+// 供系统日志定位「保存未生效」的真实原因（如宿主合并语义吞掉了某字段）。
+function describeJsonDiff(a, b, depth = 0) {
+  if (a === b) return '';
+  if (depth > 2) return ' …';
+  const bothObjects = a !== null && b !== null
+    && typeof a === 'object' && typeof b === 'object'
+    && Array.isArray(a) === Array.isArray(b);
+  if (!bothObjects) return ` ${JSON.stringify(a)} ≠ ${JSON.stringify(b)}`;
+  if (Array.isArray(a)) {
+    if (a.length !== b.length) return ` 长度 ${a.length} ≠ ${b.length}`;
+    for (let i = 0; i < a.length; i++) {
+      const detail = describeJsonDiff(a[i], b[i], depth + 1);
+      if (detail) return ` 第${i + 1}项${detail}`;
+    }
+    return '';
+  }
+  const parts = [];
+  for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    if (!Object.prototype.hasOwnProperty.call(a, key)) { parts.push(`+${key}`); continue; }
+    if (!Object.prototype.hasOwnProperty.call(b, key)) { parts.push(`-${key}`); continue; }
+    const detail = describeJsonDiff(a[key], b[key], depth + 1);
+    if (detail) parts.push(`${key}${detail}`);
+  }
+  return parts.length ? ` {${parts.join(', ')}}` : '';
+}
+
 
 // 轻量日志：写入系统日志缓冲（面板「系统日志」视图可见），同时输出到控制台。
 // pushLogEntry / CONSOLE_ORIGINALS 由 js/views-log.js 提供；加载顺序保证运行时已就绪。

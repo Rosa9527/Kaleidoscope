@@ -1,7 +1,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.2.2';
+const MODULE_VERSION = '1.3.0';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -418,6 +418,59 @@ const GAME_REFRESH_ID = 'kaleido-game-refresh';
 const GAME_GEAR_ID = 'kaleido-game-gear';
 const GAME_TREE_ID = 'kaleido-game-tree';
 const GAME_REFRESH_ENDED_KEY = '__kaleido_game_refresh_ended__';
+// ---------- 地图系统（游戏地图：角色卡绑定）----------
+// 地图数据存角色卡 extensions['kaleidoscope_map']，随角色卡导入/导出自动携带；
+// 群聊 / 未选角色时回退全局设置 mapData。背景图为裁剪后的 base64 PNG，
+// 地点坐标为背景图百分比（0~100），展示与编辑按比例缩放对齐。
+const MAP_CARD_EXTENSION_KEY = 'kaleidoscope_map';
+const MAP_CARD_DATA_VERSION = 1;
+// 裁剪导出最长边上限（px）：超出等比降采样，避免角色卡被超大图片撑爆。
+const MAP_IMAGE_MAX_DIM = 1600;
+// 背景图 dataURL 超过该长度（字符数）时提示体积偏大。
+const MAP_IMAGE_MAX_LEN = 1.5 * 1024 * 1024;
+const MAP_DEFAULT_POINT_NAME = '新地点';
+const MAP_POINT_NAME_MAX = 40;
+// 游戏模式 · 地图展示（游戏地图 / 游戏数据 两个切换图标）
+const GAME_MAP_TAB_ID = 'kaleido-game-map-tab';
+const GAME_DATA_TAB_ID = 'kaleido-game-data-tab';
+const GAME_MAP_PANE_ID = 'kaleido-game-map-pane';
+const MAP_GO_EDIT_ID = 'kaleido-map-go-edit';
+const MAP_ICON_CLASS = 'fa-solid fa-map';
+const MAP_DATA_ICON_CLASS = 'fa-solid fa-chart-simple';
+const MAP_POINT_ICON_CLASS = 'fa-solid fa-location-dot';
+const MAP_CROP_ICON_CLASS = 'fa-solid fa-crop';
+// 变量工作台 · 地图编辑器（第 5 个 tab）
+const VALUES_TAB_MAP_ID = 'kaleido-values-tab-map';
+const VALUES_MAP_PANE_ID = 'kaleido-values-map-pane';
+const MAP_BINDING_ID = 'kaleido-map-binding';
+const MAP_UPLOAD_BTN_ID = 'kaleido-map-upload-btn';
+const MAP_UPLOAD_INPUT_ID = 'kaleido-map-upload-input';
+const MAP_CROP_BTN_ID = 'kaleido-map-crop-btn';
+const MAP_ADD_POINT_ID = 'kaleido-map-add-point';
+const MAP_SAVE_ID = 'kaleido-map-save';
+const MAP_DELETE_ID = 'kaleido-map-delete';
+const MAP_STAGE_ID = 'kaleido-map-stage';
+const MAP_STAGE_IMG_ID = 'kaleido-map-stage-img';
+const MAP_POINTS_ID = 'kaleido-map-points';
+const MAP_EMPTY_ID = 'kaleido-map-empty';
+const MAP_HINT_ID = 'kaleido-map-hint';
+const MAP_POINT_EDITOR_ID = 'kaleido-map-point-editor';
+const MAP_POINT_NAME_ID = 'kaleido-map-point-name';
+const MAP_POINT_REMOVE_ID = 'kaleido-map-point-remove';
+const MAP_POINT_EDITOR_CLOSE_ID = 'kaleido-map-point-editor-close';
+// 裁剪弹层（全屏遮罩，挂在 body；is-open 控制显示）
+const MAP_CROP_DIALOG_ID = 'kaleido-map-crop-dialog';
+const MAP_CROP_STAGE_ID = 'kaleido-map-crop-stage';
+const MAP_CROP_VIEW_ID = 'kaleido-map-crop-view';
+const MAP_CROP_IMG_ID = 'kaleido-map-crop-img';
+const MAP_CROP_BOX_ID = 'kaleido-map-crop-box';
+const MAP_CROP_INFO_ID = 'kaleido-map-crop-info';
+const MAP_CROP_CONFIRM_ID = 'kaleido-map-crop-confirm';
+const MAP_CROP_CANCEL_ID = 'kaleido-map-crop-cancel';
+// 编辑器内存态 / 事件去重 key
+const MAP_EDITOR_KEY = '__kaleido_map_editor__';
+const MAP_CROP_ESC_KEY = '__kaleido_map_crop_esc_key__';
+const MAP_EDITOR_EVENTS_KEY = '__kaleido_map_editor_events__';
 // ---------- 剧情预筛（Story Gate）----------
 const STORY_GATE_INJECT_KEY = 'Kaleidoscope_Story_Event';
 const STORY_GATE_RECENT_COUNT = 4;
@@ -556,6 +609,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   storyGatePrompt: '',
   valuesNavCollapsed: false,
   theme: DEFAULT_THEME,
+  mapData: null,
 });
 
 // 宿主上下文不可扩展时的兜底设置存储（WeakMap 随上下文释放）。

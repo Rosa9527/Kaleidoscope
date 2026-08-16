@@ -1,9 +1,11 @@
-// ===== 万华镜（Kaleidoscope）游戏模式：玩家数据档案 =====
-// 只读展示「变量系统」注入提示词的那些变量：当前游戏值总览，
-// 让玩家随时看到当前游戏中的各种数据（角色属性、资源、好感、状态等）。
-// 数据源与「变量注入」完全一致（getValuesGameTree），
-// 展示的就是主模型实际看到的内容；本视图不提供任何编辑入口。
+// ===== 万华镜（Kaleidoscope）游戏模式：玩家档案 + 游戏地图 =====
+// 视图内两个切换图标：左边「游戏地图」（当前角色绑定的地图展示），
+// 右边「游戏数据」（「变量系统」注入提示词的那些变量：当前游戏值总览，
+// 展示的就是主模型实际看到的内容）。两个区块均只读，无编辑入口；
+// 地图编辑在「变量系统 → 游戏地图」tab 里完成。
 // 视觉：档案体例——朱砂印章节 + 点线目次，只呈现数值本身，不做工作台式标注。
+
+let gameActivePane = 'map'; // 'map'（游戏地图） | 'data'（游戏数据）
 
 function getGameView() {
   return document.getElementById(GAME_VIEW_ID);
@@ -21,6 +23,8 @@ function renderGameView() {
   const ctx = getContextSafe();
   renderGameMeta(ctx);
   renderGameTree(ctx);
+  renderGameMap(ctx);
+  applyGamePane();
 }
 
 // 视图正打开时刷新（变量维护完成 / 生成结束后调用，让面板数据保持最新）。
@@ -29,7 +33,25 @@ function refreshGameViewIfActive() {
   renderGameView();
 }
 
-
+// 两个切换图标对应的内容区显隐：地图区 / 数据区二选一。
+function applyGamePane() {
+  const mapPane = document.getElementById(GAME_MAP_PANE_ID);
+  const tree = document.getElementById(GAME_TREE_ID);
+  const mapTab = document.getElementById(GAME_MAP_TAB_ID);
+  const dataTab = document.getElementById(GAME_DATA_TAB_ID);
+  if (!mapPane || !tree) return;
+  const isMap = gameActivePane === 'map';
+  mapPane.hidden = !isMap;
+  tree.hidden = isMap;
+  if (mapTab) {
+    mapTab.classList.toggle('is-active', isMap);
+    mapTab.setAttribute('aria-selected', String(isMap));
+  }
+  if (dataTab) {
+    dataTab.classList.toggle('is-active', !isMap);
+    dataTab.setAttribute('aria-selected', String(!isMap));
+  }
+}
 
 // 封面副题：只保留最近更新时间（注入 / 自动维护等工程信息不面向玩家）。
 function renderGameMeta(ctx) {
@@ -129,7 +151,7 @@ function initGameSection(panel) {
       <div class="kaleido-game__cover">
         <span class="kaleido-game__cover-seal" aria-hidden="true"><span class="${GAME_ICON_CLASS}"></span></span>
         <span class="kaleido-game__cover-text">
-          <span class="kaleido-game__cover-title">游戏档案</span>
+          <span class="kaleido-game__cover-title">游戏模式</span>
           <span id="${GAME_UPDATED_ID}" class="kaleido-game__cover-updated" hidden title="最近一次游戏值写入时间"></span>
         </span>
         <span class="kaleido-game__cover-spacer"></span>
@@ -140,8 +162,21 @@ function initGameSection(panel) {
           <span class="fa-solid fa-house"></span>
         </button>
       </div>
+      <!-- 双入口切换：游戏地图 / 游戏数据 -->
+      <div class="kaleido-game__switch" role="tablist" aria-label="游戏模式入口">
+        <button type="button" id="${GAME_MAP_TAB_ID}" class="kaleido-game__switch-btn is-active" role="tab" aria-selected="true" title="当前角色绑定的游戏地图（在「变量系统 → 游戏地图」编辑）">
+          <span class="kaleido-game__switch-icon"><span class="${MAP_ICON_CLASS}"></span></span>
+          <span class="kaleido-game__switch-label">游戏地图</span>
+        </button>
+        <button type="button" id="${GAME_DATA_TAB_ID}" class="kaleido-game__switch-btn" role="tab" aria-selected="false" title="当前游戏数据总览">
+          <span class="kaleido-game__switch-icon"><span class="${MAP_DATA_ICON_CLASS}"></span></span>
+          <span class="kaleido-game__switch-label">游戏数据</span>
+        </button>
+      </div>
+      <!-- 地图展示（渲染函数见 views-map.js） -->
+      <div id="${GAME_MAP_PANE_ID}" class="kaleido-game__map"></div>
       <!-- 档案正文：游戏值总览 -->
-      <div id="${GAME_TREE_ID}" class="kaleido-game__tree"></div>
+      <div id="${GAME_TREE_ID}" class="kaleido-game__tree" hidden></div>
     </div>
   `;
   panel.querySelector('.kaleido-panel__body')?.appendChild(section);
@@ -149,4 +184,12 @@ function initGameSection(panel) {
     renderGameView();
   });
   document.getElementById(GAME_GEAR_ID)?.addEventListener('click', () => showPanelView(HOME_VIEW_ID));
+  document.getElementById(GAME_MAP_TAB_ID)?.addEventListener('click', () => {
+    gameActivePane = 'map';
+    applyGamePane();
+  });
+  document.getElementById(GAME_DATA_TAB_ID)?.addEventListener('click', () => {
+    gameActivePane = 'data';
+    applyGamePane();
+  });
 }

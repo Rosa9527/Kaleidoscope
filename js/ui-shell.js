@@ -374,7 +374,7 @@ function createPanel() {
             <div class="kaleido-home__hero">
               <span class="kaleido-home__logo"><span class="${MENU_ICON_CLASS}"></span></span>
               <p class="kaleido-home__slogan"><span class="kaleido-home__slogan-first" aria-hidden="true">镜</span>中万象</p>
-              <button type="button" id="${HOME_GAME_BUTTON_ID}" class="kaleido-home__log-btn" title="游戏模式：玩家数据档案" aria-label="游戏模式">
+              <button type="button" id="${HOME_GAME_BUTTON_ID}" class="kaleido-home__log-btn" title="游戏模式：游戏地图与玩家数据档案" aria-label="游戏模式">
                 <span class="${GAME_ICON_CLASS}"></span>
               </button>
             </div>
@@ -611,6 +611,7 @@ function createPanel() {
   initStorySection(panel);
   initValuesSection(panel);
   initGameSection(panel);
+  initMapSection();
   initLogView(panel);
   initPresetSection(panel);
   initThemeSection(panel);

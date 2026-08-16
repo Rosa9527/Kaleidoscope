@@ -33,6 +33,9 @@ const FILES = [
   'js/values-inject.js',
   'js/values-trigger.js',
   'js/views-values.js',
+  'js/map-data.js',
+  'js/map-image.js',
+  'js/views-map.js',
   'js/views-game.js',
   'js/main.js',
 ];

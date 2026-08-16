@@ -167,4 +167,98 @@ runner.test('游戏模式：无变量时显示空档案提示', () => {
   }
 });
 
+// ---------- 游戏地图 / 游戏数据 双入口 ----------
+runner.test('游戏模式：双入口图标，默认停在游戏地图', () => {
+  ui.showPanelView('kaleido-game-view');
+  const mapTab = $('kaleido-game-map-tab');
+  const dataTab = $('kaleido-game-data-tab');
+  assert(mapTab && dataTab, '应有「游戏地图」「游戏数据」两个切换图标');
+  assert(mapTab.textContent.includes('游戏地图'), '左边应是游戏地图');
+  assert(dataTab.textContent.includes('游戏数据'), '右边应是游戏数据');
+  assert(mapTab.classList.contains('is-active'), '默认应停在游戏地图');
+  assert(dataTab.classList.contains('is-active') === false, '游戏数据默认不激活');
+  assert($('kaleido-game-map-pane').hidden === false, '地图区应显示');
+  assert($('kaleido-game-tree').hidden === true, '数据区默认隐藏');
+  assert($('kaleido-map-crop-dialog'), '裁剪弹层应随面板创建');
+});
+
+runner.test('游戏模式：点击「游戏数据」切换值树，再切回地图', () => {
+  ui.showPanelView('kaleido-game-view');
+  click($('kaleido-game-data-tab'));
+  assert($('kaleido-game-data-tab').classList.contains('is-active'), '游戏数据应激活');
+  assert($('kaleido-game-tree').hidden === false, '值树应显示');
+  assert($('kaleido-game-map-pane').hidden === true, '地图区应隐藏');
+  click($('kaleido-game-map-tab'));
+  assert($('kaleido-game-map-tab').classList.contains('is-active'), '切回游戏地图应激活');
+  assert($('kaleido-game-map-pane').hidden === false, '地图区应恢复显示');
+});
+
+// ---------- 地图展示 ----------
+runner.test('游戏模式：无地图时显示空态与「去编辑地图」', () => {
+  const emptyCtx = makeContext();
+  emptyCtx.chatMetadata = {};
+  emptyCtx.saveChat = () => {};
+  const prev = sandbox.Luker.getContext;
+  sandbox.Luker.getContext = () => emptyCtx;
+  try {
+    ui.renderGameView();
+    const pane = $('kaleido-game-map-pane');
+    const empty = pane.querySelector('.kaleido-game-map__empty');
+    assert(empty, '应显示地图空态');
+    assert(empty.textContent.includes('暂无地图'), '空态应有「暂无地图」');
+    assert($('kaleido-map-go-edit'), '空态应有去编辑按钮');
+  } finally {
+    sandbox.Luker.getContext = prev;
+  }
+});
+
+runner.test('游戏模式：有地图时展示背景图与地点标记（名称常显）', () => {
+  const mapCtx = makeContext();
+  mapCtx.chatMetadata = {};
+  mapCtx.saveChat = () => {};
+  mapCtx.extensionSettings.Kaleidoscope = {
+    mapData: {
+      version: 1,
+      background: 'data:image/png;base64,AAAA',
+      points: [
+        { id: 'p_1', name: '学校', x: 30, y: 40 },
+        { id: 'p_2', name: '森林', x: 70, y: 60 },
+      ],
+      updatedAt: '2026-08-16T00:00:00.000Z',
+    },
+  };
+  const prev = sandbox.Luker.getContext;
+  sandbox.Luker.getContext = () => mapCtx;
+  try {
+    ui.renderGameView();
+    const pane = $('kaleido-game-map-pane');
+    assert(pane.querySelector('.kaleido-game-map__img'), '应有背景图');
+    const points = pane.querySelectorAll('.kaleido-game-map__point');
+    assert(points.length === 2, '应有 2 个地点标记');
+    assert(points[0].textContent.includes('学校'), '标记应显示地点名称');
+    const meta = pane.querySelector('.kaleido-game-map__meta');
+    assert(meta && meta.textContent.includes('最近更新'), '应显示最近更新时间');
+  } finally {
+    sandbox.Luker.getContext = prev;
+  }
+});
+
+runner.test('游戏模式：空态「去编辑地图」打开变量工作台并激活游戏地图 tab', () => {
+  const emptyCtx = makeContext();
+  emptyCtx.chatMetadata = {};
+  emptyCtx.saveChat = () => {};
+  const prev = sandbox.Luker.getContext;
+  sandbox.Luker.getContext = () => emptyCtx;
+  try {
+    ui.renderGameView();
+    click($('kaleido-map-go-edit'));
+    assert($('kaleido-values-dialog').classList.contains('is-open'), '应打开变量工作台');
+    assert($('kaleido-values-tab-map').classList.contains('is-active'), '应激活游戏地图 tab');
+    assert(dom.window.document.querySelector('.kaleido-map-editor'), '地图编辑器内容应已渲染');
+    assert($('kaleido-map-stage'), '应有编辑舞台');
+  } finally {
+    sandbox.Luker.getContext = prev;
+  }
+});
+
 runner.run();
