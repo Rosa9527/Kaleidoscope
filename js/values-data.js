@@ -1260,8 +1260,12 @@ function serializeValuesBundle(ctx) {
   deriveValuesChildren(bundle.defaults, bundle.keys);
   const lines = ['format: ' + yamlScalar(VALUES_BUNDLE_FORMAT)];
   if (character) lines.push('character: ' + yamlScalar(String(character.name || '')));
-  lines.push('keys:');
-  for (const key of bundle.keys) {
+  const keys = Array.isArray(bundle.keys) ? bundle.keys : [];
+  if (keys.length === 0) {
+    lines.push('keys: []');
+  } else {
+    lines.push('keys:');
+    for (const key of keys) {
     lines.push(`  - name: ${yamlScalar(String(key?.name || ''))}`);
     if (isValuesChildKey(key)) {
       lines.push('    type: child');
@@ -1287,6 +1291,7 @@ function serializeValuesBundle(ctx) {
     } else {
       lines.push('    type: parent');
       lines.push(`    rule: ${yamlBlockScalarText(String(key?.rule || ''), '    ')}`);
+    }
     }
   }
   lines.push('defaults:');
@@ -1360,7 +1365,8 @@ function parseValuesBundle(text) {
     throw new Error(`不是万华镜变量包（format=${String(parsed.format)}）`);
   }
   const keys = [];
-  if (parsed.keys !== undefined) {
+  // != null：缺省与旧版导出的裸 keys:（解析为 null）都视为无键。
+  if (parsed.keys != null) {
     if (!Array.isArray(parsed.keys)) throw new Error('keys 必须是列表');
     for (const item of parsed.keys) {
       const name = String(item?.name || '').trim();

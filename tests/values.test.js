@@ -211,6 +211,20 @@ runner.test('整包解析：错误格式抛错', () => {
   assert(threw, '错误 format 应抛错');
 });
 
+runner.test('整包 YAML 往返：无注册键（空 keys）', () => {
+  const c = fresh();
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['拉姆', '友谊'], 61);
+  const yaml = ctx.serializeValuesBundle(c);
+  assert(yaml.includes('keys: []'), '空注册表应导出 keys: []，而不是裸 keys:');
+  const parsed = ctx.parseValuesBundle(yaml);
+  assert(parsed.keys.length === 0, '空包应解析出 0 个键');
+  assert(parsed.defaults['拉姆']['友谊'] === 61, '默认值应保留');
+  // 兼容旧版导出：裸 keys:（解析为 null）也应可导入。
+  const legacy = ctx.parseValuesBundle('format: kaleidoscope-values\nkeys:\ndefaults:\n  拉姆:\n    友谊: 61\norder: []\ntriggers: []');
+  assert(legacy.keys.length === 0, '旧版裸 keys: 应视为无键');
+  assert(legacy.defaults['拉姆']['友谊'] === 61, '旧版默认值应保留');
+});
+
 // ---------- 维护消息 ----------
 runner.test('维护消息：键规则 + 当前值 + 最新 2 条消息', () => {
   const c = makeChatCtx();
