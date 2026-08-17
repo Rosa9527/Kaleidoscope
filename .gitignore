@@ -23,3 +23,8 @@ tests/_tmp_layer_shot.png
 
 # 调试截图（主页重设计）
 tests/_home_*.png
+
+# 调试产物（游戏模式图标入口预览）
+tests/_preview_game_icons.html
+tests/_preview_game_probe.js
+tests/_preview_game_*.png

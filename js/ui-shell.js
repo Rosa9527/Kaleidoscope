@@ -328,14 +328,23 @@ function showPanelView(viewId) {
     refreshHomeValuesStatus();
   }
   if (viewId === GAME_VIEW_ID) {
-    renderGameView();
+    // 进入游戏模式时重置到入口：不点击图标不显示任何界面。
+    renderGameView(true);
   }
   ensurePanelPosition(panel);
 }
 
 function initPanelViews(panel) {
   if (!panel || panel.dataset.viewsReady === 'true') return;
-  document.getElementById(PANEL_BACK_ID)?.addEventListener('click', () => showPanelView(HOME_VIEW_ID));
+  document.getElementById(PANEL_BACK_ID)?.addEventListener('click', () => {
+    // 游戏模式界面内（地图 / 数据）：返回键回到图标入口，而不是首页。
+    if (isGameViewActive() && gameActivePane !== null) {
+      gameActivePane = null;
+      applyGamePane();
+      return;
+    }
+    showPanelView(HOME_VIEW_ID);
+  });
   document.getElementById(HOME_API_CARD_ID)?.addEventListener('click', () => showPanelView(API_VIEW_ID));
   document.getElementById(HOME_STORY_CARD_ID)?.addEventListener('click', () => {
     if (isNarrowViewport()) showPanelView(STORY_VIEW_ID);
@@ -630,6 +639,12 @@ function createPanel() {
       const activeView = panel.querySelector('.kaleido-view.is-active');
       if (activeView && activeView.id !== HOME_VIEW_ID && activeView.id !== GAME_VIEW_ID) {
         showPanelView(HOME_VIEW_ID);
+        return;
+      }
+      // 游戏模式界面内：Esc 先回到图标入口，再按才关闭面板。
+      if (activeView?.id === GAME_VIEW_ID && gameActivePane !== null) {
+        gameActivePane = null;
+        applyGamePane();
         return;
       }
       closePanel();

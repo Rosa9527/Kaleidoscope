@@ -435,6 +435,8 @@ const MAP_POINT_NAME_MAX = 40;
 const GAME_MAP_TAB_ID = 'kaleido-game-map-tab';
 const GAME_DATA_TAB_ID = 'kaleido-game-data-tab';
 const GAME_MAP_PANE_ID = 'kaleido-game-map-pane';
+const GAME_SWITCH_ID = 'kaleido-game-switch';
+const GAME_LAUNCHER_HINT_ID = 'kaleido-game-launcher-hint';
 const MAP_GO_EDIT_ID = 'kaleido-map-go-edit';
 const MAP_ICON_CLASS = 'fa-solid fa-map';
 const MAP_DATA_ICON_CLASS = 'fa-solid fa-chart-simple';
@@ -729,13 +731,14 @@ const PANEL_VIEW_TITLES = Object.freeze({
   [GAME_VIEW_ID]: '游戏模式',
 });
 // 宽视图模式：日志视图需要更宽的窗口展示时间/级别/来源/内容。
-// 游戏模式是面板内视图（与首页一致），不需要加宽。
+// 游戏模式也加宽：地图展示需要更大的展示空间（地图图片随面板宽度缩放）。
 const PANEL_WIDE_MODES = Object.freeze({
   [LOG_VIEW_ID]: 'is-log-mode',
   [PRESET_VIEW_ID]: 'is-preset-mode',
   [INJECT_VIEW_ID]: 'is-inject-mode',
   [STORY_VIEW_ID]: 'is-story-mode',
   [VALUES_VIEW_ID]: 'is-values-mode',
+  [GAME_VIEW_ID]: 'is-game-mode',
 });
 const ESC_KEY_HANDLER_KEY = '__kaleido_esc_key_handler__';
 const MENU_RECOVERY_OBSERVER_KEY = '__kaleido_menu_recovery_observer__';

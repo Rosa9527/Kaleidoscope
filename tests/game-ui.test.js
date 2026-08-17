@@ -168,18 +168,46 @@ runner.test('游戏模式：无变量时显示空档案提示', () => {
 });
 
 // ---------- 游戏地图 / 游戏数据 双入口 ----------
-runner.test('游戏模式：双入口图标，默认停在游戏地图', () => {
+runner.test('游戏模式：双入口图标，未点击只显示入口', () => {
   ui.showPanelView('kaleido-game-view');
   const mapTab = $('kaleido-game-map-tab');
   const dataTab = $('kaleido-game-data-tab');
-  assert(mapTab && dataTab, '应有「游戏地图」「游戏数据」两个切换图标');
+  assert(mapTab && dataTab, '应有「游戏地图」「游戏数据」两个入口图标');
   assert(mapTab.textContent.includes('游戏地图'), '左边应是游戏地图');
   assert(dataTab.textContent.includes('游戏数据'), '右边应是游戏数据');
-  assert(mapTab.classList.contains('is-active'), '默认应停在游戏地图');
-  assert(dataTab.classList.contains('is-active') === false, '游戏数据默认不激活');
-  assert($('kaleido-game-map-pane').hidden === false, '地图区应显示');
-  assert($('kaleido-game-tree').hidden === true, '数据区默认隐藏');
+  assert(mapTab.classList.contains('is-active') === false, '未点击前地图入口不激活');
+  assert(dataTab.classList.contains('is-active') === false, '未点击前数据入口不激活');
+  assert($('kaleido-game-map-pane').hidden === true, '未点击前地图区不显示');
+  assert($('kaleido-game-tree').hidden === true, '未点击前数据区不显示');
+  assert($('kaleido-game-launcher-hint').hidden === false, '应显示入口提示');
   assert($('kaleido-map-crop-dialog'), '裁剪弹层应随面板创建');
+});
+
+runner.test('游戏模式：点击图标进入对应界面，图标消失，返回键回到入口', () => {
+  ui.showPanelView('kaleido-game-view');
+  click($('kaleido-game-map-tab'));
+  assert($('kaleido-game-map-tab').classList.contains('is-active'), '点击地图图标应进入地图界面');
+  assert($('kaleido-game-map-pane').hidden === false, '地图区应显示');
+  assert($('kaleido-game-tree').hidden === true, '数据区应隐藏');
+  assert($('kaleido-game-switch').hidden === true, '进入界面后入口图标应消失');
+  assert($('kaleido-game-launcher-hint').hidden === true, '进入界面后入口提示应隐藏');
+  assert($('kaleido-panel-back').style.visibility === 'visible', '界面内左上角返回键应可见');
+  click($('kaleido-panel-back'));
+  assert($('kaleido-game-map-tab').classList.contains('is-active') === false, '返回键应回到图标入口');
+  assert($('kaleido-game-map-pane').hidden === true, '回到入口后地图区应隐藏');
+  assert($('kaleido-game-switch').hidden === false, '回到入口后图标应恢复');
+  assert($('kaleido-game-launcher-hint').hidden === false, '回到入口后提示应恢复');
+  assert($('kaleido-panel-back').style.visibility === 'hidden', '入口态返回键应隐藏');
+});
+
+runner.test('游戏模式：界面内右上角关闭按钮关掉面板回悬浮球', () => {
+  ui.showPanelView('kaleido-game-view');
+  click($('kaleido-game-data-tab'));
+  assert($('kaleido-game-tree').hidden === false, '先进入数据界面');
+  const closeBtn = dom.window.document.querySelector('.kaleido-panel__close');
+  assert(closeBtn, '应有右上角关闭按钮');
+  click(closeBtn);
+  assert(!$('kaleido-panel').classList.contains('is-open'), '关闭按钮应关掉面板');
 });
 
 runner.test('游戏模式：点击「游戏数据」切换值树，再切回地图', () => {
@@ -191,6 +219,16 @@ runner.test('游戏模式：点击「游戏数据」切换值树，再切回地�
   click($('kaleido-game-map-tab'));
   assert($('kaleido-game-map-tab').classList.contains('is-active'), '切回游戏地图应激活');
   assert($('kaleido-game-map-pane').hidden === false, '地图区应恢复显示');
+});
+
+runner.test('游戏模式：再次进入视图重置回入口', () => {
+  ui.showPanelView('kaleido-game-view');
+  click($('kaleido-game-data-tab'));
+  assert($('kaleido-game-tree').hidden === false, '先进入数据界面');
+  ui.showPanelView('kaleido-home-view');
+  ui.showPanelView('kaleido-game-view');
+  assert($('kaleido-game-data-tab').classList.contains('is-active') === false, '重新进入应回到入口');
+  assert($('kaleido-game-tree').hidden === true, '重新进入后数据区应隐藏');
 });
 
 // ---------- 地图展示 ----------

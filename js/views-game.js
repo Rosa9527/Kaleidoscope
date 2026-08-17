@@ -1,11 +1,12 @@
 // ===== 万华镜（Kaleidoscope）游戏模式：玩家档案 + 游戏地图 =====
-// 视图内两个切换图标：左边「游戏地图」（当前角色绑定的地图展示），
-// 右边「游戏数据」（「变量系统」注入提示词的那些变量：当前游戏值总览，
-// 展示的就是主模型实际看到的内容）。两个区块均只读，无编辑入口；
-// 地图编辑在「变量系统 → 游戏地图」tab 里完成。
+// 手机桌面式双入口：视图里先看到两个 App 图标（游戏地图 / 游戏数据），
+// 点击某个图标后图标消失、进入对应界面（地图界面 / 数据档案界面，
+// 「变量系统」注入提示词的那些变量总览，展示的就是主模型实际看到的内容）。
+// 界面内点左上角返回键回到图标入口，点右上角 ✕ 关闭面板回悬浮球。
+// 两个区块均只读，无编辑入口；地图编辑在「变量系统 → 游戏地图」tab 里完成。
 // 视觉：档案体例——朱砂印章节 + 点线目次，只呈现数值本身，不做工作台式标注。
 
-let gameActivePane = 'map'; // 'map'（游戏地图） | 'data'（游戏数据）
+let gameActivePane = null; // null（图标入口）| 'map'（游戏地图） | 'data'（游戏数据）
 
 function getGameView() {
   return document.getElementById(GAME_VIEW_ID);
@@ -17,9 +18,11 @@ function isGameViewActive() {
 }
 
 // 刷新入口：视图打开 / 手动刷新 / 每轮生成结束后（若视图正打开）调用。
-function renderGameView() {
+// resetToLauncher：进入视图时重置到入口（不点击不显示任何界面）。
+function renderGameView(resetToLauncher = false) {
   const view = getGameView();
   if (!view) return;
+  if (resetToLauncher) gameActivePane = null;
   const ctx = getContextSafe();
   renderGameMeta(ctx);
   renderGameTree(ctx);
@@ -33,24 +36,34 @@ function refreshGameViewIfActive() {
   renderGameView();
 }
 
-// 两个切换图标对应的内容区显隐：地图区 / 数据区二选一。
+// 手机桌面式切换：入口态只显示两个 App 图标；点击图标后图标消失、
+// 对应界面接管整个视图；界面内左上角返回键（面板头部）回到入口。
 function applyGamePane() {
   const mapPane = document.getElementById(GAME_MAP_PANE_ID);
   const tree = document.getElementById(GAME_TREE_ID);
   const mapTab = document.getElementById(GAME_MAP_TAB_ID);
   const dataTab = document.getElementById(GAME_DATA_TAB_ID);
+  const switchEl = document.getElementById(GAME_SWITCH_ID);
+  const hint = document.getElementById(GAME_LAUNCHER_HINT_ID);
   if (!mapPane || !tree) return;
   const isMap = gameActivePane === 'map';
+  const isData = gameActivePane === 'data';
+  const inInterface = gameActivePane !== null;
   mapPane.hidden = !isMap;
-  tree.hidden = isMap;
+  tree.hidden = !isData;
+  if (switchEl) switchEl.hidden = inInterface;
+  if (hint) hint.hidden = inInterface;
   if (mapTab) {
     mapTab.classList.toggle('is-active', isMap);
     mapTab.setAttribute('aria-selected', String(isMap));
   }
   if (dataTab) {
-    dataTab.classList.toggle('is-active', !isMap);
-    dataTab.setAttribute('aria-selected', String(!isMap));
+    dataTab.classList.toggle('is-active', isData);
+    dataTab.setAttribute('aria-selected', String(isData));
   }
+  // 界面内显示左上角返回键（回到图标入口）；入口态隐藏（与首页一致）。
+  const back = document.getElementById(PANEL_BACK_ID);
+  if (back) back.style.visibility = inInterface ? 'visible' : 'hidden';
 }
 
 // 封面副题：只保留最近更新时间（注入 / 自动维护等工程信息不面向玩家）。
@@ -162,17 +175,18 @@ function initGameSection(panel) {
           <span class="fa-solid fa-house"></span>
         </button>
       </div>
-      <!-- 双入口切换：游戏地图 / 游戏数据 -->
-      <div class="kaleido-game__switch" role="tablist" aria-label="游戏模式入口">
-        <button type="button" id="${GAME_MAP_TAB_ID}" class="kaleido-game__switch-btn is-active" role="tab" aria-selected="true" title="当前角色绑定的游戏地图（在「变量系统 → 游戏地图」编辑）">
+      <!-- 双入口 App 图标：游戏地图 / 游戏数据（点击图标消失、进入对应界面） -->
+      <div id="${GAME_SWITCH_ID}" class="kaleido-game__switch" role="tablist" aria-label="游戏模式入口">
+        <button type="button" id="${GAME_MAP_TAB_ID}" class="kaleido-game__switch-btn" role="tab" aria-selected="false" title="进入当前角色绑定的游戏地图（在「变量系统 → 游戏地图」编辑）">
           <span class="kaleido-game__switch-icon"><span class="${MAP_ICON_CLASS}"></span></span>
           <span class="kaleido-game__switch-label">游戏地图</span>
         </button>
-        <button type="button" id="${GAME_DATA_TAB_ID}" class="kaleido-game__switch-btn" role="tab" aria-selected="false" title="当前游戏数据总览">
+        <button type="button" id="${GAME_DATA_TAB_ID}" class="kaleido-game__switch-btn" role="tab" aria-selected="false" title="进入当前游戏数据总览">
           <span class="kaleido-game__switch-icon"><span class="${MAP_DATA_ICON_CLASS}"></span></span>
           <span class="kaleido-game__switch-label">游戏数据</span>
         </button>
       </div>
+      <p id="${GAME_LAUNCHER_HINT_ID}" class="kaleido-game__launcher-hint">点击图标进入对应界面 · 左上角返回键回到入口</p>
       <!-- 地图展示（渲染函数见 views-map.js） -->
       <div id="${GAME_MAP_PANE_ID}" class="kaleido-game__map"></div>
       <!-- 档案正文：游戏值总览 -->

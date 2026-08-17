@@ -68,11 +68,18 @@ Kaleidoscope/
 改 `js/` 下的源码，**不要手改 index.js**；构建产物会被覆盖。
 
 ```bash
-node build.js          # 一次性构建
-node build.js --watch  # 监听 js/ 变更自动重建
+node build.js           # 一次性构建
+node build.js --watch   # 监听 js/ 与 build.js 变更：源码改动重建、build.js 改动自重启
+node build.js --check   # 校验 index.js 与当前源码一致（提交前保险）
 ```
 
 改完构建后重启酒馆（或热重载扩展）即可生效。
+
+防呆机制（详见 build.js 头部注释）：
+- `--watch` 同时监听 build.js 自身，文件列表变化后自动重启进程，杜绝旧进程用旧列表覆盖产物（曾因此把地图系统拼丢）；
+- 每次构建对比 `js/` 目录与构建列表，新源码忘记加进列表会警告；
+- 产物头部写入构建时间与内容指纹，`--check` 随时比对；
+- 仓库自带 `hooks/pre-commit` 提交钩子：克隆后执行一次 `git config core.hooksPath hooks` 启用，之后每次提交自动跑 `--check`，产物与源码不一致会被拦住（`git commit --no-verify` 可绕过，不推荐）。
 
 数据层与工作台 UI 有自动化测试（jsdom，仅开发用）：
 

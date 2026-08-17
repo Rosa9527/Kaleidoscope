@@ -1,0 +1,11 @@
+#!/bin/sh
+# 万华镜（Kaleidoscope）提交前校验：index.js 必须与 js/ 源码一致。
+# 忘记重建、或 build 文件列表过时导致产物缺文件，都会被拦下。
+# 确认产物无误后可用 `git commit --no-verify` 绕过（不推荐）。
+# 启用方式（每个克隆一次）：git config core.hooksPath hooks
+root="$(git rev-parse --show-toplevel)" || exit 1
+if command -v node >/dev/null 2>&1; then
+  node "$root/build.js" --check
+else
+  echo "[pre-commit] 未找到 node，跳过 index.js 一致性校验" >&2
+fi
