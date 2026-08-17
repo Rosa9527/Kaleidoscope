@@ -1041,6 +1041,7 @@ function openValuesKeyEditor(name) {
   const typeSelect = document.getElementById(VALUES_KEY_EDITOR_TYPE_ID);
   const deriveSelect = document.getElementById(VALUES_KEY_EDITOR_DERIVE_ID);
   const formulaInput = document.getElementById(VALUES_KEY_EDITOR_FORMULA_ID);
+  const decimalsSelect = document.getElementById(VALUES_KEY_EDITOR_DECIMALS_ID);
   const ctx = getContextSafe();
   if (valuesKeyEditorName) {
     const key = getValuesKeyByName(ctx, valuesKeyEditorName);
@@ -1054,6 +1055,7 @@ function openValuesKeyEditor(name) {
     const formula = isChild ? String(key?.formula || '').trim() : '';
     if (deriveSelect) deriveSelect.value = formula !== '' ? VALUES_KEY_DERIVE_FORMULA : VALUES_KEY_DERIVE_RULES;
     if (formulaInput) formulaInput.value = formula;
+    if (decimalsSelect) decimalsSelect.value = String(toValuesDecimals(key?.decimals) ?? 0);
     populateValuesKeyParentSelect(isChild ? String(key?.parent || '') : '');
     renderValuesKeyRules(isChild ? key?.rules : []);
   } else {
@@ -1065,6 +1067,7 @@ function openValuesKeyEditor(name) {
     ruleInput.value = '';
     if (deriveSelect) deriveSelect.value = VALUES_KEY_DERIVE_RULES;
     if (formulaInput) formulaInput.value = '';
+    if (decimalsSelect) decimalsSelect.value = '0';
     populateValuesKeyParentSelect('');
     renderValuesKeyRules([]);
   }
@@ -1106,7 +1109,8 @@ function saveValuesKeyEditor() {
         valuesToastr('warning', `派生存在循环引用：${cycle.join(' → ')}`);
         return;
       }
-      upsertValuesKey(ctx, name, '', { type, formula });
+      const decimals = toValuesDecimals(Number(document.getElementById(VALUES_KEY_EDITOR_DECIMALS_ID)?.value));
+      upsertValuesKey(ctx, name, '', { type, formula, decimals: decimals ?? 0 });
     } else {
       const parent = String(document.getElementById(VALUES_KEY_EDITOR_PARENT_ID)?.value || '').trim();
       if (!parent) {
@@ -2209,6 +2213,18 @@ function buildValuesContentHTML(editorClass) {
                     <span class="kaleido-api__label">派生公式 *</span>
                     <textarea id="${VALUES_KEY_EDITOR_FORMULA_ID}" class="kaleido-input kaleido-values__textarea kaleido-values__textarea--small" rows="3" placeholder="如：((0.5*友谊+0.5*情欲)+1.2*情欲)/10" title="支持 + - * / 与括号；变量为同路径下的已注册变量（父 / 子均可）" spellcheck="false"></textarea>
                     <span class="kaleido-api__hint">支持 + - * / 与括号；变量为同路径下的已注册变量（父 / 子均可）。</span>
+                  </label>
+                  <label class="kaleido-api__field" for="${VALUES_KEY_EDITOR_DECIMALS_ID}">
+                    <span class="kaleido-api__label">结果小数位</span>
+                    <select id="${VALUES_KEY_EDITOR_DECIMALS_ID}" class="kaleido-input" title="公式结果四舍五入保留的小数位（默认取整）">
+                      <option value="0">0 位（四舍五入取整）</option>
+                      <option value="1">1 位</option>
+                      <option value="2">2 位</option>
+                      <option value="3">3 位</option>
+                      <option value="4">4 位</option>
+                      <option value="5">5 位</option>
+                      <option value="6">6 位</option>
+                    </select>
                   </label>
                 </div>
                 <div id="${VALUES_KEY_EDITOR_RULES_FIELDS_ID}">

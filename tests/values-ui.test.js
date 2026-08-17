@@ -328,11 +328,20 @@ runner.test('键注册：子变量切换派生方式为公式并保存', () => {
   assert(!$('kaleido-values-key-editor-formula-fields').hidden, '公式模式应显示公式输入');
   assert($('kaleido-values-key-editor-rules-fields').hidden, '公式模式应隐藏派生源与区间');
   setValue('kaleido-values-key-editor-formula', '0.5*服从值+0.5*美貌值');
+  const decimalsSelect = $('kaleido-values-key-editor-decimals');
+  assert(decimalsSelect, '公式模式应显示结果小数位下拉');
+  assert(decimalsSelect.value === '0', '小数位默认应为 0（取整）');
+  decimalsSelect.value = '2';
   click($('kaleido-values-key-editor-save'));
   const key = ui.getValuesKeyByName(hostCtx, '综合评分');
   assert(key && key.formula === '0.5*服从值+0.5*美貌值', '公式应保存');
+  assert(key.decimals === 2, '小数位应保存为 2');
   assert(key.parent === '', '公式模式不应有派生源');
   assert(key.rules.length === 0, '公式模式不应有区间');
+  // 重新打开编辑器应回填小数位
+  ui.openValuesKeyEditor('综合评分');
+  assert($('kaleido-values-key-editor-decimals').value === '2', '打开编辑器应回填小数位 2');
+  click($('kaleido-values-key-editor-cancel'));
   const listRows = Array.from($('kaleido-values-keys-body').querySelectorAll('.kaleido-values__row'));
   const scoreRow = listRows.find((r) => r.dataset.name === '综合评分');
   assert(scoreRow && scoreRow.querySelector('.kaleido-values__row-rule').textContent.includes('0.5*服从值+0.5*美貌值'), '列表应显示公式摘要');

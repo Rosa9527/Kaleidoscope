@@ -343,6 +343,7 @@ function getValuesKeys(ctx) {
       key.parent = String(key.parent || '').trim();
       if (!Array.isArray(key.rules)) key.rules = [];
       if (typeof key.formula !== 'string') key.formula = '';
+      if (toValuesDecimals(key.decimals) === null) key.decimals = 0;
     }
   }
   const cardKeyNames = new Set(bundle.keys.map((key) => String(key?.name || '').trim()).filter(Boolean));
@@ -387,10 +388,13 @@ function upsertValuesKey(ctx, name, rule, extra = {}) {
       key.formula = formula;
       key.parent = '';
       key.rules = [];
+      const decimals = toValuesDecimals(extra?.decimals);
+      key.decimals = decimals !== null ? decimals : 0;
     } else {
       key.parent = String(extra?.parent || '').trim();
       key.rules = normalizeValuesChildRules(extra?.rules);
       delete key.formula;
+      delete key.decimals;
     }
   };
   if (existing) {
@@ -402,6 +406,7 @@ function upsertValuesKey(ctx, name, rule, extra = {}) {
       delete existing.parent;
       delete existing.rules;
       delete existing.formula;
+      delete existing.decimals;
     }
     existing.updatedAt = now;
   } else {
@@ -643,19 +648,48 @@ function validateValuesFormulaSyntax(formula) {
   return { ok: true, ast, refs };
 }
 
-// 求值公式 AST：lookup(name) 返回数值（数字或可转数字的字符串，缺失 /
-// 非数值返回 null）；除零、结果非有限都视为求值失败返回 null（保持原值）。
+// 变量值 → 数值：数字原样；字符串去空白后支持「%」后缀并按百分比小数参与
+// 计算（如 43% → 0.43、89% → 0.89），转不出有限数返回 null。公式求值与
+// 区间派生的父值转换共用。
+function toValuesNumeric(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed === '') return null;
+    const isPercent = trimmed.endsWith('%');
+    const normalized = isPercent ? trimmed.slice(0, -1).trim() : trimmed;
+    const parsed = Number(normalized);
+    if (!Number.isFinite(parsed)) return null;
+    return isPercent ? parsed / 100 : parsed;
+  }
+  return null;
+}
+
+// 公式结果保留小数位：归一化 decimals（0~6 的整数，其余返回 null）。
+function toValuesDecimals(value) {
+  if (typeof value !== 'number') {
+    if (typeof value !== 'string' || value.trim() === '') return null;
+    value = Number(value);
+  }
+  if (!Number.isInteger(value) || value < 0 || value > 6) return null;
+  return value;
+}
+
+// 四舍五入到指定小数位（half away from zero，负数如 -0.5 → -1）；
+// + EPSILON 抵消 1.005*100 = 100.499… 这类浮点误差。
+function roundValuesResult(value, digits) {
+  if (!Number.isFinite(value)) return null;
+  const factor = Math.pow(10, digits);
+  return Math.sign(value) * Math.round((Math.abs(value) + Number.EPSILON) * factor) / factor;
+}
+
+// 求值公式 AST：lookup(name) 返回变量原始值（数字或字符串，缺失 / 非数值返回
+// null）；除零、结果非有限都视为求值失败返回 null（保持原值）。
 function evalValuesFormula(ast, lookup) {
   if (!ast || typeof ast !== 'object') return null;
   if (ast.t === 'num') return ast.v;
   if (ast.t === 'var') {
-    const value = lookup ? lookup(ast.name) : null;
-    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-    if (typeof value === 'string' && value.trim() !== '') {
-      const parsed = Number(value);
-      if (Number.isFinite(parsed)) return parsed;
-    }
-    return null;
+    return toValuesNumeric(lookup ? lookup(ast.name) : null);
   }
   if (ast.t === 'neg') {
     const v = evalValuesFormula(ast.v, lookup);
@@ -723,30 +757,20 @@ function deriveValuesChildAt(tree, path, childKey) {
   if (formula !== '') {
     const syntax = validateValuesFormulaSyntax(formula);
     if (!syntax.ok) return false;
-    const lookup = (varName) => {
-      const raw = valuesGetAtPath(tree, path.slice(0, -1).concat(varName));
-      if (typeof raw === 'number') return raw;
-      if (typeof raw === 'string' && raw.trim() !== '') {
-        const parsed = Number(raw);
-        if (Number.isFinite(parsed)) return parsed;
-      }
-      return null;
-    };
+    const lookup = (varName) => valuesGetAtPath(tree, path.slice(0, -1).concat(varName));
     const result = evalValuesFormula(syntax.ast, lookup);
     if (result === null || !Number.isFinite(result)) return false;
-    valuesSetAtPath(tree, path, result);
+    // 按小数位设置四舍五入写入（默认取整，decimals 归一化在 getValuesKeys）。
+    const digits = toValuesDecimals(childKey?.decimals);
+    const stored = digits === null ? result : roundValuesResult(result, digits);
+    if (stored === null || !Number.isFinite(stored)) return false;
+    valuesSetAtPath(tree, path, stored);
     return true;
   }
   const parentName = String(childKey?.parent || '').trim();
   if (!parentName) return false;
   const parentValue = valuesGetAtPath(tree, path.slice(0, -1).concat(parentName));
-  let numeric = null;
-  if (typeof parentValue === 'number') {
-    numeric = parentValue;
-  } else if (typeof parentValue === 'string' && parentValue.trim() !== '') {
-    const parsed = Number(parentValue);
-    if (Number.isFinite(parsed)) numeric = parsed;
-  }
+  const numeric = toValuesNumeric(parentValue);
   if (numeric === null) return false;
   for (const rule of Array.isArray(childKey?.rules) ? childKey.rules : []) {
     if (rule.min !== undefined && numeric < rule.min) continue;
@@ -1244,6 +1268,8 @@ function serializeValuesBundle(ctx) {
       const formula = String(key?.formula || '').trim();
       if (formula !== '') {
         lines.push(`    formula: ${yamlScalar(formula)}`);
+        const decimals = toValuesDecimals(key?.decimals);
+        lines.push(`    decimals: ${decimals === null ? 0 : decimals}`);
       } else {
         lines.push(`    parent: ${yamlScalar(String(key?.parent || ''))}`);
         lines.push('    rules:');
@@ -1347,6 +1373,8 @@ function parseValuesBundle(text) {
           key.formula = formula;
           key.parent = '';
           key.rules = [];
+          const decimals = toValuesDecimals(item?.decimals);
+          key.decimals = decimals === null ? 0 : decimals;
         } else {
           key.parent = String(item?.parent || '').trim();
           key.rules = normalizeValuesChildRules(item?.rules);

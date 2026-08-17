@@ -401,6 +401,20 @@ runner.test('子变量派生：按父变量值命中区间（40 → 颇具好感
   assert(ctx.getValuesGameTree(c)['张三']['态度'] === '冷淡', '超出范围应保持原值');
 });
 
+runner.test('子变量派生：带 % 的字符串父值按百分比小数命中区间（43% = 0.43）', () => {
+  const c = makeChatCtx();
+  ctx.upsertValuesKey(c, '好感度', '规则');
+  ctx.upsertValuesKey(c, '态度', '', { type: 'child', parent: '好感度', rules: [
+    { max: 0.5, value: '低' },
+    { min: 0.51, value: '高' },
+  ] });
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['张三', '好感度'], '43%');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['张三', '态度'], '未知');
+  assert(ctx.getValuesGameTree(c)['张三']['态度'] === '低', '43% = 0.43 应命中 ~0.5 区间');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['张三', '好感度'], '60%');
+  assert(ctx.getValuesGameTree(c)['张三']['态度'] === '高', '60% = 0.6 应命中 0.51~ 区间');
+});
+
 runner.test('子变量派生：默认值层就地派生；父变量缺失 / 非数值保持原值', () => {
   const c = fresh();
   ctx.upsertValuesKey(c, '好感度', '规则');
@@ -728,6 +742,7 @@ runner.test('公式语法：四则 / 括号 / 中文变量 / 负号 / 非法输�
 });
 
 runner.test('公式求值：优先级 / 括号 / 缺失与非数值 / 除零', () => {
+  const close = (a, b) => Math.abs(a - b) < 1e-9;
   const evalFormula = (formula, values) => {
     const syntax = ctx.validateValuesFormulaSyntax(formula);
     if (!syntax.ok) throw new Error(`公式非法：${syntax.error}`);
@@ -739,6 +754,9 @@ runner.test('公式求值：优先级 / 括号 / 缺失与非数值 / 除零', (
   assert(evalFormula('10-服从值', { 服从值: 3 }) === 7, '减法');
   assert(evalFormula('-服从值+100', { 服从值: 30 }) === 70, '负号');
   assert(evalFormula('服从值/2', { 服从值: '80' }) === 40, '字符串数值可参与');
+  assert(close(evalFormula('立法会席位*支持度', { 立法会席位: 89, 支持度: '43%' }), 38.27), '带 % 的字符串按百分比小数参与（43% = 0.43）');
+  assert(close(evalFormula('立法会席位*支持度', { 立法会席位: '89%', 支持度: '43%' }), 0.3827), '两个 % 相乘按小数计算');
+  assert(close(evalFormula('立法会席位*2', { 立法会席位: '89.5%' }), 1.79), '带小数与 % 的字符串可参与');
   assert(evalFormula('服从值+1', {}) === null, '变量缺失返回 null');
   assert(evalFormula('服从值+1', { 服从值: '未知' }) === null, '非数值返回 null');
   assert(evalFormula('1/0', {}) === null, '除零返回 null');
@@ -753,6 +771,15 @@ runner.test('子变量派生：公式模式（多变量加权，同路径查找�
   ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['奴隶', '美貌值'], 60);
   ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['奴隶', '综合评分'], '旧值');
   assert(ctx.getValuesGameTree(c)['奴隶']['综合评分'] === 70, '80/60 应加权为 70');
+  // 带 % 后缀的字符串值（如 80% / 60%）按百分比小数参与（0.8 / 0.6），
+  // 默认结果小数位为 0（四舍五入取整）
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['奴隶', '服从值'], '80%');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['奴隶', '美貌值'], '60%');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['奴隶', '综合评分'], '旧值');
+  assert(ctx.getValuesGameTree(c)['奴隶']['综合评分'] === 1, '0.7 默认取整为 1');
+  // 指定小数位 1 后保留一位（0.7）
+  ctx.upsertValuesKey(c, '综合评分', '', { type: 'child', formula: '0.5*服从值+0.5*美貌值', decimals: 1 });
+  assert(Math.abs(ctx.getValuesGameTree(c)['奴隶']['综合评分'] - 0.7) < 1e-9, 'decimals=1 应保留一位（0.7）');
   ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['奴隶', '服从值'], 100);
   ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['奴隶', '美貌值'], 0);
   ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['奴隶', '综合评分'], '旧值');
@@ -761,6 +788,23 @@ runner.test('子变量派生：公式模式（多变量加权，同路径查找�
   ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['奴隶', '服从值'], '未知');
   ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['奴隶', '综合评分'], '保持');
   assert(ctx.getValuesGameTree(c)['奴隶']['综合评分'] === '保持', '非数值输入应保持原值');
+});
+
+runner.test('子变量派生：公式结果按小数位四舍五入（默认取整）', () => {
+  const c = fresh();
+  ctx.upsertValuesKey(c, '立法会席位', '规则');
+  ctx.upsertValuesKey(c, '支持度', '规则');
+  ctx.upsertValuesKey(c, '有效席位', '', { type: 'child', formula: '立法会席位*支持度' });
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['大道寺家族', '立法会席位'], 89);
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['大道寺家族', '支持度'], '43%');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['大道寺家族', '有效席位'], '旧值');
+  assert(ctx.getValuesGameTree(c)['大道寺家族']['有效席位'] === 38, '38.27 默认四舍五入取整为 38');
+  ctx.upsertValuesKey(c, '有效席位', '', { type: 'child', formula: '立法会席位*支持度', decimals: 1 });
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['大道寺家族', '有效席位'], '旧值');
+  assert(Math.abs(ctx.getValuesGameTree(c)['大道寺家族']['有效席位'] - 38.3) < 1e-9, 'decimals=1 应保留一位（38.3）');
+  ctx.upsertValuesKey(c, '有效席位', '', { type: 'child', formula: '立法会席位*支持度', decimals: 2 });
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['大道寺家族', '有效席位'], '旧值');
+  assert(Math.abs(ctx.getValuesGameTree(c)['大道寺家族']['有效席位'] - 38.27) < 1e-9, 'decimals=2 应保留两位（38.27）');
 });
 
 runner.test('子变量派生：链式（公式子变量 → 区间子变量）', () => {
@@ -818,20 +862,23 @@ runner.test('整包 YAML 往返：公式派生子变量', () => {
   const character = makeCharacter('测试角色', 'avatar-1');
   const c = makeContext({ characters: [character], characterId: 0, writeExtensionField: () => Promise.resolve() });
   ctx.upsertValuesKey(c, '服从值', '规则');
-  ctx.upsertValuesKey(c, '综合评分', '', { type: 'child', formula: '0.5*服从值+0.5*美貌值' });
+  ctx.upsertValuesKey(c, '综合评分', '', { type: 'child', formula: '0.5*服从值+0.5*美貌值', decimals: 2 });
   ctx.upsertValuesKey(c, '态度', '', { type: 'child', parent: '服从值', rules: [{ min: 0, max: 50, value: '低' }] });
   const yaml = ctx.serializeValuesBundle(c);
   assert(yaml.includes('formula: 0.5*服从值+0.5*美貌值'), '应导出公式');
+  assert(yaml.includes('decimals: 2'), '应导出小数位');
   assert(yaml.includes('parent: 服从值'), '区间模式应照旧导出派生源');
   const parsed = ctx.parseValuesBundle(yaml);
   const score = parsed.keys.find((key) => key.name === '综合评分');
   assert(score.formula === '0.5*服从值+0.5*美貌值', '导入应还原公式');
+  assert(score.decimals === 2, '导入应还原小数位');
   assert(score.parent === '', '公式模式不应有派生源');
   const attitude = parsed.keys.find((key) => key.name === '态度');
   assert(attitude.parent === '服从值' && attitude.rules.length === 1, '区间模式应还原');
   const c2 = fresh();
   ctx.applyValuesBundle(c2, parsed, 'merge');
   assert(ctx.getValuesKeyByName(c2, '综合评分').formula === '0.5*服从值+0.5*美貌值', '合并导入应保留公式');
+  assert(ctx.getValuesKeyByName(c2, '综合评分').decimals === 2, '合并导入应保留小数位');
 });
 
 runner.test('删除依赖检查：公式引用者被列为依赖', () => {

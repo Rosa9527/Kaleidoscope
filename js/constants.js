@@ -254,6 +254,7 @@ const VALUES_KEY_DERIVE_FORMULA = 'formula';
 const VALUES_KEY_EDITOR_DERIVE_ID = 'kaleido-values-key-editor-derive';
 const VALUES_KEY_EDITOR_FORMULA_ID = 'kaleido-values-key-editor-formula';
 const VALUES_KEY_EDITOR_FORMULA_FIELDS_ID = 'kaleido-values-key-editor-formula-fields';
+const VALUES_KEY_EDITOR_DECIMALS_ID = 'kaleido-values-key-editor-decimals';
 const VALUES_KEY_EDITOR_RULES_FIELDS_ID = 'kaleido-values-key-editor-rules-fields';
 const VALUES_EDITOR_CHILD_HINT_ID = 'kaleido-values-editor-child-hint';
 // 变量 · 角色卡绑定（与剧情脉络同模式）：数据存角色卡 extensions，
