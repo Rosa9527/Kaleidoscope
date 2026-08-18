@@ -1,5 +1,5 @@
 // ===== 万华镜（Kaleidoscope）index.js — 构建产物，勿手改 =====
-// 构建时间: 2026-08-18 01:14:19 · 文件数: 23 · 指纹: 9bb15ca0
+// 构建时间: 2026-08-18 20:13:09 · 文件数: 23 · 指纹: 8c3d9576
 
 // ===== js/constants.js =====
 // ===== 万华镜（Kaleidoscope）全局常量 =====
@@ -323,7 +323,7 @@ const VALUES_BUILTIN_KEYS = [
 const VALUES_AUTO_UPDATE_ENABLED = true;
 const VALUES_MAINTAIN_RECENT_COUNT = 2;
 const VALUES_MAINTAIN_TIMEOUT_MS = 60000;
-const VALUES_MAINTAIN_MAX_TOKENS = 2000;
+const VALUES_MAINTAIN_MAX_TOKENS = 8192;
 const VALUES_MAINTAIN_HANDLER_KEY = '__kaleido_values_maintain_handler__';
 const VALUES_MAINTAIN_STARTED_KEY = '__kaleido_values_maintain_started__';
 const VALUES_MAINTAIN_STOPPED_KEY = '__kaleido_values_maintain_stopped__';
