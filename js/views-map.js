@@ -5,6 +5,8 @@
 // - 变量工作台「游戏地图」tab：上传图片 → 裁剪成背景 → 双击建点 / 拖动移动 /
 //   选中改名，全部编辑先落内存（mapEditorState），点「保存」才写角色卡。
 // 地点坐标一律按背景图百分比（0~100）存取，展示与编辑按比例缩放对齐。
+// 编辑舞台限高（60vh）内部滚动（工作台是固定高度容器，无外层滚动兜底）；
+// 坐标与地点层的基准是画布层 canvas（背景图完整显示区，随滚动移动）。
 
 // ---------- 编辑器内存态 ----------
 // { card, dirty, selectedId, rawDataURL, rawImage }
@@ -123,8 +125,10 @@ function buildMapEditorHTML() {
             <p class="kaleido-map-editor__empty-title">还没有地图背景</p>
             <p class="kaleido-map-editor__empty-text">点击「上传图片」，裁剪出想要的区域后，<br/>即可双击地图添加地点。</p>
           </div>
-          <img id="${MAP_STAGE_IMG_ID}" class="kaleido-map-editor__img" alt="地图背景" hidden />
-          <div id="${MAP_POINTS_ID}" class="kaleido-map-editor__points" hidden></div>
+          <div id="${MAP_CANVAS_ID}" class="kaleido-map-editor__canvas">
+            <img id="${MAP_STAGE_IMG_ID}" class="kaleido-map-editor__img" alt="地图背景" hidden />
+            <div id="${MAP_POINTS_ID}" class="kaleido-map-editor__points" hidden></div>
+          </div>
         </div>
         <div id="${MAP_POINT_EDITOR_ID}" class="kaleido-map-editor__point-editor" hidden>
           <span class="kaleido-map-editor__point-editor-label"><span class="${MAP_POINT_ICON_CLASS}"></span> 地点名称</span>
@@ -401,9 +405,10 @@ function handleMapStageDblClick(event) {
   if (event.target.closest(`#${MAP_POINTS_ID} .kaleido-map-editor__point`)) return;
   const state = ensureMapEditorState();
   if (!state.card.background) return;
-  const stage = document.getElementById(MAP_STAGE_ID);
-  const rect = stage.getBoundingClientRect();
-  if (!rect.width || !rect.height) return;
+  // 坐标基准是 canvas（背景图完整显示区），舞台限高滚动后 rect 仍随内容移动，公式不变。
+  const canvas = document.getElementById(MAP_CANVAS_ID);
+  const rect = canvas?.getBoundingClientRect();
+  if (!rect || !rect.width || !rect.height) return;
   addMapPoint(
     mapClampCoord(((event.clientX - rect.left) / rect.width) * 100),
     mapClampCoord(((event.clientY - rect.top) / rect.height) * 100)
@@ -411,24 +416,26 @@ function handleMapStageDblClick(event) {
 }
 
 // 地点拖动：按下即选中；位移超过阈值才算拖动，抬起时提交坐标。
+// 坐标基准是 canvas（背景图完整显示区）：舞台限高滚动后 rect 随内容移动，
+// clientY - rect.top 天然含滚动偏移，无需再读 scrollTop。
 function handleMapPointsPointerDown(event) {
   const pointEl = event.target.closest('.kaleido-map-editor__point');
   if (!pointEl) return;
   const state = ensureMapEditorState();
   const id = pointEl.dataset.id;
   if (state.selectedId !== id) selectMapPoint(id);
-  const stage = document.getElementById(MAP_STAGE_ID);
-  const rect = stage.getBoundingClientRect();
-  if (!rect.width || !rect.height) return;
+  const canvas = document.getElementById(MAP_CANVAS_ID);
+  const rect = canvas?.getBoundingClientRect();
+  if (!rect || !rect.width || !rect.height) return;
   mapPointDrag = {
     id,
     el: pointEl,
     startX: event.clientX,
     startY: event.clientY,
-    stageLeft: rect.left,
-    stageTop: rect.top,
-    stageW: rect.width,
-    stageH: rect.height,
+    canvasLeft: rect.left,
+    canvasTop: rect.top,
+    canvasW: rect.width,
+    canvasH: rect.height,
     moved: false,
   };
   pointEl.setPointerCapture?.(event.pointerId);
@@ -442,8 +449,8 @@ function handleMapPointsPointerMove(event) {
   const dy = event.clientY - drag.startY;
   if (!drag.moved && Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
   drag.moved = true;
-  const x = mapClampCoord(((event.clientX - drag.stageLeft) / drag.stageW) * 100);
-  const y = mapClampCoord(((event.clientY - drag.stageTop) / drag.stageH) * 100);
+  const x = mapClampCoord(((event.clientX - drag.canvasLeft) / drag.canvasW) * 100);
+  const y = mapClampCoord(((event.clientY - drag.canvasTop) / drag.canvasH) * 100);
   const point = findMapPoint(drag.id);
   if (!point) return;
   point.x = x;

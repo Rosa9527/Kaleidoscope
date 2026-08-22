@@ -28,3 +28,7 @@ tests/_home_*.png
 tests/_preview_game_icons.html
 tests/_preview_game_probe.js
 tests/_preview_game_*.png
+
+# 调试产物（地图高图滚动复现）
+tests/_map_tall_*.js
+tests/_map_tall_*.png

@@ -3817,13 +3817,25 @@ textarea.kaleido-input {
   gap: 8px;
 }
 
+/* 编辑舞台：限高 + 内部滚动。电脑工作台是固定高度容器（overflow: hidden、
+   无外层滚动），其他 tab 靠内部滚动容器；地图舞台同样限高（60vh），
+   高图超出部分在舞台内滚动，避免图片下方内容被裁掉看不见。 */
 .kaleido-map-editor__stage {
   position: relative;
   min-height: 180px;
+  max-height: min(60vh, 520px);
   background: var(--k-content);
   border: 1px dashed var(--k-hairline-strong);
   border-radius: 12px;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* 画布层：随图片完整高度撑开，作为地点层的定位包含块
+   （舞台滚动后 absolute inset:0 仍铺满整张图，地点随内容滚动） */
+.kaleido-map-editor__canvas {
+  position: relative;
 }
 
 .kaleido-map-editor__img {

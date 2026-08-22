@@ -1,11 +1,11 @@
 // ===== 万华镜（Kaleidoscope）index.js — 构建产物，勿手改 =====
-// 构建时间: 2026-08-18 20:13:09 · 文件数: 23 · 指纹: 8c3d9576
+// 构建时间: 2026-08-22 22:50:09 · 文件数: 23 · 指纹: 976ff28a
 
 // ===== js/constants.js =====
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.3.0';
+const MODULE_VERSION = '1.3.1';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -457,6 +457,7 @@ const MAP_ADD_POINT_ID = 'kaleido-map-add-point';
 const MAP_SAVE_ID = 'kaleido-map-save';
 const MAP_DELETE_ID = 'kaleido-map-delete';
 const MAP_STAGE_ID = 'kaleido-map-stage';
+const MAP_CANVAS_ID = 'kaleido-map-canvas';
 const MAP_STAGE_IMG_ID = 'kaleido-map-stage-img';
 const MAP_POINTS_ID = 'kaleido-map-points';
 const MAP_EMPTY_ID = 'kaleido-map-empty';
@@ -11480,6 +11481,8 @@ function mapCropImageToDataURL(image, rect, maxDim) {
 // - 变量工作台「游戏地图」tab：上传图片 → 裁剪成背景 → 双击建点 / 拖动移动 /
 //   选中改名，全部编辑先落内存（mapEditorState），点「保存」才写角色卡。
 // 地点坐标一律按背景图百分比（0~100）存取，展示与编辑按比例缩放对齐。
+// 编辑舞台限高（60vh）内部滚动（工作台是固定高度容器，无外层滚动兜底）；
+// 坐标与地点层的基准是画布层 canvas（背景图完整显示区，随滚动移动）。
 
 // ---------- 编辑器内存态 ----------
 // { card, dirty, selectedId, rawDataURL, rawImage }
@@ -11598,8 +11601,10 @@ function buildMapEditorHTML() {
             <p class="kaleido-map-editor__empty-title">还没有地图背景</p>
             <p class="kaleido-map-editor__empty-text">点击「上传图片」，裁剪出想要的区域后，<br/>即可双击地图添加地点。</p>
           </div>
-          <img id="${MAP_STAGE_IMG_ID}" class="kaleido-map-editor__img" alt="地图背景" hidden />
-          <div id="${MAP_POINTS_ID}" class="kaleido-map-editor__points" hidden></div>
+          <div id="${MAP_CANVAS_ID}" class="kaleido-map-editor__canvas">
+            <img id="${MAP_STAGE_IMG_ID}" class="kaleido-map-editor__img" alt="地图背景" hidden />
+            <div id="${MAP_POINTS_ID}" class="kaleido-map-editor__points" hidden></div>
+          </div>
         </div>
         <div id="${MAP_POINT_EDITOR_ID}" class="kaleido-map-editor__point-editor" hidden>
           <span class="kaleido-map-editor__point-editor-label"><span class="${MAP_POINT_ICON_CLASS}"></span> 地点名称</span>
@@ -11876,9 +11881,10 @@ function handleMapStageDblClick(event) {
   if (event.target.closest(`#${MAP_POINTS_ID} .kaleido-map-editor__point`)) return;
   const state = ensureMapEditorState();
   if (!state.card.background) return;
-  const stage = document.getElementById(MAP_STAGE_ID);
-  const rect = stage.getBoundingClientRect();
-  if (!rect.width || !rect.height) return;
+  // 坐标基准是 canvas（背景图完整显示区），舞台限高滚动后 rect 仍随内容移动，公式不变。
+  const canvas = document.getElementById(MAP_CANVAS_ID);
+  const rect = canvas?.getBoundingClientRect();
+  if (!rect || !rect.width || !rect.height) return;
   addMapPoint(
     mapClampCoord(((event.clientX - rect.left) / rect.width) * 100),
     mapClampCoord(((event.clientY - rect.top) / rect.height) * 100)
@@ -11886,24 +11892,26 @@ function handleMapStageDblClick(event) {
 }
 
 // 地点拖动：按下即选中；位移超过阈值才算拖动，抬起时提交坐标。
+// 坐标基准是 canvas（背景图完整显示区）：舞台限高滚动后 rect 随内容移动，
+// clientY - rect.top 天然含滚动偏移，无需再读 scrollTop。
 function handleMapPointsPointerDown(event) {
   const pointEl = event.target.closest('.kaleido-map-editor__point');
   if (!pointEl) return;
   const state = ensureMapEditorState();
   const id = pointEl.dataset.id;
   if (state.selectedId !== id) selectMapPoint(id);
-  const stage = document.getElementById(MAP_STAGE_ID);
-  const rect = stage.getBoundingClientRect();
-  if (!rect.width || !rect.height) return;
+  const canvas = document.getElementById(MAP_CANVAS_ID);
+  const rect = canvas?.getBoundingClientRect();
+  if (!rect || !rect.width || !rect.height) return;
   mapPointDrag = {
     id,
     el: pointEl,
     startX: event.clientX,
     startY: event.clientY,
-    stageLeft: rect.left,
-    stageTop: rect.top,
-    stageW: rect.width,
-    stageH: rect.height,
+    canvasLeft: rect.left,
+    canvasTop: rect.top,
+    canvasW: rect.width,
+    canvasH: rect.height,
     moved: false,
   };
   pointEl.setPointerCapture?.(event.pointerId);
@@ -11917,8 +11925,8 @@ function handleMapPointsPointerMove(event) {
   const dy = event.clientY - drag.startY;
   if (!drag.moved && Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
   drag.moved = true;
-  const x = mapClampCoord(((event.clientX - drag.stageLeft) / drag.stageW) * 100);
-  const y = mapClampCoord(((event.clientY - drag.stageTop) / drag.stageH) * 100);
+  const x = mapClampCoord(((event.clientX - drag.canvasLeft) / drag.canvasW) * 100);
+  const y = mapClampCoord(((event.clientY - drag.canvasTop) / drag.canvasH) * 100);
   const point = findMapPoint(drag.id);
   if (!point) return;
   point.x = x;

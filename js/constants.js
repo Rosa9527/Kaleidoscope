@@ -1,7 +1,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.3.0';
+const MODULE_VERSION = '1.3.1';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -453,6 +453,7 @@ const MAP_ADD_POINT_ID = 'kaleido-map-add-point';
 const MAP_SAVE_ID = 'kaleido-map-save';
 const MAP_DELETE_ID = 'kaleido-map-delete';
 const MAP_STAGE_ID = 'kaleido-map-stage';
+const MAP_CANVAS_ID = 'kaleido-map-canvas';
 const MAP_STAGE_IMG_ID = 'kaleido-map-stage-img';
 const MAP_POINTS_ID = 'kaleido-map-points';
 const MAP_EMPTY_ID = 'kaleido-map-empty';
