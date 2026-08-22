@@ -2511,6 +2511,9 @@ textarea.kaleido-input {
 
 .kaleido-values-view.is-active {
   display: flex;
+  /* 至少填满所在容器（手机端面板 body / 电脑端工作台 body 均为确定高度）：
+     内容主体整条 flex 链才能拉满，空态不塌陷；内容更多时照常撑高滚动。 */
+  min-height: 100%;
 }
 
 .kaleido-values-view .kaleido-values__pane {
@@ -3787,6 +3790,8 @@ textarea.kaleido-input {
    地图系统：变量工作台「游戏地图」编辑器
    ========================================================= */
 .kaleido-map-editor {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -3812,16 +3817,20 @@ textarea.kaleido-input {
 }
 
 .kaleido-map-editor__stage-wrap {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-/* 编辑舞台：限高 + 内部滚动。电脑工作台是固定高度容器（overflow: hidden、
-   无外层滚动），其他 tab 靠内部滚动容器；地图舞台同样限高（60vh），
-   高图超出部分在舞台内滚动，避免图片下方内容被裁掉看不见。 */
+/* 编辑舞台：flex 撑满剩余空间（空态 / 矮图不留白）+ 限高 + 内部滚动。
+   电脑工作台是固定高度容器（overflow: hidden、无外层滚动），其他 tab
+   靠内部滚动容器；地图舞台同样限高（60vh），高图超出部分在舞台内滚动，
+   避免图片下方内容被裁掉看不见。 */
 .kaleido-map-editor__stage {
   position: relative;
+  flex: 1;
   min-height: 180px;
   max-height: min(60vh, 520px);
   background: var(--k-content);
@@ -4197,9 +4206,18 @@ textarea.kaleido-input {
     row-gap: 6px;
   }
 
-  .kaleido-story__tree-body,
-  .kaleido-values__tree-body {
+  /* 剧情树仍需 40vh 撑起手机端面板高度（面板高度随内容自适应）；
+     变量树的 40vh 已移除——变量系统面板改用固定高度（见下），
+     tree-body 由 flex 自动填满，避免与多工具行叠加时轻微溢出。 */
+  .kaleido-story__tree-body {
     min-height: 40vh;
+  }
+
+  /* 手机端变量系统面板固定高度：五个 tab 的默认视窗一样大（原来面板高度
+     随内容自适应，除变量树外空态 / 内容少时面板明显更矮）。内容主体均
+     flex:1 自动填满，max-height 仍兜底小屏。 */
+  .kaleido-panel__dialog.is-values-mode {
+    height: min(680px, 88dvh);
   }
 
   .kaleido-story__tree-hint {

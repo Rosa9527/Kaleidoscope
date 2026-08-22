@@ -32,3 +32,6 @@ tests/_preview_game_*.png
 # 调试产物（地图高图滚动复现）
 tests/_map_tall_*.js
 tests/_map_tall_*.png
+
+# 调试产物（变量系统手机端视窗复现）
+tests/_values_pane_*.js
