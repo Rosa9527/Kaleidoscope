@@ -1,7 +1,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.3.2';
+const MODULE_VERSION = '1.3.4';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -247,15 +247,24 @@ const VALUES_KEY_EDITOR_RULE_MIN_CLASS = 'kaleido-values__key-rule-min';
 const VALUES_KEY_EDITOR_RULE_MAX_CLASS = 'kaleido-values__key-rule-max';
 const VALUES_KEY_EDITOR_RULE_VALUE_CLASS = 'kaleido-values__key-rule-value';
 const VALUES_KEY_EDITOR_RULE_REMOVE_CLASS = 'kaleido-values__key-rule-remove';
-// 子变量派生方式：区间（单派生源 + 区间规则，输出文本）/ 公式（引用变量四则
-// 运算，输出数值）。
+// 子变量派生方式：区间（单派生源数值 + 区间规则，输出文本）/ 取值映射（单
+// 派生源取值 + 等值映射，输出文本）/ 公式（引用变量四则运算，输出数值）。
 const VALUES_KEY_DERIVE_RULES = 'rules';
+const VALUES_KEY_DERIVE_MAP = 'map';
 const VALUES_KEY_DERIVE_FORMULA = 'formula';
 const VALUES_KEY_EDITOR_DERIVE_ID = 'kaleido-values-key-editor-derive';
 const VALUES_KEY_EDITOR_FORMULA_ID = 'kaleido-values-key-editor-formula';
 const VALUES_KEY_EDITOR_FORMULA_FIELDS_ID = 'kaleido-values-key-editor-formula-fields';
 const VALUES_KEY_EDITOR_DECIMALS_ID = 'kaleido-values-key-editor-decimals';
 const VALUES_KEY_EDITOR_RULES_FIELDS_ID = 'kaleido-values-key-editor-rules-fields';
+const VALUES_KEY_EDITOR_PARENT_FIELDS_ID = 'kaleido-values-key-editor-parent-fields';
+const VALUES_KEY_EDITOR_MAP_FIELDS_ID = 'kaleido-values-key-editor-map-fields';
+const VALUES_KEY_EDITOR_MAP_RULES_ID = 'kaleido-values-key-editor-map-rules';
+const VALUES_KEY_EDITOR_MAP_RULES_ADD_ID = 'kaleido-values-key-editor-map-rules-add';
+const VALUES_KEY_EDITOR_MAP_RULE_ROW_CLASS = 'kaleido-values__key-map-row';
+const VALUES_KEY_EDITOR_MAP_MATCH_CLASS = 'kaleido-values__key-map-match';
+const VALUES_KEY_EDITOR_MAP_VALUE_CLASS = 'kaleido-values__key-map-value';
+const VALUES_KEY_EDITOR_MAP_REMOVE_CLASS = 'kaleido-values__key-map-remove';
 const VALUES_EDITOR_CHILD_HINT_ID = 'kaleido-values-editor-child-hint';
 // 变量 · 角色卡绑定（与剧情脉络同模式）：数据存角色卡 extensions，
 // 随角色卡导入/导出自动携带；群聊/未选角色时回退全局设置 valuesData。

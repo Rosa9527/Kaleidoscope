@@ -342,6 +342,7 @@ function getValuesKeys(ctx) {
     } else {
       key.parent = String(key.parent || '').trim();
       if (!Array.isArray(key.rules)) key.rules = [];
+      if (!Array.isArray(key.mapRules)) key.mapRules = [];
       if (typeof key.formula !== 'string') key.formula = '';
       if (toValuesDecimals(key.decimals) === null) key.decimals = 0;
     }
@@ -372,9 +373,12 @@ function getValuesTreeOrder(ctx) {
 }
 
 // 注册 / 更新键（以名称为身份）；返回保存后的键对象。
-// extra 可携带 { type, parent, rules, formula }：type 为 child 时按子变量保存——
-// formula 非空为公式派生（引用变量名写在公式里，不用 parent），否则为区间派生
-// （parent 为派生源变量名，rules 为区间规则 [{ min, max, value }]）；否则按父变量保存。
+// extra 可携带 { type, parent, rules, mapRules, formula }：type 为 child 时按子变量
+// 保存——formula 非空为公式派生（引用变量名写在公式里，不用 parent）；mapRules
+// 为数组时为取值映射派生（parent 为派生源变量名，mapRules 为等值规则
+// [{ match, value }]，match 留空 = 兜底行），适合「当某子变量 = 某文本时输出
+// 另一文本」的链式场景；否则为区间派生（parent 为派生源变量名，rules 为区间
+// 规则 [{ min, max, value }]）；否则按父变量保存。
 function upsertValuesKey(ctx, name, rule, extra = {}) {
   const bundle = getValuesBundle(ctx);
   const target = String(name || '').trim();
@@ -388,11 +392,19 @@ function upsertValuesKey(ctx, name, rule, extra = {}) {
       key.formula = formula;
       key.parent = '';
       key.rules = [];
+      key.mapRules = [];
       const decimals = toValuesDecimals(extra?.decimals);
       key.decimals = decimals !== null ? decimals : 0;
+    } else if (Array.isArray(extra?.mapRules)) {
+      key.parent = String(extra?.parent || '').trim();
+      key.mapRules = normalizeValuesChildMapRules(extra.mapRules);
+      key.rules = [];
+      delete key.formula;
+      delete key.decimals;
     } else {
       key.parent = String(extra?.parent || '').trim();
       key.rules = normalizeValuesChildRules(extra?.rules);
+      key.mapRules = [];
       delete key.formula;
       delete key.decimals;
     }
@@ -405,6 +417,7 @@ function upsertValuesKey(ctx, name, rule, extra = {}) {
     } else {
       delete existing.parent;
       delete existing.rules;
+      delete existing.mapRules;
       delete existing.formula;
       delete existing.decimals;
     }
@@ -455,7 +468,8 @@ function reorderValuesKeys(ctx, names) {
 
 // ---------- 父变量 / 子变量 ----------
 // 父变量：由 AI 按「变化规则」维护；子变量：不参与 AI 维护，值由同路径下的
-// 父变量按区间规则（rules）自动派生（如 好感度 40 → 态度「颇具好感」）。
+// 父变量按派生规则自动计算——区间（rules，如 好感度 40 → 态度「颇具好感」）、
+// 取值映射（mapRules，如 情欲等级「干柴烈火」→ 性爱态度「……」）或公式（formula）。
 function isValuesChildKey(key) {
   return Boolean(key && String(key.type || '') === VALUES_KEY_TYPE_CHILD);
 }
@@ -478,8 +492,8 @@ function getValuesChildKeysByParent(ctx, parentName) {
   );
 }
 
-// 依赖指定变量的全部子变量（删除前的依赖检查用）：区间派生按派生源 parent
-// 匹配，公式派生按公式引用变量匹配；内置子变量不参与检查。
+// 依赖指定变量的全部子变量（删除前的依赖检查用）：区间 / 取值映射派生按派生
+// 源 parent 匹配，公式派生按公式引用变量匹配；内置子变量不参与检查。
 function getValuesChildKeysByRef(ctx, varName) {
   const target = String(varName || '').trim();
   if (!target) return [];
@@ -538,6 +552,52 @@ function validateValuesChildRules(rules) {
     }
   }
   return { invalid, overlaps };
+}
+
+// 归一化子变量取值映射规则：{ match?, value }，value 必填（输出文本），match
+// 可省略（省略 = 兜底行：具名行都不匹配时输出）；非法条目丢弃。
+function normalizeValuesChildMapRules(rules) {
+  if (!Array.isArray(rules)) return [];
+  const normalized = [];
+  for (const item of rules) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const value = String(item.value ?? '').trim();
+    if (value === '') continue;
+    normalized.push({ match: String(item.match ?? '').trim(), value });
+  }
+  return normalized;
+}
+
+// 取值映射匹配判定：派生源当前值与映射值文本等值（去空白）或数值等值
+// （85 与 "85" / 85.0 互相匹配）即命中；来源缺失不命中。
+function valuesMapRuleMatches(sourceValue, matchText) {
+  if (sourceValue === undefined || sourceValue === null) return false;
+  const source = String(sourceValue).trim();
+  const match = String(matchText ?? '').trim();
+  if (source === match) return true;
+  const a = toValuesNumeric(source);
+  const b = toValuesNumeric(match);
+  return a !== null && b !== null && a === b;
+}
+
+// 校验子变量取值映射规则：返回 { duplicates }。
+// - duplicates：match 会命中同一来源取值的规则对下标（文本等值或数值等值，
+//   如「干柴烈火」重复、100 与 100.0；两条兜底行同样算重复，兜底只允许一行）。
+function validateValuesChildMapRules(rules) {
+  const list = Array.isArray(rules) ? rules : [];
+  const duplicates = [];
+  for (let i = 0; i < list.length; i += 1) {
+    const match = String(list[i]?.match ?? '').trim();
+    for (let j = i + 1; j < list.length; j += 1) {
+      const other = String(list[j]?.match ?? '').trim();
+      if (match === '') {
+        if (other === '') duplicates.push([i, j]);
+      } else if (other !== '' && valuesMapRuleMatches(match, other)) {
+        duplicates.push([i, j]);
+      }
+    }
+  }
+  return { duplicates };
 }
 
 // ---------- 子变量公式派生 ----------
@@ -749,8 +809,9 @@ function findValuesChildCycle(keys, name, refs) {
 
 // 单叶子派生：按子变量派生方式计算子变量值（就地写入）。
 // 公式模式（formula 非空）：用同路径下各引用变量求值，写数值；
-// 区间模式：按 parent 值顺序匹配规则，写文本。输入缺失 / 非数值 / 求值失败 /
-// 无规则命中时保持原值。
+// 区间模式：按 parent 值顺序匹配规则，写文本；取值映射模式（mapRules 非空）：
+// 按 parent 值等值匹配（先具名行后兜底行），写文本。输入缺失 / 非数值 /
+// 求值失败 / 无规则命中时保持原值。
 function deriveValuesChildAt(tree, path, childKey) {
   if (!Array.isArray(path) || path.length === 0) return false;
   const formula = String(childKey?.formula || '').trim();
@@ -770,6 +831,24 @@ function deriveValuesChildAt(tree, path, childKey) {
   const parentName = String(childKey?.parent || '').trim();
   if (!parentName) return false;
   const parentValue = valuesGetAtPath(tree, path.slice(0, -1).concat(parentName));
+  const mapRules = Array.isArray(childKey?.mapRules) ? childKey.mapRules : [];
+  if (mapRules.length > 0) {
+    for (const rule of mapRules) {
+      const match = String(rule?.match ?? '').trim();
+      if (match === '') continue;
+      if (valuesMapRuleMatches(parentValue, match)) {
+        valuesSetAtPath(tree, path, String(rule.value));
+        return true;
+      }
+    }
+    for (const rule of mapRules) {
+      if (String(rule?.match ?? '').trim() === '') {
+        valuesSetAtPath(tree, path, String(rule.value));
+        return true;
+      }
+    }
+    return false;
+  }
   const numeric = toValuesNumeric(parentValue);
   if (numeric === null) return false;
   for (const rule of Array.isArray(childKey?.rules) ? childKey.rules : []) {
@@ -1274,6 +1353,13 @@ function serializeValuesBundle(ctx) {
         lines.push(`    formula: ${yamlScalar(formula)}`);
         const decimals = toValuesDecimals(key?.decimals);
         lines.push(`    decimals: ${decimals === null ? 0 : decimals}`);
+      } else if (Array.isArray(key?.mapRules) && key.mapRules.length > 0) {
+        lines.push(`    parent: ${yamlScalar(String(key?.parent || ''))}`);
+        lines.push('    mapRules:');
+        for (const rule of key.mapRules) {
+          lines.push(`      - match: ${yamlScalar(String(rule?.match ?? ''))}`);
+          lines.push(`        value: ${yamlScalar(String(rule?.value ?? ''))}`);
+        }
       } else {
         lines.push(`    parent: ${yamlScalar(String(key?.parent || ''))}`);
         lines.push('    rules:');
@@ -1381,6 +1467,10 @@ function parseValuesBundle(text) {
           key.rules = [];
           const decimals = toValuesDecimals(item?.decimals);
           key.decimals = decimals === null ? 0 : decimals;
+        } else if (item?.mapRules !== undefined) {
+          if (!Array.isArray(item.mapRules)) throw new Error(`变量「${name}」的 mapRules 必须是列表`);
+          key.parent = String(item?.parent || '').trim();
+          key.mapRules = normalizeValuesChildMapRules(item.mapRules);
         } else {
           key.parent = String(item?.parent || '').trim();
           key.rules = normalizeValuesChildRules(item?.rules);
@@ -1478,11 +1568,33 @@ function applyValuesBundle(ctx, parsed, mode) {
       existing.rule = String(key.rule || '').trim();
       existing.type = key.type === VALUES_KEY_TYPE_CHILD ? VALUES_KEY_TYPE_CHILD : VALUES_KEY_TYPE_PARENT;
       if (existing.type === VALUES_KEY_TYPE_CHILD) {
-        existing.parent = String(key.parent || '').trim();
-        existing.rules = normalizeValuesChildRules(key.rules);
+        const formula = String(key.formula || '').trim();
+        if (formula !== '') {
+          existing.formula = formula;
+          const decimals = toValuesDecimals(key.decimals);
+          existing.decimals = decimals !== null ? decimals : 0;
+          existing.parent = '';
+          existing.rules = [];
+          existing.mapRules = [];
+        } else if (Array.isArray(key.mapRules) && key.mapRules.length > 0) {
+          existing.parent = String(key.parent || '').trim();
+          existing.mapRules = normalizeValuesChildMapRules(key.mapRules);
+          existing.rules = [];
+          delete existing.formula;
+          delete existing.decimals;
+        } else {
+          existing.parent = String(key.parent || '').trim();
+          existing.rules = normalizeValuesChildRules(key.rules);
+          existing.mapRules = [];
+          delete existing.formula;
+          delete existing.decimals;
+        }
       } else {
         delete existing.parent;
         delete existing.rules;
+        delete existing.mapRules;
+        delete existing.formula;
+        delete existing.decimals;
       }
     } else {
       bundle.keys.push(cloneValue(key));

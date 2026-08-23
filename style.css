@@ -3240,6 +3240,33 @@ textarea.kaleido-input {
   box-shadow: 0 0 0 3px rgba(255, 69, 58, 0.2);
 }
 
+/* 子变量取值映射规则行（匹配值 → 输出文本） */
+.kaleido-values__key-map-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kaleido-values__key-map-row .kaleido-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.kaleido-values__key-map-row .kaleido-values__key-map-value {
+  flex: 2.2;
+}
+
+.kaleido-values__key-map-arrow {
+  flex: none;
+  font-size: 13px;
+  color: var(--k-text-3);
+}
+
+.kaleido-values__key-map-row.is-conflict .kaleido-input {
+  border-color: var(--k-red);
+  box-shadow: 0 0 0 3px rgba(255, 69, 58, 0.2);
+}
+
 /* 编辑器只读变量名 */
 .kaleido-values__editor-key-name {
   font-size: 13px;

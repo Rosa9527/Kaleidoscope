@@ -273,6 +273,73 @@ runner.test('键注册：添加区间自动接续下限（上一行上限 + 1）
   click($('kaleido-values-key-editor-cancel'));
 });
 
+// ---------- 键注册：子变量取值映射 ----------
+runner.test('键注册：子变量取值映射（派生源可选手变量，重复匹配值阻止保存）', () => {
+  click($('kaleido-values-add-key'));
+  setValue('kaleido-values-key-editor-name', '性爱态度');
+  const typeSelect = $('kaleido-values-key-editor-type');
+  typeSelect.value = 'child';
+  typeSelect.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+  const deriveSelect = $('kaleido-values-key-editor-derive');
+  assert(!$('kaleido-values-key-editor-parent-fields').hidden, '区间模式默认显示派生源');
+  deriveSelect.value = 'map';
+  deriveSelect.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+  assert($('kaleido-values-key-editor-rules-fields').hidden, '取值映射应隐藏区间编辑器');
+  assert(!$('kaleido-values-key-editor-map-fields').hidden, '取值映射应显示映射编辑器');
+  assert(!$('kaleido-values-key-editor-parent-fields').hidden, '取值映射应显示派生源');
+  assert($('kaleido-values-key-editor-formula-fields').hidden, '公式输入应隐藏');
+  // 派生源下拉应含内置子变量 情欲等级（链式派生）
+  const parentOptions = Array.from($('kaleido-values-key-editor-parent').options).map((option) => option.value);
+  assert(parentOptions.includes('情欲等级'), '派生源下拉应含内置子变量情欲等级');
+  $('kaleido-values-key-editor-parent').value = '情欲等级';
+  click($('kaleido-values-key-editor-map-rules-add'));
+  click($('kaleido-values-key-editor-map-rules-add'));
+  click($('kaleido-values-key-editor-map-rules-add'));
+  const rows = $('kaleido-values-key-editor-map-rules').querySelectorAll('.kaleido-values__key-map-row');
+  assert(rows.length === 3, '应有 3 行映射');
+  rows[0].querySelector('.kaleido-values__key-map-match').value = 'lv4: 干柴烈火';
+  rows[0].querySelector('.kaleido-values__key-map-value').value = '迫不及待，主动索取';
+  rows[1].querySelector('.kaleido-values__key-map-match').value = 'lv4: 干柴烈火';
+  rows[1].querySelector('.kaleido-values__key-map-value').value = '重复行';
+  rows[2].querySelector('.kaleido-values__key-map-match').value = '';
+  rows[2].querySelector('.kaleido-values__key-map-value').value = '尚未开窍';
+  rows[1].querySelector('.kaleido-values__key-map-match').dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+  assert(rows[0].classList.contains('is-conflict') && rows[1].classList.contains('is-conflict'), '重复匹配值行应标红');
+  assert(!rows[2].classList.contains('is-conflict'), '兜底行不应标红');
+  click($('kaleido-values-key-editor-save'));
+  assert(!ui.getValuesKeyByName(hostCtx, '性爱态度'), '重复映射不应保存');
+  assert(toasts.some((t) => t[0] === 'warning' && t[1].includes('重复')), '应提示映射重复');
+  // 修正重复行后可保存
+  rows[1].querySelector('.kaleido-values__key-map-match').value = 'lv5: 鱼水之欢';
+  rows[1].querySelector('.kaleido-values__key-map-match').dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+  click($('kaleido-values-key-editor-save'));
+  const key = ui.getValuesKeyByName(hostCtx, '性爱态度');
+  assert(key && ui.isValuesChildKey(key), '性爱态度应保存为子变量');
+  assert(key.parent === '情欲等级', '派生源应保存');
+  assert(key.mapRules.length === 3, '应有 3 条映射');
+  assert(key.mapRules[0].match === 'lv4: 干柴烈火', '具名映射应保存');
+  assert(key.mapRules[2].match === '' && key.mapRules[2].value === '尚未开窍', '兜底行应保存');
+  // 重新打开编辑器：派生方式与映射行应回填
+  const listRows = Array.from($('kaleido-values-keys-body').querySelectorAll('.kaleido-values__row'));
+  click(listRows.find((r) => r.dataset.name === '性爱态度').querySelector('button[data-action="edit-key"]'));
+  assert($('kaleido-values-key-editor-derive').value === 'map', '编辑时应回填取值映射模式');
+  assert(!$('kaleido-values-key-editor-map-fields').hidden, '映射编辑器应显示');
+  const reopened = $('kaleido-values-key-editor-map-rules').querySelectorAll('.kaleido-values__key-map-row');
+  assert(reopened.length === 3 && reopened[0].querySelector('.kaleido-values__key-map-match').value === 'lv4: 干柴烈火', '映射行应回填');
+  click($('kaleido-values-key-editor-cancel'));
+  // 树行派生：情欲 85 → 情欲等级 干柴烈火 → 性爱态度
+  const defaults = ui.getValuesDefaults(hostCtx);
+  defaults['情欲'] = 75;
+  defaults['情欲等级'] = '未知';
+  defaults['性爱态度'] = '未知';
+  ui.saveValuesData(hostCtx);
+  assert(ui.getValuesGameTree(hostCtx)['性爱态度'] === '迫不及待，主动索取', '75 应链式派生性爱态度');
+  ui.deleteValuesKey(hostCtx, '性爱态度');
+  delete defaults['情欲'];
+  delete defaults['情欲等级'];
+  delete defaults['性爱态度'];
+});
+
 // ---------- 树行：子变量派生 ----------
 runner.test('树行：子变量显示派生徽标、不可编辑、值自动计算', () => {
   const defaults = ui.getValuesDefaults(hostCtx);
@@ -294,7 +361,7 @@ runner.test('新建变量：选择子变量时不提供值输入、只显示派�
   select.value = '态度';
   select.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
   assert(!$('kaleido-values-editor-child-hint').hidden, '应显示子变量提示');
-  assert($('kaleido-values-editor-child-hint').textContent === '子变量值由派生规则（区间 / 公式）自动计算', '提示文字应为派生规则说明');
+  assert($('kaleido-values-editor-child-hint').textContent === '子变量值由派生规则（区间 / 取值映射 / 公式）自动计算', '提示文字应为派生规则说明');
   assert($('kaleido-values-editor-value').hidden, '子变量不应显示值输入框');
   assert($('kaleido-values-editor-value-label').hidden, '子变量不应显示值标签');
   click($('kaleido-values-editor-cancel'));

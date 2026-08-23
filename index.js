@@ -1,11 +1,11 @@
 // ===== 万华镜（Kaleidoscope）index.js — 构建产物，勿手改 =====
-// 构建时间: 2026-08-22 23:07:31 · 文件数: 23 · 指纹: c2aa180b
+// 构建时间: 2026-08-23 23:08:43 · 文件数: 23 · 指纹: 6b9935b4
 
 // ===== js/constants.js =====
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.3.2';
+const MODULE_VERSION = '1.3.4';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -251,15 +251,24 @@ const VALUES_KEY_EDITOR_RULE_MIN_CLASS = 'kaleido-values__key-rule-min';
 const VALUES_KEY_EDITOR_RULE_MAX_CLASS = 'kaleido-values__key-rule-max';
 const VALUES_KEY_EDITOR_RULE_VALUE_CLASS = 'kaleido-values__key-rule-value';
 const VALUES_KEY_EDITOR_RULE_REMOVE_CLASS = 'kaleido-values__key-rule-remove';
-// 子变量派生方式：区间（单派生源 + 区间规则，输出文本）/ 公式（引用变量四则
-// 运算，输出数值）。
+// 子变量派生方式：区间（单派生源数值 + 区间规则，输出文本）/ 取值映射（单
+// 派生源取值 + 等值映射，输出文本）/ 公式（引用变量四则运算，输出数值）。
 const VALUES_KEY_DERIVE_RULES = 'rules';
+const VALUES_KEY_DERIVE_MAP = 'map';
 const VALUES_KEY_DERIVE_FORMULA = 'formula';
 const VALUES_KEY_EDITOR_DERIVE_ID = 'kaleido-values-key-editor-derive';
 const VALUES_KEY_EDITOR_FORMULA_ID = 'kaleido-values-key-editor-formula';
 const VALUES_KEY_EDITOR_FORMULA_FIELDS_ID = 'kaleido-values-key-editor-formula-fields';
 const VALUES_KEY_EDITOR_DECIMALS_ID = 'kaleido-values-key-editor-decimals';
 const VALUES_KEY_EDITOR_RULES_FIELDS_ID = 'kaleido-values-key-editor-rules-fields';
+const VALUES_KEY_EDITOR_PARENT_FIELDS_ID = 'kaleido-values-key-editor-parent-fields';
+const VALUES_KEY_EDITOR_MAP_FIELDS_ID = 'kaleido-values-key-editor-map-fields';
+const VALUES_KEY_EDITOR_MAP_RULES_ID = 'kaleido-values-key-editor-map-rules';
+const VALUES_KEY_EDITOR_MAP_RULES_ADD_ID = 'kaleido-values-key-editor-map-rules-add';
+const VALUES_KEY_EDITOR_MAP_RULE_ROW_CLASS = 'kaleido-values__key-map-row';
+const VALUES_KEY_EDITOR_MAP_MATCH_CLASS = 'kaleido-values__key-map-match';
+const VALUES_KEY_EDITOR_MAP_VALUE_CLASS = 'kaleido-values__key-map-value';
+const VALUES_KEY_EDITOR_MAP_REMOVE_CLASS = 'kaleido-values__key-map-remove';
 const VALUES_EDITOR_CHILD_HINT_ID = 'kaleido-values-editor-child-hint';
 // 变量 · 角色卡绑定（与剧情脉络同模式）：数据存角色卡 extensions，
 // 随角色卡导入/导出自动携带；群聊/未选角色时回退全局设置 valuesData。
@@ -6789,6 +6798,7 @@ function getValuesKeys(ctx) {
     } else {
       key.parent = String(key.parent || '').trim();
       if (!Array.isArray(key.rules)) key.rules = [];
+      if (!Array.isArray(key.mapRules)) key.mapRules = [];
       if (typeof key.formula !== 'string') key.formula = '';
       if (toValuesDecimals(key.decimals) === null) key.decimals = 0;
     }
@@ -6819,9 +6829,12 @@ function getValuesTreeOrder(ctx) {
 }
 
 // 注册 / 更新键（以名称为身份）；返回保存后的键对象。
-// extra 可携带 { type, parent, rules, formula }：type 为 child 时按子变量保存——
-// formula 非空为公式派生（引用变量名写在公式里，不用 parent），否则为区间派生
-// （parent 为派生源变量名，rules 为区间规则 [{ min, max, value }]）；否则按父变量保存。
+// extra 可携带 { type, parent, rules, mapRules, formula }：type 为 child 时按子变量
+// 保存——formula 非空为公式派生（引用变量名写在公式里，不用 parent）；mapRules
+// 为数组时为取值映射派生（parent 为派生源变量名，mapRules 为等值规则
+// [{ match, value }]，match 留空 = 兜底行），适合「当某子变量 = 某文本时输出
+// 另一文本」的链式场景；否则为区间派生（parent 为派生源变量名，rules 为区间
+// 规则 [{ min, max, value }]）；否则按父变量保存。
 function upsertValuesKey(ctx, name, rule, extra = {}) {
   const bundle = getValuesBundle(ctx);
   const target = String(name || '').trim();
@@ -6835,11 +6848,19 @@ function upsertValuesKey(ctx, name, rule, extra = {}) {
       key.formula = formula;
       key.parent = '';
       key.rules = [];
+      key.mapRules = [];
       const decimals = toValuesDecimals(extra?.decimals);
       key.decimals = decimals !== null ? decimals : 0;
+    } else if (Array.isArray(extra?.mapRules)) {
+      key.parent = String(extra?.parent || '').trim();
+      key.mapRules = normalizeValuesChildMapRules(extra.mapRules);
+      key.rules = [];
+      delete key.formula;
+      delete key.decimals;
     } else {
       key.parent = String(extra?.parent || '').trim();
       key.rules = normalizeValuesChildRules(extra?.rules);
+      key.mapRules = [];
       delete key.formula;
       delete key.decimals;
     }
@@ -6852,6 +6873,7 @@ function upsertValuesKey(ctx, name, rule, extra = {}) {
     } else {
       delete existing.parent;
       delete existing.rules;
+      delete existing.mapRules;
       delete existing.formula;
       delete existing.decimals;
     }
@@ -6902,7 +6924,8 @@ function reorderValuesKeys(ctx, names) {
 
 // ---------- 父变量 / 子变量 ----------
 // 父变量：由 AI 按「变化规则」维护；子变量：不参与 AI 维护，值由同路径下的
-// 父变量按区间规则（rules）自动派生（如 好感度 40 → 态度「颇具好感」）。
+// 父变量按派生规则自动计算——区间（rules，如 好感度 40 → 态度「颇具好感」）、
+// 取值映射（mapRules，如 情欲等级「干柴烈火」→ 性爱态度「……」）或公式（formula）。
 function isValuesChildKey(key) {
   return Boolean(key && String(key.type || '') === VALUES_KEY_TYPE_CHILD);
 }
@@ -6925,8 +6948,8 @@ function getValuesChildKeysByParent(ctx, parentName) {
   );
 }
 
-// 依赖指定变量的全部子变量（删除前的依赖检查用）：区间派生按派生源 parent
-// 匹配，公式派生按公式引用变量匹配；内置子变量不参与检查。
+// 依赖指定变量的全部子变量（删除前的依赖检查用）：区间 / 取值映射派生按派生
+// 源 parent 匹配，公式派生按公式引用变量匹配；内置子变量不参与检查。
 function getValuesChildKeysByRef(ctx, varName) {
   const target = String(varName || '').trim();
   if (!target) return [];
@@ -6985,6 +7008,52 @@ function validateValuesChildRules(rules) {
     }
   }
   return { invalid, overlaps };
+}
+
+// 归一化子变量取值映射规则：{ match?, value }，value 必填（输出文本），match
+// 可省略（省略 = 兜底行：具名行都不匹配时输出）；非法条目丢弃。
+function normalizeValuesChildMapRules(rules) {
+  if (!Array.isArray(rules)) return [];
+  const normalized = [];
+  for (const item of rules) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const value = String(item.value ?? '').trim();
+    if (value === '') continue;
+    normalized.push({ match: String(item.match ?? '').trim(), value });
+  }
+  return normalized;
+}
+
+// 取值映射匹配判定：派生源当前值与映射值文本等值（去空白）或数值等值
+// （85 与 "85" / 85.0 互相匹配）即命中；来源缺失不命中。
+function valuesMapRuleMatches(sourceValue, matchText) {
+  if (sourceValue === undefined || sourceValue === null) return false;
+  const source = String(sourceValue).trim();
+  const match = String(matchText ?? '').trim();
+  if (source === match) return true;
+  const a = toValuesNumeric(source);
+  const b = toValuesNumeric(match);
+  return a !== null && b !== null && a === b;
+}
+
+// 校验子变量取值映射规则：返回 { duplicates }。
+// - duplicates：match 会命中同一来源取值的规则对下标（文本等值或数值等值，
+//   如「干柴烈火」重复、100 与 100.0；两条兜底行同样算重复，兜底只允许一行）。
+function validateValuesChildMapRules(rules) {
+  const list = Array.isArray(rules) ? rules : [];
+  const duplicates = [];
+  for (let i = 0; i < list.length; i += 1) {
+    const match = String(list[i]?.match ?? '').trim();
+    for (let j = i + 1; j < list.length; j += 1) {
+      const other = String(list[j]?.match ?? '').trim();
+      if (match === '') {
+        if (other === '') duplicates.push([i, j]);
+      } else if (other !== '' && valuesMapRuleMatches(match, other)) {
+        duplicates.push([i, j]);
+      }
+    }
+  }
+  return { duplicates };
 }
 
 // ---------- 子变量公式派生 ----------
@@ -7196,8 +7265,9 @@ function findValuesChildCycle(keys, name, refs) {
 
 // 单叶子派生：按子变量派生方式计算子变量值（就地写入）。
 // 公式模式（formula 非空）：用同路径下各引用变量求值，写数值；
-// 区间模式：按 parent 值顺序匹配规则，写文本。输入缺失 / 非数值 / 求值失败 /
-// 无规则命中时保持原值。
+// 区间模式：按 parent 值顺序匹配规则，写文本；取值映射模式（mapRules 非空）：
+// 按 parent 值等值匹配（先具名行后兜底行），写文本。输入缺失 / 非数值 /
+// 求值失败 / 无规则命中时保持原值。
 function deriveValuesChildAt(tree, path, childKey) {
   if (!Array.isArray(path) || path.length === 0) return false;
   const formula = String(childKey?.formula || '').trim();
@@ -7217,6 +7287,24 @@ function deriveValuesChildAt(tree, path, childKey) {
   const parentName = String(childKey?.parent || '').trim();
   if (!parentName) return false;
   const parentValue = valuesGetAtPath(tree, path.slice(0, -1).concat(parentName));
+  const mapRules = Array.isArray(childKey?.mapRules) ? childKey.mapRules : [];
+  if (mapRules.length > 0) {
+    for (const rule of mapRules) {
+      const match = String(rule?.match ?? '').trim();
+      if (match === '') continue;
+      if (valuesMapRuleMatches(parentValue, match)) {
+        valuesSetAtPath(tree, path, String(rule.value));
+        return true;
+      }
+    }
+    for (const rule of mapRules) {
+      if (String(rule?.match ?? '').trim() === '') {
+        valuesSetAtPath(tree, path, String(rule.value));
+        return true;
+      }
+    }
+    return false;
+  }
   const numeric = toValuesNumeric(parentValue);
   if (numeric === null) return false;
   for (const rule of Array.isArray(childKey?.rules) ? childKey.rules : []) {
@@ -7721,6 +7809,13 @@ function serializeValuesBundle(ctx) {
         lines.push(`    formula: ${yamlScalar(formula)}`);
         const decimals = toValuesDecimals(key?.decimals);
         lines.push(`    decimals: ${decimals === null ? 0 : decimals}`);
+      } else if (Array.isArray(key?.mapRules) && key.mapRules.length > 0) {
+        lines.push(`    parent: ${yamlScalar(String(key?.parent || ''))}`);
+        lines.push('    mapRules:');
+        for (const rule of key.mapRules) {
+          lines.push(`      - match: ${yamlScalar(String(rule?.match ?? ''))}`);
+          lines.push(`        value: ${yamlScalar(String(rule?.value ?? ''))}`);
+        }
       } else {
         lines.push(`    parent: ${yamlScalar(String(key?.parent || ''))}`);
         lines.push('    rules:');
@@ -7828,6 +7923,10 @@ function parseValuesBundle(text) {
           key.rules = [];
           const decimals = toValuesDecimals(item?.decimals);
           key.decimals = decimals === null ? 0 : decimals;
+        } else if (item?.mapRules !== undefined) {
+          if (!Array.isArray(item.mapRules)) throw new Error(`变量「${name}」的 mapRules 必须是列表`);
+          key.parent = String(item?.parent || '').trim();
+          key.mapRules = normalizeValuesChildMapRules(item.mapRules);
         } else {
           key.parent = String(item?.parent || '').trim();
           key.rules = normalizeValuesChildRules(item?.rules);
@@ -7925,11 +8024,33 @@ function applyValuesBundle(ctx, parsed, mode) {
       existing.rule = String(key.rule || '').trim();
       existing.type = key.type === VALUES_KEY_TYPE_CHILD ? VALUES_KEY_TYPE_CHILD : VALUES_KEY_TYPE_PARENT;
       if (existing.type === VALUES_KEY_TYPE_CHILD) {
-        existing.parent = String(key.parent || '').trim();
-        existing.rules = normalizeValuesChildRules(key.rules);
+        const formula = String(key.formula || '').trim();
+        if (formula !== '') {
+          existing.formula = formula;
+          const decimals = toValuesDecimals(key.decimals);
+          existing.decimals = decimals !== null ? decimals : 0;
+          existing.parent = '';
+          existing.rules = [];
+          existing.mapRules = [];
+        } else if (Array.isArray(key.mapRules) && key.mapRules.length > 0) {
+          existing.parent = String(key.parent || '').trim();
+          existing.mapRules = normalizeValuesChildMapRules(key.mapRules);
+          existing.rules = [];
+          delete existing.formula;
+          delete existing.decimals;
+        } else {
+          existing.parent = String(key.parent || '').trim();
+          existing.rules = normalizeValuesChildRules(key.rules);
+          existing.mapRules = [];
+          delete existing.formula;
+          delete existing.decimals;
+        }
       } else {
         delete existing.parent;
         delete existing.rules;
+        delete existing.mapRules;
+        delete existing.formula;
+        delete existing.decimals;
       }
     } else {
       bundle.keys.push(cloneValue(key));
@@ -8055,6 +8176,8 @@ function buildValuesMaintainMessages(ctx, prompt) {
   const describeChildSource = (key) => {
     const formula = String(key?.formula || '').trim();
     if (formula !== '') return `${String(key?.name || '')} ← 公式 ${formula}`;
+    const mapRules = Array.isArray(key?.mapRules) ? key.mapRules : [];
+    if (mapRules.length > 0) return `${String(key?.name || '')} ← ${String(key?.parent || '')}按取值映射`;
     return `${String(key?.name || '')} ← ${String(key?.parent || '')}`;
   };
   const childNote = childKeysInUse.length > 0
@@ -9105,7 +9228,7 @@ function buildValuesRow(path, name, node, depth) {
   row.className = 'kaleido-values__row kaleido-values__row--leaf' + (isChildLeaf ? ' is-derived' : '');
   row.dataset.kind = 'leaf';
   const derivedBadge = isChildLeaf
-    ? `<span class="kaleido-values__row-derived-badge" title="子变量：值由派生规则（区间 / 公式）自动计算，不可手动编辑">派生</span>`
+    ? `<span class="kaleido-values__row-derived-badge" title="子变量：值由派生规则（区间 / 取值映射 / 公式）自动计算，不可手动编辑">派生</span>`
     : '';
   const editButton = isChildLeaf
     ? `<button type="button" class="kaleido-values__icon-btn" disabled title="子变量由父变量自动计算，不可手动编辑" aria-label="子变量不可编辑"><span class="${VALUES_EDIT_ICON_CLASS}"></span></button>`
@@ -9632,7 +9755,7 @@ function renderValuesKeys() {
     const isBuiltin = isValuesBuiltinKey(key);
     const isChild = isValuesChildKey(key);
     const typeBadge = isChild
-      ? `<span class="kaleido-values__row-type-badge is-child" title="子变量：值由父变量自动派生，不参与 AI 维护">子</span>`
+      ? `<span class="kaleido-values__row-type-badge is-child" title="子变量：值由派生规则自动派生，不参与 AI 维护">子</span>`
       : `<span class="kaleido-values__row-type-badge" title="父变量：由 AI 按变化规则维护">父</span>`;
     // 内置行：带「内置」徽标、不可拖动、无删除按钮（编辑 = 按当前角色卡保存
     // 自定义规则并生成卡级覆盖，之后该行变为普通卡键行，删除即恢复内置默认）。
@@ -9662,10 +9785,13 @@ function renderValuesKeys() {
   }
 }
 
-// 子变量派生方式摘要：公式模式显示公式，区间模式显示派生源 + 区间。
+// 子变量派生方式摘要：公式模式显示公式，取值映射显示派生源 + 等值映射，
+// 区间模式显示派生源 + 区间。
 function formatValuesChildDeriveSummary(key) {
   const formula = String(key?.formula || '').trim();
   if (formula !== '') return `由公式派生：${formula}`;
+  const mapRules = Array.isArray(key?.mapRules) ? key.mapRules : [];
+  if (mapRules.length > 0) return `由「${String(key?.parent || '')}」按取值映射派生：${formatValuesChildMapRulesSummary(key)}`;
   return `由「${String(key?.parent || '')}」派生：${formatValuesChildRulesSummary(key)}`;
 }
 
@@ -9676,6 +9802,15 @@ function formatValuesChildRulesSummary(key) {
     const min = rule?.min !== undefined ? String(rule.min) : '';
     const max = rule?.max !== undefined ? String(rule.max) : '';
     return `${min}~${max} ${String(rule?.value || '')}`;
+  }).join('；');
+}
+
+// 子变量取值映射规则摘要（「匹配值→输出」串，兜底行显示「其他」）。
+function formatValuesChildMapRulesSummary(key) {
+  const mapRules = Array.isArray(key?.mapRules) ? key.mapRules : [];
+  return mapRules.map((rule) => {
+    const match = String(rule?.match ?? '').trim();
+    return `${match === '' ? '其他' : match}→${String(rule?.value || '')}`;
   }).join('；');
 }
 
@@ -9797,14 +9932,93 @@ function nextValuesChildRuleMinFromRow(row) {
   return String(max + 1);
 }
 
-// 派生方式联动：区间显示派生源 + 区间编辑器，公式显示公式输入。
+// 子变量取值映射规则行：匹配值 → 输出文本 + 删除（匹配值留空 = 兜底行）。
+function buildValuesKeyMapRuleRow(rule) {
+  const row = document.createElement('div');
+  row.className = VALUES_KEY_EDITOR_MAP_RULE_ROW_CLASS;
+  row.innerHTML = `
+    <input type="text" class="kaleido-input ${VALUES_KEY_EDITOR_MAP_MATCH_CLASS}" placeholder="匹配值，如：lv4: 干柴烈火" title="派生源变量的取值（文本或数字）；留空 = 兜底行（具名映射都不命中时输出）" autocomplete="off" spellcheck="false" />
+    <span class="kaleido-values__key-map-arrow">→</span>
+    <input type="text" class="kaleido-input ${VALUES_KEY_EDITOR_MAP_VALUE_CLASS}" placeholder="子变量文本" title="该取值对应的子变量文本" autocomplete="off" spellcheck="false" />
+    <button type="button" class="kaleido-icon-btn ${VALUES_KEY_EDITOR_MAP_REMOVE_CLASS}" title="删除映射" aria-label="删除映射">✕</button>
+  `;
+  const matchInput = row.querySelector('.' + VALUES_KEY_EDITOR_MAP_MATCH_CLASS);
+  const valueInput = row.querySelector('.' + VALUES_KEY_EDITOR_MAP_VALUE_CLASS);
+  if (rule?.match !== undefined) matchInput.value = String(rule.match);
+  if (rule?.value !== undefined) valueInput.value = String(rule.value);
+  return row;
+}
+
+// 渲染子变量取值映射规则编辑器。
+function renderValuesKeyMapRules(rules) {
+  const container = document.getElementById(VALUES_KEY_EDITOR_MAP_RULES_ID);
+  if (!container) return;
+  container.innerHTML = '';
+  const list = Array.isArray(rules) ? rules : [];
+  if (list.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'kaleido-values__key-rules-empty';
+    empty.textContent = '还没有映射规则。';
+    container.appendChild(empty);
+  }
+  for (const rule of list) {
+    container.appendChild(buildValuesKeyMapRuleRow(rule));
+  }
+}
+
+// 读取单行取值映射规则（输出文本为空返回 null；匹配值可为空 = 兜底）。
+function readValuesKeyMapRuleFromRow(row) {
+  if (!row) return null;
+  const match = String(row.querySelector('.' + VALUES_KEY_EDITOR_MAP_MATCH_CLASS)?.value || '').trim();
+  const value = String(row.querySelector('.' + VALUES_KEY_EDITOR_MAP_VALUE_CLASS)?.value || '').trim();
+  if (value === '') return null;
+  return { match, value };
+}
+
+// 读取映射编辑器当前内容（输出文本为空的行丢弃）。
+function readValuesKeyMapRules() {
+  const container = document.getElementById(VALUES_KEY_EDITOR_MAP_RULES_ID);
+  if (!container) return [];
+  const rules = [];
+  for (const row of container.querySelectorAll('.' + VALUES_KEY_EDITOR_MAP_RULE_ROW_CLASS)) {
+    const rule = readValuesKeyMapRuleFromRow(row);
+    if (rule) rules.push(rule);
+  }
+  return rules;
+}
+
+// 实时标红重复匹配值 / 多条兜底行的映射行（只统计已填输出文本的行）。
+function refreshValuesKeyMapConflicts() {
+  const container = document.getElementById(VALUES_KEY_EDITOR_MAP_RULES_ID);
+  if (!container) return;
+  const rows = Array.from(container.querySelectorAll('.' + VALUES_KEY_EDITOR_MAP_RULE_ROW_CLASS));
+  const participating = [];
+  rows.forEach((row, index) => {
+    if (readValuesKeyMapRuleFromRow(row)) participating.push(index);
+  });
+  const validation = validateValuesChildMapRules(participating.map((index) => readValuesKeyMapRuleFromRow(rows[index])));
+  const conflictSet = new Set();
+  for (const [i, j] of validation.duplicates) {
+    conflictSet.add(participating[i]);
+    conflictSet.add(participating[j]);
+  }
+  rows.forEach((row, index) => row.classList.toggle('is-conflict', conflictSet.has(index)));
+}
+
+// 派生方式联动：区间 / 取值映射显示派生源 + 对应规则编辑器，公式显示公式输入。
 function syncValuesKeyDeriveUI() {
   const deriveSelect = document.getElementById(VALUES_KEY_EDITOR_DERIVE_ID);
+  const mode = String(deriveSelect?.value || '');
+  const isFormula = mode === VALUES_KEY_DERIVE_FORMULA;
+  const isMap = mode === VALUES_KEY_DERIVE_MAP;
   const formulaFields = document.getElementById(VALUES_KEY_EDITOR_FORMULA_FIELDS_ID);
   const rulesFields = document.getElementById(VALUES_KEY_EDITOR_RULES_FIELDS_ID);
-  const isFormula = String(deriveSelect?.value || '') === VALUES_KEY_DERIVE_FORMULA;
+  const mapFields = document.getElementById(VALUES_KEY_EDITOR_MAP_FIELDS_ID);
+  const parentFields = document.getElementById(VALUES_KEY_EDITOR_PARENT_FIELDS_ID);
   if (formulaFields) formulaFields.hidden = !isFormula;
-  if (rulesFields) rulesFields.hidden = isFormula;
+  if (rulesFields) rulesFields.hidden = isFormula || isMap;
+  if (mapFields) mapFields.hidden = !isMap;
+  if (parentFields) parentFields.hidden = isFormula;
 }
 
 // 类型切换联动：父变量显示变化规则，子变量显示派生方式 + 派生源 / 公式。
@@ -9840,11 +10054,16 @@ function openValuesKeyEditor(name) {
     typeSelect.value = isChild ? VALUES_KEY_TYPE_CHILD : VALUES_KEY_TYPE_PARENT;
     ruleInput.value = isChild ? '' : (key ? String(key.rule || '') : '');
     const formula = isChild ? String(key?.formula || '').trim() : '';
-    if (deriveSelect) deriveSelect.value = formula !== '' ? VALUES_KEY_DERIVE_FORMULA : VALUES_KEY_DERIVE_RULES;
+    const mapRules = isChild && Array.isArray(key?.mapRules) ? key.mapRules : [];
+    const deriveMode = formula !== ''
+      ? VALUES_KEY_DERIVE_FORMULA
+      : (mapRules.length > 0 ? VALUES_KEY_DERIVE_MAP : VALUES_KEY_DERIVE_RULES);
+    if (deriveSelect) deriveSelect.value = deriveMode;
     if (formulaInput) formulaInput.value = formula;
     if (decimalsSelect) decimalsSelect.value = String(toValuesDecimals(key?.decimals) ?? 0);
     populateValuesKeyParentSelect(isChild ? String(key?.parent || '') : '');
-    renderValuesKeyRules(isChild ? key?.rules : []);
+    renderValuesKeyRules(isChild && deriveMode === VALUES_KEY_DERIVE_RULES ? key?.rules : []);
+    renderValuesKeyMapRules(isChild && deriveMode === VALUES_KEY_DERIVE_MAP ? mapRules : []);
   } else {
     title.textContent = '注册新变量';
     nameInput.value = '';
@@ -9857,6 +10076,7 @@ function openValuesKeyEditor(name) {
     if (decimalsSelect) decimalsSelect.value = '0';
     populateValuesKeyParentSelect('');
     renderValuesKeyRules([]);
+    renderValuesKeyMapRules([]);
   }
   syncValuesKeyEditorTypeUI();
   editor.hidden = false;
@@ -9883,8 +10103,8 @@ function saveValuesKeyEditor() {
     : VALUES_KEY_TYPE_PARENT;
   if (type === VALUES_KEY_TYPE_CHILD) {
     const deriveSelect = document.getElementById(VALUES_KEY_EDITOR_DERIVE_ID);
-    const isFormula = String(deriveSelect?.value || '') === VALUES_KEY_DERIVE_FORMULA;
-    if (isFormula) {
+    const deriveMode = String(deriveSelect?.value || '');
+    if (deriveMode === VALUES_KEY_DERIVE_FORMULA) {
       const formula = String(document.getElementById(VALUES_KEY_EDITOR_FORMULA_ID)?.value || '').trim();
       const syntax = validateValuesFormulaSyntax(formula);
       if (!syntax.ok) {
@@ -9898,6 +10118,29 @@ function saveValuesKeyEditor() {
       }
       const decimals = toValuesDecimals(Number(document.getElementById(VALUES_KEY_EDITOR_DECIMALS_ID)?.value));
       upsertValuesKey(ctx, name, '', { type, formula, decimals: decimals ?? 0 });
+    } else if (deriveMode === VALUES_KEY_DERIVE_MAP) {
+      const parent = String(document.getElementById(VALUES_KEY_EDITOR_PARENT_ID)?.value || '').trim();
+      if (!parent) {
+        valuesToastr('warning', '请选择派生源变量');
+        return;
+      }
+      const mapRules = readValuesKeyMapRules();
+      if (mapRules.length === 0 || mapRules.every((rule) => rule.match === '')) {
+        valuesToastr('warning', '请至少添加一条具名映射（匹配值 + 子变量文本）');
+        return;
+      }
+      const validation = validateValuesChildMapRules(mapRules);
+      if (validation.duplicates.length > 0) {
+        const pairs = validation.duplicates.map(([i, j]) => `第 ${i + 1} 行与第 ${j + 1} 行`);
+        valuesToastr('warning', `映射匹配值重复：${pairs.join('、')}（兜底行只允许一行，数值等值也算重复，如 100 与 100.0）`);
+        return;
+      }
+      const cycle = findValuesChildCycle(getValuesKeys(ctx), name, [parent]);
+      if (cycle) {
+        valuesToastr('warning', `派生存在循环引用：${cycle.join(' → ')}`);
+        return;
+      }
+      upsertValuesKey(ctx, name, '', { type, parent, mapRules });
     } else {
       const parent = String(document.getElementById(VALUES_KEY_EDITOR_PARENT_ID)?.value || '').trim();
       if (!parent) {
@@ -10788,6 +11031,23 @@ function bindValuesContentEvents() {
   document.getElementById(VALUES_KEY_EDITOR_RULES_ID)?.addEventListener('input', () => {
     refreshValuesKeyRuleConflicts();
   });
+  document.getElementById(VALUES_KEY_EDITOR_MAP_RULES_ADD_ID)?.addEventListener('click', () => {
+    const container = document.getElementById(VALUES_KEY_EDITOR_MAP_RULES_ID);
+    if (!container) return;
+    const empty = container.querySelector('.kaleido-values__key-rules-empty');
+    if (empty) empty.remove();
+    container.appendChild(buildValuesKeyMapRuleRow({}));
+    refreshValuesKeyMapConflicts();
+  });
+  document.getElementById(VALUES_KEY_EDITOR_MAP_RULES_ID)?.addEventListener('click', (event) => {
+    const button = event.target instanceof Element ? event.target.closest('.' + VALUES_KEY_EDITOR_MAP_REMOVE_CLASS) : null;
+    if (!button) return;
+    button.closest('.' + VALUES_KEY_EDITOR_MAP_RULE_ROW_CLASS)?.remove();
+    refreshValuesKeyMapConflicts();
+  });
+  document.getElementById(VALUES_KEY_EDITOR_MAP_RULES_ID)?.addEventListener('input', () => {
+    refreshValuesKeyMapConflicts();
+  });
   document.getElementById(VALUES_EDITOR_KEY_SELECT_ID)?.addEventListener('change', syncValuesKeyEntryChildHint);
 
   document.getElementById(VALUES_EDITOR_VALUE_ID)?.addEventListener('keydown', (event) => {
@@ -10956,7 +11216,7 @@ function buildValuesContentHTML(editorClass) {
                 <label class="kaleido-api__field" for="${VALUES_EDITOR_VALUE_ID}">
                   <span id="${VALUES_EDITOR_VALUE_LABEL_ID}" class="kaleido-api__label">变量值 *</span>
                   <textarea id="${VALUES_EDITOR_VALUE_ID}" class="kaleido-input kaleido-values__textarea kaleido-values__textarea--small" rows="2" placeholder="如：30 / 1000 / 友好 / true" spellcheck="false"></textarea>
-                  <span id="${VALUES_EDITOR_CHILD_HINT_ID}" class="kaleido-values__editor-hint" hidden>子变量值由派生规则（区间 / 公式）自动计算</span>
+                  <span id="${VALUES_EDITOR_CHILD_HINT_ID}" class="kaleido-values__editor-hint" hidden>子变量值由派生规则（区间 / 取值映射 / 公式）自动计算</span>
                 </label>
               </div>
               <div class="kaleido-values__editor-actions">
@@ -10976,7 +11236,7 @@ function buildValuesContentHTML(editorClass) {
               </label>
               <label class="kaleido-api__field" for="${VALUES_KEY_EDITOR_TYPE_ID}">
                 <span class="kaleido-api__label">变量类型</span>
-                <select id="${VALUES_KEY_EDITOR_TYPE_ID}" class="kaleido-input" title="父变量：由 AI 按变化规则维护；子变量：按派生规则（区间 / 公式）由同路径变量自动计算">
+                  <select id="${VALUES_KEY_EDITOR_TYPE_ID}" class="kaleido-input" title="父变量：由 AI 按变化规则维护；子变量：按派生规则（区间 / 取值映射 / 公式）由同路径变量自动计算">
                   <option value="${VALUES_KEY_TYPE_PARENT}">父变量（AI 按变化规则维护）</option>
                   <option value="${VALUES_KEY_TYPE_CHILD}">子变量（按派生规则自动计算）</option>
                 </select>
@@ -10990,11 +11250,18 @@ function buildValuesContentHTML(editorClass) {
               <div id="${VALUES_KEY_EDITOR_CHILD_FIELDS_ID}" hidden>
                 <label class="kaleido-api__field" for="${VALUES_KEY_EDITOR_DERIVE_ID}">
                   <span class="kaleido-api__label">派生方式</span>
-                  <select id="${VALUES_KEY_EDITOR_DERIVE_ID}" class="kaleido-input" title="区间：按派生源数值匹配区间输出文本；公式：引用一个或多个同路径变量四则运算输出数值">
+                  <select id="${VALUES_KEY_EDITOR_DERIVE_ID}" class="kaleido-input" title="区间：按派生源数值匹配区间输出文本；取值映射：按派生源取值（可为另一子变量的文本，如 情欲等级「干柴烈火」）等值匹配输出文本；公式：引用一个或多个同路径变量四则运算输出数值">
                     <option value="${VALUES_KEY_DERIVE_RULES}">区间（按派生源数值匹配，输出文本）</option>
+                    <option value="${VALUES_KEY_DERIVE_MAP}">取值映射（按派生源取值匹配，输出文本）</option>
                     <option value="${VALUES_KEY_DERIVE_FORMULA}">公式（引用变量计算，输出数值）</option>
                   </select>
                 </label>
+                <div id="${VALUES_KEY_EDITOR_PARENT_FIELDS_ID}">
+                  <label class="kaleido-api__field" for="${VALUES_KEY_EDITOR_PARENT_ID}">
+                    <span class="kaleido-api__label">派生源 *</span>
+                    <select id="${VALUES_KEY_EDITOR_PARENT_ID}" class="kaleido-input" title="子变量的值由同路径下该变量的值决定（父 / 子变量均可，如 性爱态度 ← 情欲等级 ← 情欲）"></select>
+                  </label>
+                </div>
                 <div id="${VALUES_KEY_EDITOR_FORMULA_FIELDS_ID}" hidden>
                   <label class="kaleido-api__field" for="${VALUES_KEY_EDITOR_FORMULA_ID}">
                     <span class="kaleido-api__label">派生公式 *</span>
@@ -11015,14 +11282,18 @@ function buildValuesContentHTML(editorClass) {
                   </label>
                 </div>
                 <div id="${VALUES_KEY_EDITOR_RULES_FIELDS_ID}">
-                  <label class="kaleido-api__field" for="${VALUES_KEY_EDITOR_PARENT_ID}">
-                    <span class="kaleido-api__label">派生源 *</span>
-                    <select id="${VALUES_KEY_EDITOR_PARENT_ID}" class="kaleido-input" title="子变量的值由同路径下该变量的值决定（父 / 子变量均可，如 张三/态度 ← 张三/综合评分）"></select>
-                  </label>
                   <div class="kaleido-api__field">
                     <span class="kaleido-api__label">派生区间 *</span>
                     <div id="${VALUES_KEY_EDITOR_RULES_ID}" class="kaleido-values__key-rules"></div>
                     <button type="button" id="${VALUES_KEY_EDITOR_RULES_ADD_ID}" class="kaleido-btn kaleido-btn--mini">＋ 添加区间</button>
+                  </div>
+                </div>
+                <div id="${VALUES_KEY_EDITOR_MAP_FIELDS_ID}" hidden>
+                  <div class="kaleido-api__field">
+                    <span class="kaleido-api__label">取值映射 *</span>
+                    <div id="${VALUES_KEY_EDITOR_MAP_RULES_ID}" class="kaleido-values__key-rules"></div>
+                    <button type="button" id="${VALUES_KEY_EDITOR_MAP_RULES_ADD_ID}" class="kaleido-btn kaleido-btn--mini">＋ 添加映射</button>
+                    <span class="kaleido-api__hint">匹配值 = 派生源变量的取值（如 情欲等级 为「lv4: 干柴烈火」）；留空 = 兜底，具名映射都不命中时输出。同一匹配值只允许一行。</span>
                   </div>
                 </div>
               </div>

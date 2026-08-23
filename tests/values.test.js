@@ -475,6 +475,104 @@ runner.test('子变量区间校验：重叠（含边界）/ 非法行 / 开区�
   assert(invalid.invalid.length === 1, '下限大于上限应标记非法');
 });
 
+runner.test('注册子变量（取值映射）：类型 / 派生源 / mapRules 归一化与依赖检查', () => {
+  const c = fresh();
+  ctx.upsertValuesKey(c, '性爱态度', '', { type: 'child', parent: '情欲等级', mapRules: [
+    { match: 'lv4: 干柴烈火', value: '态度描述 A' },
+    { match: 'lv5: 鱼水之欢', value: '态度描述 B' },
+    { match: '', value: '默认态度' },
+    { match: '  ', value: '' },
+  ] });
+  const key = ctx.getValuesKeyByName(c, '性爱态度');
+  assert(ctx.isValuesChildKey(key) === true, '性爱态度应为子变量');
+  assert(key.parent === '情欲等级', '派生源应保存');
+  assert(key.mapRules.length === 3, '空文本行丢弃，应剩 3 条映射');
+  assert(key.mapRules[2].match === '', '兜底行（match 空）应保留');
+  assert(Array.isArray(key.rules) && key.rules.length === 0, '区间规则应为空');
+  assert(key.formula === '', '公式应为空');
+  assert(ctx.getValuesChildKeysByRef(c, '情欲等级').some((k) => k.name === '性爱态度'), '删除派生源前应能查到依赖');
+  // 切回区间派生应清空 mapRules
+  ctx.upsertValuesKey(c, '性爱态度', '', { type: 'child', parent: '情欲', rules: [{ min: 0, max: 100, value: 'x' }] });
+  const switched = ctx.getValuesKeyByName(c, '性爱态度');
+  assert(switched.mapRules.length === 0 && switched.rules.length === 1, '切回区间后 mapRules 应清空');
+  // 切回取值映射应清空 rules
+  ctx.upsertValuesKey(c, '性爱态度', '', { type: 'child', parent: '情欲等级', mapRules: [{ match: 'a', value: 'b' }] });
+  const switchedBack = ctx.getValuesKeyByName(c, '性爱态度');
+  assert(switchedBack.mapRules.length === 1 && switchedBack.rules.length === 0, '切回映射后 rules 应清空');
+});
+
+runner.test('子变量派生（取值映射）：链式派生 情欲 75 → 情欲等级 干柴烈火 → 性爱态度', () => {
+  const c = makeChatCtx();
+  // 内置：情欲（父）→ 情欲等级（区间子，61~80 = lv4 干柴烈火）；自定义：
+  // 性爱态度（映射子，源 = 情欲等级）。
+  ctx.upsertValuesKey(c, '性爱态度', '', { type: 'child', parent: '情欲等级', mapRules: [
+    { match: 'lv4: 干柴烈火', value: '迫不及待，主动索取' },
+    { match: 'lv5: 鱼水之欢', value: '完全沉溺' },
+    { match: '', value: '尚未开窍' },
+  ] });
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['情欲'], 75);
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['情欲等级'], '未知');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['性爱态度'], '未知');
+  const tree = ctx.getValuesGameTree(c);
+  assert(tree['情欲等级'] === 'lv4: 干柴烈火', '75 应先派生情欲等级');
+  assert(tree['性爱态度'] === '迫不及待，主动索取', '等级文本应再映射出性爱态度（链式多轮收敛）');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['情欲'], 95);
+  assert(ctx.getValuesGameTree(c)['性爱态度'] === '完全沉溺', '95 → 鱼水之欢 → 完全沉溺');
+  // 无具名命中 → 兜底行
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['情欲'], 10);
+  assert(ctx.getValuesGameTree(c)['性爱态度'] === '尚未开窍', '未命中具名映射应输出兜底行');
+});
+
+runner.test('子变量派生（取值映射）：数值等值匹配、无兜底保持原值、缺失保持原值', () => {
+  const c = makeChatCtx();
+  ctx.upsertValuesKey(c, '阶段', '数值变量');
+  ctx.upsertValuesKey(c, '阶段名', '', { type: 'child', parent: '阶段', mapRules: [
+    { match: '100', value: '满阶' },
+    { match: '50.0', value: '半阶' },
+  ] });
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['阶段'], 100);
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['阶段名'], '未知');
+  assert(ctx.getValuesGameTree(c)['阶段名'] === '满阶', '数值 100 应匹配映射值 "100"');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['阶段'], 50);
+  assert(ctx.getValuesGameTree(c)['阶段名'] === '半阶', '数值 50 应数值等值匹配 "50.0"');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['阶段'], 75);
+  assert(ctx.getValuesGameTree(c)['阶段名'] === '半阶', '无兜底行且未命中应保持原值');
+  const c2 = makeChatCtx();
+  ctx.upsertValuesKey(c2, '阶段名', '', { type: 'child', parent: '阶段', mapRules: [{ match: '100', value: '满阶' }] });
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c2), ['阶段名'], '旧值');
+  assert(ctx.getValuesGameTree(c2)['阶段名'] === '旧值', '派生源缺失应保持原值');
+});
+
+runner.test('子变量取值映射校验：文本 / 数值等值重复与多条兜底', () => {
+  const dupText = ctx.validateValuesChildMapRules([
+    { match: '干柴烈火', value: 'a' },
+    { match: ' 干柴烈火 ', value: 'b' },
+  ]);
+  assert(dupText.duplicates.length === 1, '文本等值（去空白）应判重复');
+  const dupNumber = ctx.validateValuesChildMapRules([
+    { match: '100', value: 'a' },
+    { match: '100.0', value: 'b' },
+  ]);
+  assert(dupNumber.duplicates.length === 1, '数值等值（100 与 100.0）应判重复');
+  const dupFallback = ctx.validateValuesChildMapRules([
+    { match: '', value: 'a' },
+    { match: '', value: 'b' },
+  ]);
+  assert(dupFallback.duplicates.length === 1, '两条兜底行应判重复');
+  const ok = ctx.validateValuesChildMapRules([
+    { match: '干柴烈火', value: 'a' },
+    { match: '', value: 'b' },
+  ]);
+  assert(ok.duplicates.length === 0, '具名 + 兜底不重复');
+  // 环检测：取值映射同样按派生源追踪（A 映射 B、B 映射 A 成环）
+  const keys = [
+    { name: 'A', type: 'child', parent: 'B', mapRules: [{ match: 'x', value: 'y' }] },
+    { name: 'B', type: 'child', parent: 'A', mapRules: [{ match: 'x', value: 'y' }] },
+  ];
+  const cycle = ctx.findValuesChildCycle(keys, 'A', ['B']);
+  assert(Array.isArray(cycle) && cycle.join('→') === 'A→B→A', '映射链成环应被检出');
+});
+
 runner.test('AI 维护：父变量变化后子变量自动重算，AI 改子变量被覆盖', async () => {
   const c = makeChatCtx();
   c.chat = [
@@ -661,6 +759,46 @@ runner.test('整包 YAML 往返：子变量类型 / 父变量 / 区间规则', (
   const key = ctx.getValuesKeyByName(c2, '态度');
   assert(ctx.isValuesChildKey(key) && key.parent === '好感度', '合并导入应保留子变量');
   assert(key.rules.length === 3, '合并导入应保留区间规则');
+});
+
+runner.test('整包 YAML 往返：子变量取值映射（mapRules）', () => {
+  const character = makeCharacter('测试角色', 'avatar-1');
+  const c = makeContext({ characters: [character], characterId: 0, writeExtensionField: () => Promise.resolve() });
+  // 导出侧派生只认卡内键（内置键不写入 bundle.keys），链路全部注册到卡上。
+  ctx.upsertValuesKey(c, '情欲', '亲密行为跃迁式增长');
+  ctx.upsertValuesKey(c, '情欲等级', '', { type: 'child', parent: '情欲', rules: [
+    { min: 0, max: 60, value: 'lv3: 卿卿我我' },
+    { min: 61, max: 80, value: 'lv4: 干柴烈火' },
+    { min: 81, max: 100, value: 'lv5: 鱼水之欢' },
+  ] });
+  ctx.upsertValuesKey(c, '性爱态度', '', { type: 'child', parent: '情欲等级', mapRules: [
+    { match: 'lv4: 干柴烈火', value: '迫不及待，主动索取' },
+    { match: 'lv5: 鱼水之欢', value: '完全沉溺' },
+    { match: '', value: '尚未开窍' },
+  ] });
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['情欲'], 75);
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['情欲等级'], '未知');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['性爱态度'], '未知');
+  const yaml = ctx.serializeValuesBundle(c);
+  assert(yaml.includes('parent: 情欲等级'), '应导出派生源');
+  assert(yaml.includes('match: "lv4: 干柴烈火"'), '应导出映射匹配值（含冒号空格引号化）');
+  assert(yaml.includes('match: ""'), '兜底行应导出空匹配值');
+  assert(yaml.includes('情欲等级: "lv4: 干柴烈火"'), '默认值树应导出区间派生值（值含冒号空格引号化）');
+  assert(yaml.includes('性爱态度: 迫不及待，主动索取'), '默认值树应导出映射派生后的值');
+  const parsed = ctx.parseValuesBundle(yaml);
+  const key = parsed.keys.find((item) => item.name === '性爱态度');
+  assert(key && key.type === 'child', '导入应识别子变量');
+  assert(key.parent === '情欲等级', '导入应保留派生源');
+  assert(key.mapRules.length === 3, '导入应保留 3 条映射');
+  assert(key.mapRules[0].match === 'lv4: 干柴烈火' && key.mapRules[0].value === '迫不及待，主动索取', '映射内容应保留');
+  assert(key.mapRules[2].match === '', '兜底行应保留');
+  // 合并导入：同名键从区间 / 公式切到映射，或反之，字段都应正确切换
+  const c2 = fresh();
+  ctx.upsertValuesKey(c2, '性爱态度', '', { type: 'child', parent: '情欲', rules: [{ min: 0, max: 100, value: 'x' }] });
+  ctx.applyValuesBundle(c2, parsed, 'merge');
+  const merged = ctx.getValuesKeyByName(c2, '性爱态度');
+  assert(merged.parent === '情欲等级' && merged.mapRules.length === 3, '合并导入应切到取值映射');
+  assert(merged.rules.length === 0, '合并导入应清空旧区间规则');
 });
 
 // ---------- 拖动排序：顺序表 ----------

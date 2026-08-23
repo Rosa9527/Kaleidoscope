@@ -74,6 +74,8 @@ function buildValuesMaintainMessages(ctx, prompt) {
   const describeChildSource = (key) => {
     const formula = String(key?.formula || '').trim();
     if (formula !== '') return `${String(key?.name || '')} ← 公式 ${formula}`;
+    const mapRules = Array.isArray(key?.mapRules) ? key.mapRules : [];
+    if (mapRules.length > 0) return `${String(key?.name || '')} ← ${String(key?.parent || '')}按取值映射`;
     return `${String(key?.name || '')} ← ${String(key?.parent || '')}`;
   };
   const childNote = childKeysInUse.length > 0
