@@ -617,6 +617,8 @@ function parseValuesEditorText(text) {
         return;
       }
       valuesSetAtPath(tree, parentPath.concat(name), {});
+      // 新建节点排在该层条目序列最后，而不是按名称序插进中间。
+      appendValuesTreeOrder(ctx, tree, parentPath, name);
       // 新建节点默认展开，方便继续往里挂条目；挂在子层时父节点一并展开以便看到新节点。
       valuesExpanded.add(parentPath.concat(name).join('/'));
       if (parentPath.length > 0) valuesExpanded.add(parentPath.join('/'));
@@ -653,6 +655,8 @@ function parseValuesEditorText(text) {
       return;
     }
     valuesSetAtPath(tree, newPath, parsed.value);
+    // 新建变量排在该节点下条目序列最后，而不是按名称序插进中间。
+    if (!valuesEditorPath) appendValuesTreeOrder(ctx, tree, parentPath, keyName);
     // 新建变量默认开启注入（仅默认数值层；打开变量会自动提升全部祖先节点）。
     if (!valuesEditorPath && valuesActiveLayer === 'default') {
       setValuesInjectPath(ctx, newPath, true);

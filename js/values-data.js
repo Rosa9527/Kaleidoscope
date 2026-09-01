@@ -1132,6 +1132,18 @@ function reorderValuesTreeAt(ctx, parentPath, names) {
   return order;
 }
 
+// 新建条目追加到父路径顺序表末尾：新建的节点 / 变量排在该层条目序列的最后，
+// 而不是混进未记录条目的名称排序里。父路径未记录过顺序时先按当前显示顺序
+// 固化，保证新条目之前的相对顺序不变。
+function appendValuesTreeOrder(ctx, tree, parentPath, newName) {
+  const key = Array.isArray(parentPath) ? parentPath.join('/') : String(parentPath || '');
+  const node = valuesGetAtPath(tree, Array.isArray(parentPath) ? parentPath : []);
+  const names = valuesOrderedNames(getValuesTreeOrder(ctx), key, node)
+    .filter((item) => item !== newName);
+  names.push(newName);
+  return reorderValuesTreeAt(ctx, key, names);
+}
+
 // ---------- 注入提示词配置（默认数值层勾选）----------
 // 配置存变量包 inject 字段：{ enabled, paths }。paths 是打开条目的路径数组
 // （path.join('/')），节点上下级联动：打开条目 = 自身 + 全部祖先 + 全部后代

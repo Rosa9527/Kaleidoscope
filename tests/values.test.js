@@ -847,6 +847,30 @@ runner.test('变量树顺序表：记录顺序 + 未记录条目按名称排序�
   assert(ctx.valuesOrderedNames(order, '', root).join(',') === '李四,张三,王五', '新条目应追加在末尾');
 });
 
+runner.test('变量树顺序表：新建条目追加到父路径序列末尾', () => {
+  const c = makeChatCtx();
+  const tree = ctx.getValuesDefaults(c);
+  ctx.valuesSetAtPath(tree, ['张三', '好感'], 30);
+  ctx.valuesSetAtPath(tree, ['张三', '金币'], 100);
+  // 未记录过顺序：显示为名称序（好感,金币）。新建「San值」按名称序会插到最前，
+  // 应改为追加在该节点序列的最后。
+  ctx.valuesSetAtPath(tree, ['张三', 'San值'], 50);
+  ctx.appendValuesTreeOrder(c, tree, ['张三'], 'San值');
+  let order = ctx.getValuesTreeOrder(c);
+  assert(order['张三'].join(',') === '好感,金币,San值', '顺序表应固化当前显示顺序并把新条目记在末尾');
+  assert(ctx.valuesOrderedNames(order, '张三', tree['张三']).join(',') === '好感,金币,San值', '新条目应显示在末尾而非名称序最前');
+  // 已记录顺序后再新建，同样追加在末尾
+  ctx.valuesSetAtPath(tree, ['张三', '心情'], 80);
+  ctx.appendValuesTreeOrder(c, tree, ['张三'], '心情');
+  order = ctx.getValuesTreeOrder(c);
+  assert(ctx.valuesOrderedNames(order, '张三', tree['张三']).join(',') === '好感,金币,San值,心情', '后续新条目也应排在末尾');
+  // 顶层新建节点同样追加末尾（A村按名称序会排在张三前面）
+  ctx.valuesSetAtPath(tree, ['A村'], {});
+  ctx.appendValuesTreeOrder(c, tree, [], 'A村');
+  order = ctx.getValuesTreeOrder(c);
+  assert(ctx.valuesOrderedNames(order, '', tree).join(',') === '张三,A村', '顶层新节点应排在末尾');
+});
+
 runner.test('整包 YAML 往返：order 顺序表', () => {
   const character = makeCharacter('测试角色', 'avatar-1');
   const c = makeContext({ characters: [character], characterId: 0, writeExtensionField: () => Promise.resolve() });
