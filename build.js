@@ -37,6 +37,7 @@ const FILES = [
   'js/views-home.js',
   'js/views-inject.js',
   'js/story-data.js',
+  'js/prompt-preset-data.js',
   'js/story-gate.js',
   'js/views-story.js',
   'js/values-data.js',

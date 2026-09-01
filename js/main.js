@@ -118,6 +118,9 @@ function installHostEventSubscriptions(ctx) {
   onHostEvent(ctx, 'generationEnded', onValuesGenerationEnded, VALUES_MAINTAIN_HANDLER_KEY);
   onHostEvent(ctx, 'generationStopped', onValuesGenerationStopped, VALUES_MAINTAIN_STOPPED_KEY);
   onHostEvent(ctx, 'chatChanged', onValuesChatChanged, VALUES_MAINTAIN_CHAT_CHANGED_KEY);
+  // 切换聊天 / 角色卡后刷新预设模版页：激活预设与预设列表随角色卡走（懒式
+  // 读取，无事件也能取到最新数据，但面板若停在预设页需要重渲染）。
+  onHostEvent(ctx, 'chatChanged', onPresetChatChanged, PROMPT_PRESET_CHAT_CHANGED_KEY);
   // 变量注入：generationEnded / generationStopped 后清空注入，下一轮发送前
   // 经发送屏障重新注入最新值（勾选条目见变量工作台「默认数值」层）。
   onHostEvent(ctx, 'generationEnded', onValuesInjectGenerationCleanup, VALUES_INJECT_CLEANUP_ENDED_KEY);

@@ -86,11 +86,10 @@ function buildStoryEventCatalog(ctx) {
   return { nodes: roots.map(buildNode), unassigned };
 }
 
-// 预筛提示词：优先用作者在设置里保存的自定义提示词，空则回退默认。
+// 预筛提示词：取当前激活预设的生效文本（自定义预设 → 预设内文本；内置默认预设
+// → 全局设置自定义文本）；两者均为空时回退出厂默认。见 prompt-preset-data.js。
 function getStoryGatePrompt(ctx) {
-  const settings = ctx ? getSettings(ctx) : null;
-  const saved = String(settings?.storyGatePrompt || '').trim();
-  return saved || DEFAULT_STORY_GATE_PROMPT;
+  return getEffectivePromptText(ctx, 'storyGate');
 }
 
 // Gate 请求体按「提示词 → 事件目录块 → 剧情块 → 输出契约」四段式组织：

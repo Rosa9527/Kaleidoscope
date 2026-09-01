@@ -47,11 +47,10 @@ function onValuesChatChanged() {
   valuesMainGenerationState.startChatSignature = '';
 }
 
-// 维护提示词：自定义优先，空则回退默认。
+// 维护提示词：取当前激活预设的生效文本（自定义预设 → 预设内文本；内置默认预设
+// → 全局设置自定义文本）；两者均为空时回退出厂默认。见 prompt-preset-data.js。
 function getValuesMaintainPrompt(ctx) {
-  const settings = ctx ? getSettings(ctx) : null;
-  const saved = String(settings?.valuesMaintainPrompt || '').trim();
-  return saved || DEFAULT_VALUES_MAINTAIN_PROMPT;
+  return getEffectivePromptText(ctx, 'valuesMaintain');
 }
 
 // 请求体：system 提示词 → 键规则块 → 当前值块 → 最近消息块。

@@ -1,11 +1,11 @@
 // ===== 万华镜（Kaleidoscope）index.js — 构建产物，勿手改 =====
-// 构建时间: 2026-08-23 23:08:43 · 文件数: 23 · 指纹: 6b9935b4
+// 构建时间: 2026-09-01 12:55:03 · 文件数: 24 · 指纹: 7fd577c9
 
 // ===== js/constants.js =====
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.3.4';
+const MODULE_VERSION = '1.4.0';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -106,10 +106,17 @@ const LOG_BACK_ID = 'kaleido-log-back-to-latest';
 const LOG_STATUS_ID = 'kaleido-log-status';
 const LOG_PAUSED_ID = 'kaleido-log-paused-badge';
 
-// 预设模版（默认提示词编辑）
+// 预设模版（提示词预设管理 + 默认提示词编辑）
 const PRESET_VIEW_ID = 'kaleido-preset-view';
 const HOME_PRESET_CARD_ID = 'kaleido-home-preset-card';
 const HOME_PRESET_STATUS_ID = 'kaleido-home-preset-status';
+// 预设选择工具栏：下拉切换激活预设 + 另存 / 删除 / 导入 / 导出。
+const PRESET_SELECTOR_ID = 'kaleido-preset-select';
+const PRESET_SAVE_AS_ID = 'kaleido-preset-save-as';
+const PRESET_DELETE_ID = 'kaleido-preset-delete';
+const PRESET_EXPORT_ID = 'kaleido-preset-export';
+const PRESET_IMPORT_BTN_ID = 'kaleido-preset-import-btn';
+const PRESET_IMPORT_INPUT_ID = 'kaleido-preset-import-input';
 const PRESET_TABS_ID = 'kaleido-preset-tabs';
 const PRESET_TEXT_ID = 'kaleido-preset-text';
 const PRESET_SAVE_ID = 'kaleido-preset-save';
@@ -180,6 +187,21 @@ const STORY_SCRIPT_FILENAME_PREFIX = '万华镜-事件';
 // 随角色卡导入/导出自动携带；群聊/未选角色时回退全局设置）。
 const STORY_CARD_EXTENSION_KEY = 'kaleidoscope_story';
 const STORY_CARD_DATA_VERSION = 1;
+// ---------- 提示词预设（剧情预筛 + 变量维护 的一套具名配置）----------
+// 一个预设 = { id, name, storyGatePrompt, valuesMaintainPrompt }。自定义预设列表
+// 与剧情脉络同模式存角色卡 extensions，随角色卡导入/导出携带；群聊 / 未选角色 /
+// 宿主不支持写卡时回退全局设置 promptPresets / promptPresetsActiveId。
+// 内置「默认预设」是兜底配置，永不落盘：激活它时提示词取全局 settings 的
+// storyGatePrompt / valuesMaintainPrompt（空串 = 出厂默认），见 prompt-preset-data.js。
+const PROMPT_PRESET_CARD_EXTENSION_KEY = 'kaleidoscope_prompt_presets';
+const PROMPT_PRESET_CARD_DATA_VERSION = 1;
+const PROMPT_PRESET_DEFAULT_ID = '__default__';
+const PROMPT_PRESET_DEFAULT_NAME = '默认预设';
+const PROMPT_PRESET_BUNDLE_FORMAT = 'kaleidoscope-prompt-preset';
+const PROMPT_PRESET_BUNDLE_VERSION = 1;
+const PROMPT_PRESET_BUNDLE_FILENAME_PREFIX = '万华镜-提示词预设';
+// chatChanged 时刷新预设模版页的宿主事件去重 key（onHostEvent 按 globalThis key 防重复挂载）。
+const PROMPT_PRESET_CHAT_CHANGED_KEY = '__kaleido_prompt_preset_chat_changed__';
 // ---------- 变量系统（键注册表 + 默认值 / 游戏值两层）----------
 const VALUES_VIEW_ID = 'kaleido-values-view';
 const VALUES_DIALOG_ID = 'kaleido-values-dialog';
@@ -624,6 +646,11 @@ const DEFAULT_SETTINGS = Object.freeze({
   storyGateEnabled: true,
   valuesTriggerEnabled: true,
   storyGatePrompt: '',
+  valuesMaintainPrompt: '',
+  // 提示词预设的全局兜底存储：仅在没有角色卡可写（群聊 / 未选角色 / 宿主不支持
+  // 写角色卡）时使用；有角色卡时预设列表存角色卡 extensions（随卡携带）。
+  promptPresets: [],
+  promptPresetsActiveId: PROMPT_PRESET_DEFAULT_ID,
   valuesNavCollapsed: false,
   theme: DEFAULT_THEME,
   mapData: null,
@@ -1913,6 +1940,12 @@ function showPanelView(viewId) {
     setValuesLayer('game');
     refreshHomeValuesStatus();
   }
+  if (viewId === PRESET_VIEW_ID) {
+    // 预设选择器与编辑器都依赖当前角色卡数据（激活预设 / 预设列表随卡切换），
+    // 每次进入视图重渲染，避免显示别的角色卡的旧列表。
+    renderPresetSelector();
+    renderPresetEditor();
+  }
   if (viewId === GAME_VIEW_ID) {
     // 进入游戏模式时重置到入口：不点击图标不显示任何界面。
     renderGameView(true);
@@ -2141,6 +2174,15 @@ function createPanel() {
                 <span class="kaleido-preset__gate-label">启用剧情触发</span>
                 <button type="button" id="${PRESET_TRIGGER_TOGGLE_ID}" class="kaleido-btn kaleido-api__concurrency-toggle" title="开启/关闭剧情触发">⚡ 剧情触发：开</button>
               </div>
+            </div>
+            <div class="kaleido-preset__toolbar">
+              <select id="${PRESET_SELECTOR_ID}" class="kaleido-input kaleido-preset__select" aria-label="选择提示词预设" title="切换当前生效的提示词预设"></select>
+              <button type="button" id="${PRESET_SAVE_AS_ID}" class="kaleido-btn kaleido-btn--ghost" title="把当前两组提示词另存为一个新预设">📝 另存</button>
+              <button type="button" id="${PRESET_DELETE_ID}" class="kaleido-btn kaleido-btn--ghost" title="删除当前选中的自定义预设">🗑</button>
+              <span class="kaleido-preset__toolbar-gap"></span>
+              <button type="button" id="${PRESET_EXPORT_ID}" class="kaleido-btn kaleido-btn--ghost" title="把当前选中的完整预设导出为独立文件">⬆ 导出</button>
+              <button type="button" id="${PRESET_IMPORT_BTN_ID}" class="kaleido-btn kaleido-btn--ghost" title="从预设文件导入（含名称 + 两组提示词）">⬇ 导入</button>
+              <input type="file" id="${PRESET_IMPORT_INPUT_ID}" accept=".yaml,.yml" hidden />
             </div>
             <div id="${PRESET_TABS_ID}" class="kaleido-preset__tabs" role="tablist" aria-label="选择要编辑的提示词">
               ${Object.entries(PRESET_META).map(([key, meta]) => `
@@ -2480,6 +2522,76 @@ function kaleidoConfirm(message) {
   setTimeout(() => okButton?.focus?.(), 0);
   return new Promise((resolve) => {
     kaleidoConfirmResolve = resolve;
+  });
+}
+
+// ---------- 自绘文本输入弹层（另存预设命名等） ----------
+// 与确认弹层同款：宿主没有可用的 prompt 对话框（ACL 拦截 window.prompt），
+// 文本输入统一走自绘浮层。返回 Promise<string|null>，取消返回 null。
+const KALEIDO_PROMPT_ID = 'kaleido-prompt-overlay';
+let kaleidoPromptResolve = null;
+
+function isKaleidoPromptOpen() {
+  const overlay = document.getElementById(KALEIDO_PROMPT_ID);
+  return Boolean(overlay && overlay.classList.contains('is-open'));
+}
+
+function settleKaleidoPrompt(result) {
+  const resolve = kaleidoPromptResolve;
+  kaleidoPromptResolve = null;
+  const overlay = document.getElementById(KALEIDO_PROMPT_ID);
+  if (overlay) overlay.classList.remove('is-open');
+  resolve?.(result);
+}
+
+function getKaleidoPromptOverlay() {
+  let overlay = document.getElementById(KALEIDO_PROMPT_ID);
+  if (overlay) return overlay;
+  overlay = document.createElement('div');
+  overlay.id = KALEIDO_PROMPT_ID;
+  overlay.className = 'kaleido-confirm';
+  overlay.innerHTML = `
+    <div class="kaleido-confirm__card" role="dialog" aria-modal="true" aria-label="输入">
+      <p class="kaleido-prompt__message kaleido-confirm__message"></p>
+      <input type="text" class="kaleido-input kaleido-prompt__input" spellcheck="false" aria-label="输入内容" />
+      <div class="kaleido-confirm__actions">
+        <button type="button" class="kaleido-confirm__cancel">取消</button>
+        <button type="button" class="kaleido-btn kaleido-prompt__ok">确定</button>
+      </div>
+    </div>
+  `;
+  const input = overlay.querySelector('.kaleido-prompt__input');
+  const submit = () => {
+    const value = String(input?.value ?? '').trim();
+    settleKaleidoPrompt(value || null);
+  };
+  overlay.querySelector('.kaleido-confirm__cancel')?.addEventListener('click', () => settleKaleidoPrompt(null));
+  overlay.querySelector('.kaleido-prompt__ok')?.addEventListener('click', submit);
+  input?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      submit();
+    }
+  });
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+// 自绘文本输入：返回 Promise<string|null>（trim 后为空 / 取消 → null）。
+// 同一时刻只允许一个待输入弹层，新的会以「取消」结掉旧的。
+function kaleidoPrompt(message, defaultValue = '') {
+  if (kaleidoPromptResolve) settleKaleidoPrompt(null);
+  const overlay = getKaleidoPromptOverlay();
+  overlay.querySelector('.kaleido-prompt__message').textContent = message;
+  const input = overlay.querySelector('.kaleido-prompt__input');
+  if (input) input.value = String(defaultValue ?? '');
+  overlay.classList.add('is-open');
+  setTimeout(() => {
+    input?.focus?.();
+    input?.select?.();
+  }, 0);
+  return new Promise((resolve) => {
+    kaleidoPromptResolve = resolve;
   });
 }
 
@@ -3550,23 +3662,36 @@ exposeLogApi();
 initNetworkCapture();
 
 // ===== js/views-preset.js =====
-// ===== 万华镜（Kaleidoscope）预设模版：默认提示词编辑 =====
-// 参考 SoulLink 的预设系统：标签页切换各子系统提示词，改完点「保存」，
-// 「恢复默认」还原出厂内容。存储沿用各提示词在 settings 中的既有字段
-// （空字符串 = 使用内置默认）。剧情预筛的启用开关与提示词编辑统一收口在这里。
+// ===== 万华镜（Kaleidoscope）预设模版：提示词预设管理 + 默认提示词编辑 =====
+// 核心概念：一个预设 = 一套完整的「剧情预筛 + 变量维护」提示词配置。预设负责
+// 管理和切换整套提示词，而不是分别管理两个提示词组。
+//
+// 数据层在 prompt-preset-data.js：自定义预设列表存角色卡（随卡携带）；内置
+// 「默认预设」永不落盘——激活它时直接读 / 写全局 settings 的 storyGatePrompt /
+// valuesMaintainPrompt（空串 = 出厂默认，兼容旧版「直接改提示词即生效」习惯）。
+// 三个系统开关（剧情预筛 / 变量自动维护 / 剧情触发）继续收口在本页。
 let presetActiveKey = PRESET_DEFAULT_KEY;
+// 未保存草稿：键为「${presetId}::${promptKey}」，切换预设 / 切换聊天时清理。
 const presetUnsaved = {};
 
+// ---------- 基础取值 ----------
 function getPresetDefaultText(key) {
   const meta = PRESET_META[key];
   return meta && typeof meta.getDefault === 'function' ? meta.getDefault() : '';
 }
 
+// 指定 tab 在「当前激活预设」下的已存文本：内置默认预设 → 全局 settings 自定义
+// 文本；自定义预设 → 预设内字段；两者为空都回退出厂默认（与生效逻辑一致）。
 function getPresetSavedText(key, ctx) {
   const meta = PRESET_META[key];
-  if (!meta) return '';
-  const settings = ctx ? getSettings(ctx) : null;
-  const saved = settings ? String(settings[meta.settingsKey] || '') : '';
+  if (!meta || !ctx) return '';
+  const activeId = getActivePromptPresetId(ctx);
+  if (activeId !== PROMPT_PRESET_DEFAULT_ID) {
+    const preset = getCustomPromptPresets(ctx).find((item) => item?.id === activeId);
+    const text = String(preset?.[meta.settingsKey] ?? '').trim();
+    return text || getPresetDefaultText(key);
+  }
+  const saved = String(getSettings(ctx)?.[meta.settingsKey] ?? '').trim();
   return saved || getPresetDefaultText(key);
 }
 
@@ -3574,13 +3699,66 @@ function getPresetEditorText() {
   return String(document.getElementById(PRESET_TEXT_ID)?.value ?? '');
 }
 
+function getPresetDraftKey(key, presetId) {
+  const ctx = getContextSafe();
+  const id = presetId || (ctx ? getActivePromptPresetId(ctx) : PROMPT_PRESET_DEFAULT_ID);
+  return `${id}::${key}`;
+}
+
 function getPresetDirty(key) {
-  return presetUnsaved[key] !== undefined;
+  return presetUnsaved[getPresetDraftKey(key)] !== undefined;
+}
+
+// 当前激活预设的「所见即所得」快照：每个 tab 取草稿（无则已存文本），供另存 /
+// 导出使用——用户改完不点保存也能直接另存 / 导出当前所见内容。
+function buildActivePresetSnapshot(ctx) {
+  const texts = {};
+  for (const key of Object.keys(PRESET_META)) {
+    const draft = presetUnsaved[getPresetDraftKey(key)];
+    texts[key] = draft !== undefined ? draft : getPresetSavedText(key, ctx);
+  }
+  return {
+    name: getActivePromptPresetName(ctx),
+    storyGatePrompt: texts.storyGate,
+    valuesMaintainPrompt: texts.valuesMaintain,
+  };
+}
+
+// ---------- 渲染 ----------
+function renderPresetSelector() {
+  const ctx = getContextSafe();
+  const select = document.getElementById(PRESET_SELECTOR_ID);
+  if (!select) return;
+  const activeId = ctx ? getActivePromptPresetId(ctx) : PROMPT_PRESET_DEFAULT_ID;
+  const options = [{ id: PROMPT_PRESET_DEFAULT_ID, name: PROMPT_PRESET_DEFAULT_NAME }];
+  for (const preset of (ctx ? getCustomPromptPresets(ctx) : [])) {
+    if (!preset?.id) continue;
+    options.push({ id: preset.id, name: preset.name || '未命名预设' });
+  }
+  select.innerHTML = '';
+  for (const option of options) {
+    const node = document.createElement('option');
+    node.value = option.id;
+    node.textContent = option.name;
+    if (option.id === activeId) node.selected = true;
+    select.appendChild(node);
+  }
+}
+
+function updatePresetToolbar() {
+  const ctx = getContextSafe();
+  const deleteBtn = document.getElementById(PRESET_DELETE_ID);
+  if (deleteBtn) {
+    const custom = ctx ? getActivePromptPresetId(ctx) !== PROMPT_PRESET_DEFAULT_ID : false;
+    deleteBtn.disabled = !custom;
+    deleteBtn.title = custom ? '删除当前选中的自定义预设' : '内置默认预设不可删除';
+  }
 }
 
 function updatePresetTabs() {
   document.querySelectorAll('.kaleido-preset__tab').forEach((tab) => {
     const key = tab.dataset.promptKey;
+    if (!key) return;
     const active = key === presetActiveKey;
     tab.classList.toggle('is-active', active);
     tab.classList.toggle('is-dirty', getPresetDirty(key));
@@ -3589,19 +3767,22 @@ function updatePresetTabs() {
 }
 
 function updatePresetStatus(key) {
+  const ctx = getContextSafe();
   const status = document.getElementById(PRESET_STATUS_ID);
   const countNode = document.getElementById(PRESET_COUNT_ID);
   const saveBtn = document.getElementById(PRESET_SAVE_ID);
   const resetBtn = document.getElementById(PRESET_RESET_ID);
   const text = getPresetEditorText();
+  const saved = getPresetSavedText(key, ctx);
   const dirty = getPresetDirty(key);
   if (status) {
-    status.textContent = dirty ? '未保存的更改' : (text === getPresetDefaultText(key) ? '默认内容' : '已保存的自定义内容');
-    status.dataset.state = dirty ? 'dirty' : (text === getPresetDefaultText(key) ? 'default' : 'custom');
+    status.textContent = dirty ? '未保存的更改' : '当前预设内容';
+    status.dataset.state = dirty ? 'dirty' : 'default';
   }
   if (countNode) countNode.textContent = `${text.length} 字 · ${text.split('\n').length} 行`;
   if (saveBtn) saveBtn.disabled = !dirty;
-  if (resetBtn) resetBtn.disabled = !dirty && text === getPresetDefaultText(key);
+  if (resetBtn) resetBtn.disabled = !dirty && text === saved;
+  updatePresetToolbar();
   updatePresetTabs();
 }
 
@@ -3609,8 +3790,24 @@ function renderPresetEditor() {
   const ctx = getContextSafe();
   const textarea = document.getElementById(PRESET_TEXT_ID);
   if (!textarea) return;
-  textarea.value = presetUnsaved[presetActiveKey] !== undefined ? presetUnsaved[presetActiveKey] : getPresetSavedText(presetActiveKey, ctx);
+  const draftKey = getPresetDraftKey(presetActiveKey);
+  textarea.value = presetUnsaved[draftKey] !== undefined ? presetUnsaved[draftKey] : getPresetSavedText(presetActiveKey, ctx);
   updatePresetStatus(presetActiveKey);
+}
+
+// 预设 / 角色卡切换后的统一刷新入口。
+function refreshPresetView() {
+  renderPresetSelector();
+  renderPresetEditor();
+  refreshHomePresetStatus();
+}
+
+// 未保存草稿清理：清掉指定预设（默认全部）的所有 tab 草稿。
+function clearPresetDrafts(presetId) {
+  const prefix = presetId ? `${presetId}::` : '';
+  for (const draftKey of Object.keys(presetUnsaved)) {
+    if (!prefix || draftKey.startsWith(prefix)) delete presetUnsaved[draftKey];
+  }
 }
 
 // ---------- 剧情预筛设置（自 API 连接页迁移） ----------
@@ -3642,7 +3839,7 @@ function toggleStoryGate() {
   renderPresetGateControl();
   refreshHomeInjectStatus();
   logApp('info', settings.storyGateEnabled ? '剧情预筛已开启' : '剧情预筛已关闭');
-  globalThis.toastr?.info?.('剧情预筛已' + (settings.storyGateEnabled ? '开启' : '关闭'), '[' + MODULE_DISPLAY_NAME + ']');
+  globalThis.toastr?.info?.('剧情预筛已' + (settings.storyGateEnabled ? '开启' : '关闭'), `[${MODULE_DISPLAY_NAME}]`);
 }
 
 // ---------- 变量自动维护设置（自变量工作台联动） ----------
@@ -3674,7 +3871,7 @@ function toggleValuesAutoUpdate() {
   renderPresetValuesControl();
   refreshHomeValuesStatus();
   logApp('info', settings.valuesAutoUpdateEnabled ? '变量自动维护已开启' : '变量自动维护已关闭');
-  globalThis.toastr?.info?.('变量自动维护已' + (settings.valuesAutoUpdateEnabled ? '开启' : '关闭'), '[' + MODULE_DISPLAY_NAME + ']');
+  globalThis.toastr?.info?.('变量自动维护已' + (settings.valuesAutoUpdateEnabled ? '开启' : '关闭'), `[${MODULE_DISPLAY_NAME}]`);
 }
 
 // ---------- 剧情触发设置（与变量工作台联动） ----------
@@ -3706,44 +3903,43 @@ function toggleValuesTrigger() {
   renderPresetTriggerControl();
   refreshHomeValuesStatus();
   logApp('info', settings.valuesTriggerEnabled ? '剧情触发已开启' : '剧情触发已关闭');
-  globalThis.toastr?.info?.('剧情触发已' + (settings.valuesTriggerEnabled ? '开启' : '关闭'), '[' + MODULE_DISPLAY_NAME + ']');
+  globalThis.toastr?.info?.('剧情触发已' + (settings.valuesTriggerEnabled ? '开启' : '关闭'), `[${MODULE_DISPLAY_NAME}]`);
 }
-// 首页「预设模版」卡片状态：已自定义的提示词份数。
+
+// ---------- 首页「预设模版」卡片状态：当前生效的预设名 ----------
 function refreshHomePresetStatus() {
   const status = document.getElementById(HOME_PRESET_STATUS_ID);
   if (!status) return;
   try {
     const ctx = getContextSafe();
-    const settings = ctx ? getSettings(ctx) : null;
-    let customized = 0;
-    for (const key of Object.keys(PRESET_META)) {
-      const meta = PRESET_META[key];
-      const saved = settings ? String(settings[meta.settingsKey] || '') : '';
-      if (saved && saved !== getPresetDefaultText(key)) customized += 1;
-    }
-    status.textContent = customized > 0 ? `已自定义 ${customized} 份` : '默认配置';
-    status.dataset.state = customized > 0 ? 'ok' : 'idle';
+    const name = ctx ? getActivePromptPresetName(ctx) : PROMPT_PRESET_DEFAULT_NAME;
+    const custom = ctx ? getActivePromptPresetId(ctx) !== PROMPT_PRESET_DEFAULT_ID : false;
+    status.textContent = `当前：${name}`;
+    status.dataset.state = custom ? 'ok' : 'idle';
   } catch (error) {
-    status.textContent = '默认配置';
+    status.textContent = `当前：${PROMPT_PRESET_DEFAULT_NAME}`;
     status.dataset.state = 'idle';
   }
 }
 
+// ---------- 保存 / 恢复默认（针对当前 tab） ----------
+// 保存当前 tab 的编辑内容到激活预设：内置默认预设 → 写全局 settings（既有的
+// 「直接修改即生效」）；自定义预设 → 写预设内字段。两条路径都在数据层收口。
 function savePreset(key) {
   const ctx = getContextSafe();
   if (!ctx) return;
   const meta = PRESET_META[key];
   if (!meta) return;
-  const settings = getSettings(ctx);
-  settings[meta.settingsKey] = getPresetEditorText();
-  saveSettingsImmediate(ctx);
-  delete presetUnsaved[key];
+  const text = getPresetEditorText();
+  savePromptPresetText(ctx, key, text);
+  delete presetUnsaved[getPresetDraftKey(key)];
   updatePresetStatus(key);
   refreshHomePresetStatus();
-  logApp('info', '预设已保存', meta.title);
-  globalThis.toastr?.success?.(`${meta.title} 已保存`, `[${MODULE_DISPLAY_NAME}]`);
+  logApp('info', '预设已保存', `${getActivePromptPresetName(ctx)} · ${meta.title}`);
+  globalThis.toastr?.success?.(`「${meta.title}」已保存到「${getActivePromptPresetName(ctx)}」`, `[${MODULE_DISPLAY_NAME}]`);
 }
 
+// 恢复出厂默认：当前 tab 在激活预设中清空自定义（空串 = 回退出厂默认文本）。
 async function resetPreset(key) {
   const ctx = getContextSafe();
   if (!ctx) return;
@@ -3753,23 +3949,142 @@ async function resetPreset(key) {
   const text = getPresetEditorText();
   if (dirty || text !== getPresetDefaultText(key)) {
     const what = dirty ? '未保存的修改' : '已保存的自定义内容';
-    if (!(await kaleidoConfirm(`将「${meta.title}」恢复为默认内容？当前${what}将被默认内容覆盖。`))) return;
+    if (!(await kaleidoConfirm(`将「${meta.title}」恢复为出厂默认内容？当前${what}将被覆盖。`))) return;
   }
-  const textarea = document.getElementById(PRESET_TEXT_ID);
-  if (textarea) textarea.value = getPresetDefaultText(key);
-  const settings = getSettings(ctx);
-  settings[meta.settingsKey] = '';
-  saveSettingsImmediate(ctx);
-  delete presetUnsaved[key];
-  updatePresetStatus(key);
+  document.getElementById(PRESET_TEXT_ID).value = getPresetDefaultText(key);
+  savePromptPresetText(ctx, key, '');
+  delete presetUnsaved[getPresetDraftKey(key)];
+  renderPresetEditor();
   refreshHomePresetStatus();
-  logApp('info', '预设已恢复默认', meta.title);
-  globalThis.toastr?.info?.(`${meta.title} 已恢复默认`, `[${MODULE_DISPLAY_NAME}]`);
+  logApp('info', '已恢复出厂默认', meta.title);
+  globalThis.toastr?.info?.(`「${meta.title}」已恢复出厂默认`, `[${MODULE_DISPLAY_NAME}]`);
 }
 
+// ---------- 预设管理：切换 / 另存 / 删除 ----------
+async function handlePresetSelectChange(target) {
+  const ctx = getContextSafe();
+  if (!ctx || !target) return;
+  const nextId = String(target.value || PROMPT_PRESET_DEFAULT_ID);
+  const previousId = getActivePromptPresetId(ctx);
+  if (nextId === previousId) return;
+  // 旧预设存在未保存修改时征询：切走后草稿会被清理。
+  const dirtyKeys = Object.keys(presetUnsaved).filter((draftKey) => draftKey.startsWith(`${previousId}::`));
+  if (dirtyKeys.length > 0) {
+    if (!(await kaleidoConfirm('当前预设还有未保存的修改，切换预设将丢弃这些修改。继续切换？'))) {
+      target.value = previousId;
+      return;
+    }
+    clearPresetDrafts(previousId);
+  }
+  setActivePromptPreset(ctx, nextId);
+  refreshPresetView();
+  logApp('info', '已切换提示词预设', getActivePromptPresetName(ctx));
+  globalThis.toastr?.success?.(`已切换到「${getActivePromptPresetName(ctx)}」`, `[${MODULE_DISPLAY_NAME}]`);
+}
+
+// 另存为预设：把当前两组提示词的所见内容（含未保存草稿）保存为一个新具名预设，
+// 保存后自动激活。
+async function savePresetAs() {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const snapshot = buildActivePresetSnapshot(ctx);
+  const suggestedBase = getActivePromptPresetId(ctx) === PROMPT_PRESET_DEFAULT_ID
+    ? '我的预设'
+    : `${getActivePromptPresetName(ctx)} 副本`;
+  const name = await kaleidoPrompt('为新预设命名（同时包含剧情预筛与变量维护两组提示词）：', suggestedName(suggestedBase));
+  if (!name) return;
+  try {
+    const preset = createPromptPreset(ctx, name, {
+      storyGatePrompt: snapshot.storyGatePrompt,
+      valuesMaintainPrompt: snapshot.valuesMaintainPrompt,
+    });
+    // 当前编辑状态已被完整捕获为新预设，清掉旧预设的遗留草稿。
+    clearPresetDrafts();
+    renderPresetSelector();
+    updatePresetToolbar();
+    renderPresetEditor();
+    refreshHomePresetStatus();
+    logApp('info', '已另存为预设', preset.name);
+    globalThis.toastr?.success?.(`预设「${preset.name}」已保存并激活`, `[${MODULE_DISPLAY_NAME}]`);
+  } catch (error) {
+    globalThis.toastr?.error?.(String(error?.message || error), `[${MODULE_DISPLAY_NAME}]`);
+  }
+}
+
+// 另存默认名称：默认预设建议「我的预设」，已有同名时顺延编号。
+function suggestedName(base) {
+  return String(base || '我的预设').slice(0, 30);
+}
+
+async function deleteActivePreset() {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const activeId = getActivePromptPresetId(ctx);
+  if (activeId === PROMPT_PRESET_DEFAULT_ID) {
+    globalThis.toastr?.info?.('内置默认预设不可删除', `[${MODULE_DISPLAY_NAME}]`);
+    return;
+  }
+  const name = getActivePromptPresetName(ctx);
+  if (!(await kaleidoConfirm(`删除预设「${name}」？该预设保存的两组提示词将一并删除，且不可恢复。`))) return;
+  const deleted = deletePromptPreset(ctx, activeId);
+  if (!deleted) {
+    globalThis.toastr?.error?.('预设删除失败：未找到该预设', `[${MODULE_DISPLAY_NAME}]`);
+    return;
+  }
+  clearPresetDrafts(activeId === PROMPT_PRESET_DEFAULT_ID ? '' : activeId);
+  renderPresetSelector();
+  renderPresetEditor();
+  refreshHomePresetStatus();
+  logApp('info', '提示词预设已删除', name);
+  globalThis.toastr?.info?.(`预设「${name}」已删除，已切回默认预设`, `[${MODULE_DISPLAY_NAME}]`);
+}
+
+// ---------- 导入 / 导出 ----------
+// 导出当前选中的完整预设（名称 + 两组提示词，含未保存草稿的所见内容）。
+function exportActivePreset() {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const preset = buildActivePresetSnapshot(ctx);
+  try {
+    const yaml = serializePromptPresetBundle(preset);
+    downloadTextFile(buildPromptPresetBundleFilename(preset), yaml);
+    logApp('info', '提示词预设已导出', preset.name);
+  } catch (error) {
+    globalThis.toastr?.error?.(`导出失败：${String(error?.message || error)}`, `[${MODULE_DISPLAY_NAME}]`);
+  }
+}
+
+async function handlePresetImportFile(file) {
+  const ctx = getContextSafe();
+  if (!ctx || !file) return;
+  try {
+    const text = await readTextFile(file);
+    const parsed = parsePromptPresetBundle(text);
+    const preset = importPromptPreset(ctx, parsed);
+    clearPresetDrafts();
+    renderPresetSelector();
+    renderPresetEditor();
+    updatePresetToolbar();
+    refreshHomePresetStatus();
+    logApp('info', '提示词预设已导入', preset.name);
+    globalThis.toastr?.success?.(`预设「${preset.name}」已导入并激活`, `[${MODULE_DISPLAY_NAME}]`);
+  } catch (error) {
+    const message = String(error?.message || error);
+    logApp('warn', '提示词预设导入失败', message);
+    globalThis.toastr?.error?.(`导入失败：${message}`, `[${MODULE_DISPLAY_NAME}]`);
+  }
+}
+
+// 切换聊天 / 角色卡后刷新（main.js 的 chatChanged 订阅入口）：预设列表与激活
+// 预设随角色卡走，编辑器 / 选择器 / 首页状态统一重渲染。
+function onPresetChatChanged() {
+  refreshPresetView();
+  updatePresetToolbar();
+}
+
+// ---------- 事件绑定 ----------
 function initPresetSection(panel) {
   if (!panel || panel.dataset.presetReady === 'true') return;
-  const getCtx = () => getContextSafe();
 
   document.getElementById(PRESET_TABS_ID)?.addEventListener('click', (event) => {
     const tab = event.target.closest('.kaleido-preset__tab');
@@ -3779,19 +4094,38 @@ function initPresetSection(panel) {
   });
 
   document.getElementById(PRESET_TEXT_ID)?.addEventListener('input', () => {
-    const ctx = getCtx();
+    const ctx = getContextSafe();
     const text = getPresetEditorText();
-    if (text === getPresetSavedText(presetActiveKey, ctx)) delete presetUnsaved[presetActiveKey];
-    else presetUnsaved[presetActiveKey] = text;
+    const draftKey = getPresetDraftKey(presetActiveKey);
+    if (ctx && text === getPresetSavedText(presetActiveKey, ctx)) delete presetUnsaved[draftKey];
+    else presetUnsaved[draftKey] = text;
     updatePresetStatus(presetActiveKey);
   });
 
   document.getElementById(PRESET_SAVE_ID)?.addEventListener('click', () => savePreset(presetActiveKey));
   document.getElementById(PRESET_RESET_ID)?.addEventListener('click', () => resetPreset(presetActiveKey));
+
+  // 预设选择工具栏。
+  document.getElementById(PRESET_SELECTOR_ID)?.addEventListener('change', (event) => {
+    handlePresetSelectChange(event.target);
+  });
+  document.getElementById(PRESET_SAVE_AS_ID)?.addEventListener('click', () => savePresetAs());
+  document.getElementById(PRESET_DELETE_ID)?.addEventListener('click', () => deleteActivePreset());
+  document.getElementById(PRESET_EXPORT_ID)?.addEventListener('click', () => exportActivePreset());
+  document.getElementById(PRESET_IMPORT_BTN_ID)?.addEventListener('click', () => {
+    document.getElementById(PRESET_IMPORT_INPUT_ID)?.click();
+  });
+  document.getElementById(PRESET_IMPORT_INPUT_ID)?.addEventListener('change', async (event) => {
+    const file = event.target?.files?.[0];
+    if (file) await handlePresetImportFile(file);
+    event.target.value = '';
+  });
+
   document.getElementById(PRESET_GATE_TOGGLE_ID)?.addEventListener('click', toggleStoryGate);
   document.getElementById(PRESET_VALUES_TOGGLE_ID)?.addEventListener('click', toggleValuesAutoUpdate);
   document.getElementById(PRESET_TRIGGER_TOGGLE_ID)?.addEventListener('click', toggleValuesTrigger);
 
+  renderPresetSelector();
   renderPresetEditor();
   renderPresetGateControl();
   renderPresetValuesControl();
@@ -3800,7 +4134,6 @@ function initPresetSection(panel) {
   panel.dataset.presetReady = 'true';
   logApp('info', '预设模版已就绪');
 }
-
 
 // ===== js/views-home.js =====
 // ===== 万华镜（Kaleidoscope）首页状态 =====
@@ -5117,6 +5450,371 @@ function downloadTextFile(filename, text) {
 }
 
 
+// ===== js/prompt-preset-data.js =====
+// ===== 万华镜（Kaleidoscope）提示词预设：数据模型 / 角色卡绑定 / YAML 导入导出 =====
+// 核心概念：一个预设 = 一套完整的「剧情预筛 + 变量维护」提示词配置
+// （{ id, name, storyGatePrompt, valuesMaintainPrompt }）。预设负责管理和切换
+// 整套提示词，而不是分别管理两个提示词组。
+//
+// 存储与剧情脉络同模式：自定义预设列表存角色卡
+// character.data.extensions.kaleidoscope_prompt_presets，随角色卡导入/导出自动
+// 携带；群聊 / 未选角色 / 宿主不支持写卡时回退全局设置
+//（settings.promptPresets / promptPresetsActiveId）。
+//
+// 内置「默认预设」是兜底配置，永不落盘：激活内置默认预设时提示词取全局
+// settings 的 storyGatePrompt / valuesMaintainPrompt（空串 = 出厂默认，兼容
+// 旧版「直接改提示词即生效」与旧自定义数据）；激活自定义预设时取预设内文本
+//（空串同样回退出厂默认）。
+
+function promptPresetGenId() {
+  const rand = Math.random().toString(36).slice(2, 8);
+  return `kaleido-preset-${Date.now().toString(36)}-${rand}`;
+}
+
+// 归一化一个预设对象：补 id / name / 两组提示词字段（非字符串一律按空串处理）。
+function normalizePromptPreset(preset) {
+  const source = preset && typeof preset === 'object' && !Array.isArray(preset) ? preset : {};
+  return {
+    id: String(source.id || '').trim() || promptPresetGenId(),
+    name: String(source.name ?? '').trim(),
+    storyGatePrompt: String(source.storyGatePrompt ?? ''),
+    valuesMaintainPrompt: String(source.valuesMaintainPrompt ?? ''),
+  };
+}
+
+function isPromptPresetEntryValid(entry) {
+  return Boolean(entry) && typeof entry === 'object' && !Array.isArray(entry)
+    && String(entry.name ?? '').trim() !== ''
+    && 'storyGatePrompt' in entry && 'valuesMaintainPrompt' in entry;
+}
+
+// ---------- 角色卡绑定 ----------
+// 读当前角色卡上的预设容器（无角色 / 卡上无数据返回 null）。返回前就地归一化
+// presets 数组与 activeId，保证后续读写始终落在合法结构上。
+function getPromptPresetCardData(ctx) {
+  const character = getStoryCharacter(ctx);
+  if (!character) return null;
+  const extensions = character?.data?.extensions;
+  if (!extensions || typeof extensions !== 'object') return null;
+  const card = extensions[PROMPT_PRESET_CARD_EXTENSION_KEY];
+  if (!card || typeof card !== 'object' || Array.isArray(card)) return null;
+  if (!Array.isArray(card.presets)) card.presets = [];
+  if (typeof card.activeId !== 'string' || !card.activeId) card.activeId = PROMPT_PRESET_DEFAULT_ID;
+  return card;
+}
+
+// 把预设数据写入角色卡对象（内存态，持久化由调用方完成）。
+function setPromptPresetCardData(character, card) {
+  if (!character || typeof character !== 'object') return;
+  if (!character.data || typeof character.data !== 'object') character.data = {};
+  if (!character.data.extensions || typeof character.data.extensions !== 'object') character.data.extensions = {};
+  character.data.extensions[PROMPT_PRESET_CARD_EXTENSION_KEY] = card;
+}
+
+// 写卡失败 / 角色已删除 / 宿主不支持时的兜底：预设列表落回全局设置，避免丢失。
+function fallbackPromptPresetsToSettings(ctx, card) {
+  const settings = getSettings(ctx);
+  settings.promptPresets = Array.isArray(card?.presets) ? card.presets : [];
+  settings.promptPresetsActiveId = typeof card?.activeId === 'string' && card.activeId
+    ? card.activeId
+    : PROMPT_PRESET_DEFAULT_ID;
+  saveSettingsImmediate(ctx);
+  logApp('warn', '提示词预设写入角色卡失败，已回退全局设置');
+}
+
+// 立即写卡：按 avatar 重新定位角色（防切换角色写错卡），失败回退全局设置。
+// 与剧情脉络同款：不做防抖，防抖窗口内退出会丢数据（TauriTavern 实测）。
+function savePromptPresetCardNow(ctx, character, card) {
+  const avatar = String(character?.avatar || '');
+  persistPromptPresetCardData(ctx, avatar, card).catch((error) => {
+    logApp('warn', '提示词预设写入角色卡失败', String(error?.message || error));
+  });
+}
+
+async function persistPromptPresetCardData(ctx, avatar, card) {
+  const characters = Array.isArray(ctx?.characters) ? ctx.characters : [];
+  const index = characters.findIndex((item) => String(item?.avatar || '') === avatar);
+  if (index < 0) {
+    fallbackPromptPresetsToSettings(ctx, card);
+    return;
+  }
+  const write = ctx?.writeExtensionField;
+  if (typeof write !== 'function') {
+    fallbackPromptPresetsToSettings(ctx, card);
+    return;
+  }
+  try {
+    await write.call(ctx, index, PROMPT_PRESET_CARD_EXTENSION_KEY, card);
+  } catch (error) {
+    fallbackPromptPresetsToSettings(ctx, card);
+    throw error;
+  }
+}
+
+// 统一保存入口：有角色且宿主支持写卡 → 确保卡上容器存在后立即落盘；否则写全局设置。
+function savePromptPresetData(ctx) {
+  const character = getStoryCharacter(ctx);
+  if (!character || typeof ctx?.writeExtensionField !== 'function') {
+    saveSettingsImmediate(ctx);
+    return;
+  }
+  let card = getPromptPresetCardData(ctx);
+  if (!card) {
+    card = { version: PROMPT_PRESET_CARD_DATA_VERSION, presets: [], activeId: PROMPT_PRESET_DEFAULT_ID };
+    setPromptPresetCardData(character, card);
+  }
+  savePromptPresetCardNow(ctx, character, card);
+}
+
+// ---------- 读取 ----------
+// 自定义预设列表：优先角色卡；无角色 / 宿主不支持时回退全局设置。有角色但卡上
+// 无数据时返回空数组（不回退全局，防止把别的角色 / 旧全局数据串到当前卡上）。
+function getCustomPromptPresets(ctx) {
+  const card = ctx ? getPromptPresetCardData(ctx) : null;
+  if (card) return card.presets;
+  if (ctx && getStoryCharacter(ctx) && typeof ctx?.writeExtensionField === 'function') return [];
+  const settings = ctx ? getSettings(ctx) : null;
+  return Array.isArray(settings?.promptPresets) ? settings.promptPresets : [];
+}
+
+// 当前激活预设 id：优先角色卡，同上回退全局设置（默认内置 id）。
+function getActivePromptPresetId(ctx) {
+  const card = ctx ? getPromptPresetCardData(ctx) : null;
+  if (card) return card.activeId;
+  if (ctx && getStoryCharacter(ctx) && typeof ctx?.writeExtensionField === 'function') {
+    return PROMPT_PRESET_DEFAULT_ID;
+  }
+  const settings = ctx ? getSettings(ctx) : null;
+  const activeId = String(settings?.promptPresetsActiveId || '').trim();
+  return activeId || PROMPT_PRESET_DEFAULT_ID;
+}
+
+// 内置「默认预设」的运行时表示：不落盘，内容实时读取（默认提示词常量或全局
+// settings 自定义文本），保证「默认预设 + 直接修改保存」的既有用法始终生效。
+function buildBuiltinDefaultPromptPreset(ctx) {
+  const settings = ctx ? getSettings(ctx) : null;
+  return {
+    id: PROMPT_PRESET_DEFAULT_ID,
+    name: PROMPT_PRESET_DEFAULT_NAME,
+    storyGatePrompt: String(settings?.storyGatePrompt ?? ''),
+    valuesMaintainPrompt: String(settings?.valuesMaintainPrompt ?? ''),
+  };
+}
+
+// 按预设 key（PRESET_META 的 storyGate / valuesMaintain）取预设内文本。
+function getPromptPresetText(preset, key) {
+  const text = preset ? preset[PRESET_META[key]?.settingsKey] : '';
+  return String(text ?? '');
+}
+
+// 出厂默认文本（DEFAULT_STORY_GATE_PROMPT / DEFAULT_VALUES_MAINTAIN_PROMPT）。
+function getPromptPresetFactoryText(key) {
+  const meta = PRESET_META[key];
+  return meta && typeof meta.getDefault === 'function' ? meta.getDefault() : '';
+}
+
+// 激活预设的展示名（下拉框 / 首页状态用）。
+function getActivePromptPresetName(ctx) {
+  const activeId = getActivePromptPresetId(ctx);
+  if (activeId === PROMPT_PRESET_DEFAULT_ID) return PROMPT_PRESET_DEFAULT_NAME;
+  const preset = getCustomPromptPresets(ctx).find((item) => item.id === activeId);
+  return preset ? preset.name : PROMPT_PRESET_DEFAULT_NAME;
+}
+
+// 解析出当前激活的完整预设（含内置默认）；激活 id 失效（预设被删 / 数据损坏）
+// 时回退内置默认。
+function resolveActivePromptPreset(ctx) {
+  const activeId = getActivePromptPresetId(ctx);
+  if (activeId !== PROMPT_PRESET_DEFAULT_ID) {
+    const preset = getCustomPromptPresets(ctx).find((item) => item.id === activeId);
+    if (preset) return preset;
+  }
+  return buildBuiltinDefaultPromptPreset(ctx);
+}
+
+// 生效提示词：底层注入（剧情预筛 / 变量维护）统一从这里取文本——
+// 激活自定义预设 → 该预设内文本，空串回退出厂默认；
+// 激活内置默认 → 全局 settings 的自定义文本（空串 = 出厂默认，旧数据兼容）。
+function getEffectivePromptText(ctx, key) {
+  const preset = resolveActivePromptPreset(ctx);
+  const text = String(getPromptPresetText(preset, key) ?? '').trim();
+  return text || getPromptPresetFactoryText(key);
+}
+
+// ---------- 写入 ----------
+// 把编辑器里的当前 tab 文本保存进激活预设。内置默认预设不可覆盖 → 写全局
+// settings（既有的「直接修改即生效」），自定义预设 → 写预设内字段。
+function savePromptPresetText(ctx, key, text) {
+  const meta = PRESET_META[key];
+  if (!meta) return;
+  const activeId = getActivePromptPresetId(ctx);
+  if (activeId === PROMPT_PRESET_DEFAULT_ID) {
+    const settings = getSettings(ctx);
+    settings[meta.settingsKey] = String(text ?? '');
+    saveSettingsImmediate(ctx);
+    return;
+  }
+  // 角色卡路径：改激活预设的内嵌字段并立即写卡。
+  const character = getStoryCharacter(ctx);
+  const card = ensurePromptPresetCardData(ctx);
+  if (card) {
+    const preset = card.presets.find((item) => item.id === activeId);
+    if (preset) {
+      preset[meta.settingsKey] = String(text ?? '');
+      savePromptPresetCardNow(ctx, character, card);
+    }
+    return;
+  }
+  // 全局兜底路径：改 settings 里的预设列表（无角色卡可写时）。
+  const settings = getSettings(ctx);
+  const fallbackPresets = Array.isArray(settings.promptPresets) ? settings.promptPresets : [];
+  const fallbackPreset = fallbackPresets.find((item) => item.id === activeId);
+  if (fallbackPreset) {
+    fallbackPreset[meta.settingsKey] = String(text ?? '');
+    settings.promptPresets = fallbackPresets;
+    saveSettingsImmediate(ctx);
+  }
+}
+
+// 确保当前角色卡有预设容器（首次写卡才创建，不自动迁移旧数据）。无角色 /
+// 宿主不支持写卡时返回 null（走全局设置路径）。
+function ensurePromptPresetCardData(ctx) {
+  const character = getStoryCharacter(ctx);
+  if (!character || typeof ctx?.writeExtensionField !== 'function') return null;
+  let card = getPromptPresetCardData(ctx);
+  if (!card) {
+    card = { version: PROMPT_PRESET_CARD_DATA_VERSION, presets: [], activeId: PROMPT_PRESET_DEFAULT_ID };
+    setPromptPresetCardData(character, card);
+  }
+  return card;
+}
+
+// 另存为新预设：写入当前角色卡（或全局兜底），成功后返回新预设对象。
+function createPromptPreset(ctx, name, texts) {
+  const cleanName = String(name ?? '').trim();
+  if (!cleanName) throw new Error('预设名称不能为空');
+  const preset = normalizePromptPreset({
+    name: cleanName,
+    storyGatePrompt: String(texts?.storyGatePrompt ?? ''),
+    valuesMaintainPrompt: String(texts?.valuesMaintainPrompt ?? ''),
+  });
+  const settings = getSettings(ctx);
+  const character = getStoryCharacter(ctx);
+  if (character && typeof ctx?.writeExtensionField === 'function') {
+    const card = ensurePromptPresetCardData(ctx);
+    card.presets = Array.isArray(card.presets) ? card.presets : [];
+    card.presets.push(preset);
+    card.activeId = preset.id;
+    savePromptPresetCardNow(ctx, character, card);
+  } else {
+    const presets = Array.isArray(settings.promptPresets) ? settings.promptPresets : [];
+    presets.push(cloneValue(preset));
+    settings.promptPresets = presets;
+    settings.promptPresetsActiveId = preset.id;
+    savePromptPresetData(ctx);
+  }
+  return preset;
+}
+
+// 删除自定义预设；删除的是当前激活预设时回退内置默认。内置默认不可删除。
+function deletePromptPreset(ctx, presetId) {
+  const targetId = String(presetId || '').trim();
+  if (!targetId || targetId === PROMPT_PRESET_DEFAULT_ID) return false;
+  const card = getPromptPresetCardData(ctx);
+  if (card) {
+    const before = card.presets.length;
+    card.presets = card.presets.filter((item) => item?.id !== targetId);
+    if (card.presets.length === before) return false;
+    if (card.activeId === targetId) card.activeId = PROMPT_PRESET_DEFAULT_ID;
+    savePromptPresetCardNow(ctx, getStoryCharacter(ctx), card);
+    return true;
+  }
+  const settings = getSettings(ctx);
+  const presets = Array.isArray(settings.promptPresets) ? settings.promptPresets : [];
+  const before = presets.length;
+  settings.promptPresets = presets.filter((item) => item?.id !== targetId);
+  if (settings.promptPresets.length === before) return false;
+  if (String(settings.promptPresetsActiveId || '') === targetId) {
+    settings.promptPresetsActiveId = PROMPT_PRESET_DEFAULT_ID;
+  }
+  savePromptPresetData(ctx);
+  return true;
+}
+
+// 切换激活预设。切换只改 activeId，不复制文本——预设各自持有完整内容。
+function setActivePromptPreset(ctx, presetId) {
+  const targetId = String(presetId || '').trim() || PROMPT_PRESET_DEFAULT_ID;
+  if (targetId !== PROMPT_PRESET_DEFAULT_ID) {
+    const exists = getCustomPromptPresets(ctx).some((item) => item?.id === targetId);
+    if (!exists) targetId = PROMPT_PRESET_DEFAULT_ID;
+  }
+  const card = ensurePromptPresetCardData(ctx);
+  if (card) {
+    card.activeId = targetId;
+    savePromptPresetCardNow(ctx, getStoryCharacter(ctx), card);
+    return;
+  }
+  const settings = getSettings(ctx);
+  settings.promptPresetsActiveId = targetId;
+  savePromptPresetData(ctx);
+}
+
+// ---------- YAML 导入导出 ----------
+// 导出当前选中的完整预设（名称 + 两组提示词），自描述头凭 format 标记识别。
+function serializePromptPresetBundle(preset) {
+  const lines = [];
+  lines.push('# 万华镜（Kaleidoscope）提示词预设导出');
+  lines.push('# 在「预设模版 → 导入预设」中可重新导入：一个预设 = 剧情预筛 + 变量维护 的一套完整配置。');
+  lines.push(`format: ${PROMPT_PRESET_BUNDLE_FORMAT}`);
+  lines.push(`version: ${PROMPT_PRESET_BUNDLE_VERSION}`);
+  lines.push(`name: ${yamlScalar(String(preset?.name ?? '').trim())}`);
+  lines.push(`storyGatePrompt: ${yamlBlockScalarText(preset?.storyGatePrompt ?? '', '  ')}`);
+  lines.push(`valuesMaintainPrompt: ${yamlBlockScalarText(preset?.valuesMaintainPrompt ?? '', '  ')}`);
+  return `${lines.join('\n')}\n`;
+}
+
+function buildPromptPresetBundleFilename(preset) {
+  const name = sanitizeStoryFilename(String(preset?.name ?? '').trim() || '未命名预设');
+  return `${PROMPT_PRESET_BUNDLE_FILENAME_PREFIX}-${name}.yaml`;
+}
+
+// 解析导入的预设文件：校验 format 标记与必填字段（name 必填，两组提示词字段
+// 必须存在、允许空串 = 导入后使用出厂默认）。
+function parsePromptPresetBundle(text) {
+  const data = parseYamlSubset(String(text ?? ''));
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new Error('预设文件格式不正确：顶层必须是 YAML 映射');
+  }
+  const format = String(data.format ?? '').trim();
+  if (format !== PROMPT_PRESET_BUNDLE_FORMAT) {
+    throw new Error(`预设文件 format 标记不匹配：期望 ${PROMPT_PRESET_BUNDLE_FORMAT}，实际「${format || '（缺失）'}」`);
+  }
+  const name = String(data.name ?? '').trim();
+  if (!name) throw new Error('预设文件缺少 name 字段');
+  if (typeof data.storyGatePrompt !== 'string' || typeof data.valuesMaintainPrompt !== 'string') {
+    throw new Error('预设文件必须同时包含 storyGatePrompt 与 valuesMaintainPrompt 两组提示词（可为空串）');
+  }
+  return {
+    name,
+    storyGatePrompt: data.storyGatePrompt,
+    valuesMaintainPrompt: data.valuesMaintainPrompt,
+  };
+}
+
+// 导入预设：写入当前角色卡（或全局兜底）、激活，并返回新预设。同名预设不覆盖，
+// 自动追加「(2)」「(3)」后缀去重。
+function importPromptPreset(ctx, parsed) {
+  const settings = getSettings(ctx);
+  const existing = getCustomPromptPresets(ctx);
+  let name = parsed.name;
+  let suffix = 2;
+  while (existing.some((item) => item?.name === name)) {
+    name = `${parsed.name}(${suffix})`;
+    suffix += 1;
+  }
+  return createPromptPreset(ctx, name, parsed);
+}
+
 // ===== js/story-gate.js =====
 // ===== 万华镜（Kaleidoscope）剧情预筛：Gate 预筛 + 事件注入 =====
 // 触发时机：用户点击发送（宿主 messageSent 事件；宿主的 emit 会 await 监听器），
@@ -5206,11 +5904,10 @@ function buildStoryEventCatalog(ctx) {
   return { nodes: roots.map(buildNode), unassigned };
 }
 
-// 预筛提示词：优先用作者在设置里保存的自定义提示词，空则回退默认。
+// 预筛提示词：取当前激活预设的生效文本（自定义预设 → 预设内文本；内置默认预设
+// → 全局设置自定义文本）；两者均为空时回退出厂默认。见 prompt-preset-data.js。
 function getStoryGatePrompt(ctx) {
-  const settings = ctx ? getSettings(ctx) : null;
-  const saved = String(settings?.storyGatePrompt || '').trim();
-  return saved || DEFAULT_STORY_GATE_PROMPT;
+  return getEffectivePromptText(ctx, 'storyGate');
 }
 
 // Gate 请求体按「提示词 → 事件目录块 → 剧情块 → 输出契约」四段式组织：
@@ -7588,6 +8285,18 @@ function reorderValuesTreeAt(ctx, parentPath, names) {
   return order;
 }
 
+// 新建条目追加到父路径顺序表末尾：新建的节点 / 变量排在该层条目序列的最后，
+// 而不是混进未记录条目的名称排序里。父路径未记录过顺序时先按当前显示顺序
+// 固化，保证新条目之前的相对顺序不变。
+function appendValuesTreeOrder(ctx, tree, parentPath, newName) {
+  const key = Array.isArray(parentPath) ? parentPath.join('/') : String(parentPath || '');
+  const node = valuesGetAtPath(tree, Array.isArray(parentPath) ? parentPath : []);
+  const names = valuesOrderedNames(getValuesTreeOrder(ctx), key, node)
+    .filter((item) => item !== newName);
+  names.push(newName);
+  return reorderValuesTreeAt(ctx, key, names);
+}
+
 // ---------- 注入提示词配置（默认数值层勾选）----------
 // 配置存变量包 inject 字段：{ enabled, paths }。paths 是打开条目的路径数组
 // （path.join('/')），节点上下级联动：打开条目 = 自身 + 全部祖先 + 全部后代
@@ -8149,11 +8858,10 @@ function onValuesChatChanged() {
   valuesMainGenerationState.startChatSignature = '';
 }
 
-// 维护提示词：自定义优先，空则回退默认。
+// 维护提示词：取当前激活预设的生效文本（自定义预设 → 预设内文本；内置默认预设
+// → 全局设置自定义文本）；两者均为空时回退出厂默认。见 prompt-preset-data.js。
 function getValuesMaintainPrompt(ctx) {
-  const settings = ctx ? getSettings(ctx) : null;
-  const saved = String(settings?.valuesMaintainPrompt || '').trim();
-  return saved || DEFAULT_VALUES_MAINTAIN_PROMPT;
+  return getEffectivePromptText(ctx, 'valuesMaintain');
 }
 
 // 请求体：system 提示词 → 键规则块 → 当前值块 → 最近消息块。
@@ -9527,6 +10235,8 @@ function parseValuesEditorText(text) {
         return;
       }
       valuesSetAtPath(tree, parentPath.concat(name), {});
+      // 新建节点排在该层条目序列最后，而不是按名称序插进中间。
+      appendValuesTreeOrder(ctx, tree, parentPath, name);
       // 新建节点默认展开，方便继续往里挂条目；挂在子层时父节点一并展开以便看到新节点。
       valuesExpanded.add(parentPath.concat(name).join('/'));
       if (parentPath.length > 0) valuesExpanded.add(parentPath.join('/'));
@@ -9563,6 +10273,8 @@ function parseValuesEditorText(text) {
       return;
     }
     valuesSetAtPath(tree, newPath, parsed.value);
+    // 新建变量排在该节点下条目序列最后，而不是按名称序插进中间。
+    if (!valuesEditorPath) appendValuesTreeOrder(ctx, tree, parentPath, keyName);
     // 新建变量默认开启注入（仅默认数值层；打开变量会自动提升全部祖先节点）。
     if (!valuesEditorPath && valuesActiveLayer === 'default') {
       setValuesInjectPath(ctx, newPath, true);
@@ -12793,6 +13505,9 @@ function installHostEventSubscriptions(ctx) {
   onHostEvent(ctx, 'generationEnded', onValuesGenerationEnded, VALUES_MAINTAIN_HANDLER_KEY);
   onHostEvent(ctx, 'generationStopped', onValuesGenerationStopped, VALUES_MAINTAIN_STOPPED_KEY);
   onHostEvent(ctx, 'chatChanged', onValuesChatChanged, VALUES_MAINTAIN_CHAT_CHANGED_KEY);
+  // 切换聊天 / 角色卡后刷新预设模版页：激活预设与预设列表随角色卡走（懒式
+  // 读取，无事件也能取到最新数据，但面板若停在预设页需要重渲染）。
+  onHostEvent(ctx, 'chatChanged', onPresetChatChanged, PROMPT_PRESET_CHAT_CHANGED_KEY);
   // 变量注入：generationEnded / generationStopped 后清空注入，下一轮发送前
   // 经发送屏障重新注入最新值（勾选条目见变量工作台「默认数值」层）。
   onHostEvent(ctx, 'generationEnded', onValuesInjectGenerationCleanup, VALUES_INJECT_CLEANUP_ENDED_KEY);

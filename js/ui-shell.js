@@ -327,6 +327,12 @@ function showPanelView(viewId) {
     setValuesLayer('game');
     refreshHomeValuesStatus();
   }
+  if (viewId === PRESET_VIEW_ID) {
+    // 预设选择器与编辑器都依赖当前角色卡数据（激活预设 / 预设列表随卡切换），
+    // 每次进入视图重渲染，避免显示别的角色卡的旧列表。
+    renderPresetSelector();
+    renderPresetEditor();
+  }
   if (viewId === GAME_VIEW_ID) {
     // 进入游戏模式时重置到入口：不点击图标不显示任何界面。
     renderGameView(true);
@@ -555,6 +561,15 @@ function createPanel() {
                 <span class="kaleido-preset__gate-label">启用剧情触发</span>
                 <button type="button" id="${PRESET_TRIGGER_TOGGLE_ID}" class="kaleido-btn kaleido-api__concurrency-toggle" title="开启/关闭剧情触发">⚡ 剧情触发：开</button>
               </div>
+            </div>
+            <div class="kaleido-preset__toolbar">
+              <select id="${PRESET_SELECTOR_ID}" class="kaleido-input kaleido-preset__select" aria-label="选择提示词预设" title="切换当前生效的提示词预设"></select>
+              <button type="button" id="${PRESET_SAVE_AS_ID}" class="kaleido-btn kaleido-btn--ghost" title="把当前两组提示词另存为一个新预设">📝 另存</button>
+              <button type="button" id="${PRESET_DELETE_ID}" class="kaleido-btn kaleido-btn--ghost" title="删除当前选中的自定义预设">🗑</button>
+              <span class="kaleido-preset__toolbar-gap"></span>
+              <button type="button" id="${PRESET_EXPORT_ID}" class="kaleido-btn kaleido-btn--ghost" title="把当前选中的完整预设导出为独立文件">⬆ 导出</button>
+              <button type="button" id="${PRESET_IMPORT_BTN_ID}" class="kaleido-btn kaleido-btn--ghost" title="从预设文件导入（含名称 + 两组提示词）">⬇ 导入</button>
+              <input type="file" id="${PRESET_IMPORT_INPUT_ID}" accept=".yaml,.yml" hidden />
             </div>
             <div id="${PRESET_TABS_ID}" class="kaleido-preset__tabs" role="tablist" aria-label="选择要编辑的提示词">
               ${Object.entries(PRESET_META).map(([key, meta]) => `
@@ -894,5 +909,75 @@ function kaleidoConfirm(message) {
   setTimeout(() => okButton?.focus?.(), 0);
   return new Promise((resolve) => {
     kaleidoConfirmResolve = resolve;
+  });
+}
+
+// ---------- 自绘文本输入弹层（另存预设命名等） ----------
+// 与确认弹层同款：宿主没有可用的 prompt 对话框（ACL 拦截 window.prompt），
+// 文本输入统一走自绘浮层。返回 Promise<string|null>，取消返回 null。
+const KALEIDO_PROMPT_ID = 'kaleido-prompt-overlay';
+let kaleidoPromptResolve = null;
+
+function isKaleidoPromptOpen() {
+  const overlay = document.getElementById(KALEIDO_PROMPT_ID);
+  return Boolean(overlay && overlay.classList.contains('is-open'));
+}
+
+function settleKaleidoPrompt(result) {
+  const resolve = kaleidoPromptResolve;
+  kaleidoPromptResolve = null;
+  const overlay = document.getElementById(KALEIDO_PROMPT_ID);
+  if (overlay) overlay.classList.remove('is-open');
+  resolve?.(result);
+}
+
+function getKaleidoPromptOverlay() {
+  let overlay = document.getElementById(KALEIDO_PROMPT_ID);
+  if (overlay) return overlay;
+  overlay = document.createElement('div');
+  overlay.id = KALEIDO_PROMPT_ID;
+  overlay.className = 'kaleido-confirm';
+  overlay.innerHTML = `
+    <div class="kaleido-confirm__card" role="dialog" aria-modal="true" aria-label="输入">
+      <p class="kaleido-prompt__message kaleido-confirm__message"></p>
+      <input type="text" class="kaleido-input kaleido-prompt__input" spellcheck="false" aria-label="输入内容" />
+      <div class="kaleido-confirm__actions">
+        <button type="button" class="kaleido-confirm__cancel">取消</button>
+        <button type="button" class="kaleido-btn kaleido-prompt__ok">确定</button>
+      </div>
+    </div>
+  `;
+  const input = overlay.querySelector('.kaleido-prompt__input');
+  const submit = () => {
+    const value = String(input?.value ?? '').trim();
+    settleKaleidoPrompt(value || null);
+  };
+  overlay.querySelector('.kaleido-confirm__cancel')?.addEventListener('click', () => settleKaleidoPrompt(null));
+  overlay.querySelector('.kaleido-prompt__ok')?.addEventListener('click', submit);
+  input?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      submit();
+    }
+  });
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+// 自绘文本输入：返回 Promise<string|null>（trim 后为空 / 取消 → null）。
+// 同一时刻只允许一个待输入弹层，新的会以「取消」结掉旧的。
+function kaleidoPrompt(message, defaultValue = '') {
+  if (kaleidoPromptResolve) settleKaleidoPrompt(null);
+  const overlay = getKaleidoPromptOverlay();
+  overlay.querySelector('.kaleido-prompt__message').textContent = message;
+  const input = overlay.querySelector('.kaleido-prompt__input');
+  if (input) input.value = String(defaultValue ?? '');
+  overlay.classList.add('is-open');
+  setTimeout(() => {
+    input?.focus?.();
+    input?.select?.();
+  }, 0);
+  return new Promise((resolve) => {
+    kaleidoPromptResolve = resolve;
   });
 }

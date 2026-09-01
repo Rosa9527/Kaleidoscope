@@ -1,7 +1,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.3.4';
+const MODULE_VERSION = '1.4.0';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -102,10 +102,17 @@ const LOG_BACK_ID = 'kaleido-log-back-to-latest';
 const LOG_STATUS_ID = 'kaleido-log-status';
 const LOG_PAUSED_ID = 'kaleido-log-paused-badge';
 
-// 预设模版（默认提示词编辑）
+// 预设模版（提示词预设管理 + 默认提示词编辑）
 const PRESET_VIEW_ID = 'kaleido-preset-view';
 const HOME_PRESET_CARD_ID = 'kaleido-home-preset-card';
 const HOME_PRESET_STATUS_ID = 'kaleido-home-preset-status';
+// 预设选择工具栏：下拉切换激活预设 + 另存 / 删除 / 导入 / 导出。
+const PRESET_SELECTOR_ID = 'kaleido-preset-select';
+const PRESET_SAVE_AS_ID = 'kaleido-preset-save-as';
+const PRESET_DELETE_ID = 'kaleido-preset-delete';
+const PRESET_EXPORT_ID = 'kaleido-preset-export';
+const PRESET_IMPORT_BTN_ID = 'kaleido-preset-import-btn';
+const PRESET_IMPORT_INPUT_ID = 'kaleido-preset-import-input';
 const PRESET_TABS_ID = 'kaleido-preset-tabs';
 const PRESET_TEXT_ID = 'kaleido-preset-text';
 const PRESET_SAVE_ID = 'kaleido-preset-save';
@@ -176,6 +183,21 @@ const STORY_SCRIPT_FILENAME_PREFIX = '万华镜-事件';
 // 随角色卡导入/导出自动携带；群聊/未选角色时回退全局设置）。
 const STORY_CARD_EXTENSION_KEY = 'kaleidoscope_story';
 const STORY_CARD_DATA_VERSION = 1;
+// ---------- 提示词预设（剧情预筛 + 变量维护 的一套具名配置）----------
+// 一个预设 = { id, name, storyGatePrompt, valuesMaintainPrompt }。自定义预设列表
+// 与剧情脉络同模式存角色卡 extensions，随角色卡导入/导出携带；群聊 / 未选角色 /
+// 宿主不支持写卡时回退全局设置 promptPresets / promptPresetsActiveId。
+// 内置「默认预设」是兜底配置，永不落盘：激活它时提示词取全局 settings 的
+// storyGatePrompt / valuesMaintainPrompt（空串 = 出厂默认），见 prompt-preset-data.js。
+const PROMPT_PRESET_CARD_EXTENSION_KEY = 'kaleidoscope_prompt_presets';
+const PROMPT_PRESET_CARD_DATA_VERSION = 1;
+const PROMPT_PRESET_DEFAULT_ID = '__default__';
+const PROMPT_PRESET_DEFAULT_NAME = '默认预设';
+const PROMPT_PRESET_BUNDLE_FORMAT = 'kaleidoscope-prompt-preset';
+const PROMPT_PRESET_BUNDLE_VERSION = 1;
+const PROMPT_PRESET_BUNDLE_FILENAME_PREFIX = '万华镜-提示词预设';
+// chatChanged 时刷新预设模版页的宿主事件去重 key（onHostEvent 按 globalThis key 防重复挂载）。
+const PROMPT_PRESET_CHAT_CHANGED_KEY = '__kaleido_prompt_preset_chat_changed__';
 // ---------- 变量系统（键注册表 + 默认值 / 游戏值两层）----------
 const VALUES_VIEW_ID = 'kaleido-values-view';
 const VALUES_DIALOG_ID = 'kaleido-values-dialog';
@@ -620,6 +642,11 @@ const DEFAULT_SETTINGS = Object.freeze({
   storyGateEnabled: true,
   valuesTriggerEnabled: true,
   storyGatePrompt: '',
+  valuesMaintainPrompt: '',
+  // 提示词预设的全局兜底存储：仅在没有角色卡可写（群聊 / 未选角色 / 宿主不支持
+  // 写角色卡）时使用；有角色卡时预设列表存角色卡 extensions（随卡携带）。
+  promptPresets: [],
+  promptPresetsActiveId: PROMPT_PRESET_DEFAULT_ID,
   valuesNavCollapsed: false,
   theme: DEFAULT_THEME,
   mapData: null,

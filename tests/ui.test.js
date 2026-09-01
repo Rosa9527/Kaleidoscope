@@ -675,9 +675,15 @@ runner.test('预设编辑器初始显示默认提示词', () => {
   const textarea = $('kaleido-preset-text');
   presetDefaultText = textarea.value;
   assert(presetDefaultText.length > 0, '编辑区应显示默认提示词');
-  assert($('kaleido-preset-status').textContent === '默认内容', '状态应为默认内容');
+  assert($('kaleido-preset-status').textContent === '当前预设内容', '状态应为当前预设内容');
   assert($('kaleido-preset-save').disabled, '未修改时保存按钮应禁用');
   assert($('kaleido-preset-reset').disabled, '未修改时恢复默认按钮应禁用');
+  assert($('kaleido-preset-select'), '预设视图应有预设选择下拉框');
+  assert($('kaleido-preset-save-as'), '预设视图应有另存为预设按钮');
+  assert($('kaleido-preset-delete'), '预设视图应有删除预设按钮');
+  assert($('kaleido-preset-export'), '预设视图应有导出按钮');
+  assert($('kaleido-preset-import-btn'), '预设视图应有导入按钮');
+  assert($('kaleido-preset-delete').disabled, '内置默认预设不可删除（删除按钮禁用）');
 });
 
 runner.test('编辑后保存写入设置', () => {
@@ -688,20 +694,20 @@ runner.test('编辑后保存写入设置', () => {
   assert(!$('kaleido-preset-save').disabled, '有修改时保存按钮应可用');
   click($('kaleido-preset-save'));
   assert(ui.getSettings(hostCtx).storyGatePrompt === custom, '保存应写入 settings.storyGatePrompt');
-  assert($('kaleido-preset-status').textContent === '已保存的自定义内容', '保存后状态应为已保存的自定义内容');
-  assert($('kaleido-home-preset-status').textContent === '已自定义 1 份', '首页卡片状态应显示已自定义');
+  assert($('kaleido-preset-status').textContent === '当前预设内容', '保存后状态应为当前预设内容');
+  assert($('kaleido-home-preset-status').textContent === '当前：默认预设', '首页卡片状态应显示当前预设名');
 });
 
 runner.test('恢复默认还原出厂内容', async () => {
   click($('kaleido-preset-reset'));
-  assert(confirmMessage().includes('恢复为默认内容'), '恢复默认前应询问确认');
+  assert(confirmMessage().includes('恢复为出厂默认内容'), '恢复默认前应询问确认');
   clickConfirmOk();
   await flush();
   const textarea = $('kaleido-preset-text');
   assert(textarea.value === presetDefaultText, '编辑区应还原为默认提示词');
   assert(ui.getSettings(hostCtx).storyGatePrompt === '', '设置应清空回退默认');
-  assert($('kaleido-preset-status').textContent === '默认内容', '状态应回到默认内容');
-  assert($('kaleido-home-preset-status').textContent === '默认配置', '首页卡片状态应回到默认配置');
+  assert($('kaleido-preset-status').textContent === '当前预设内容', '状态应回到当前预设内容');
+  assert($('kaleido-home-preset-status').textContent === '当前：默认预设', '首页卡片状态应回到默认预设');
 });
 
 runner.test('预设模版剧情预筛开关：默认开启，点击切换并同步状态', () => {
