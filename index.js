@@ -1,11 +1,11 @@
 // ===== 万华镜（Kaleidoscope）index.js — 构建产物，勿手改 =====
-// 构建时间: 2026-09-01 21:27:08 · 文件数: 24 · 指纹: 4d657e49
+// 构建时间: 2026-09-01 22:14:27 · 文件数: 24 · 指纹: 89738613
 
 // ===== js/constants.js =====
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.4.2';
+const MODULE_VERSION = '1.4.3';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -316,7 +316,7 @@ const VALUES_BUILTIN_KEYS = [
   {
     name: '友谊',
     type: VALUES_KEY_TYPE_PARENT,
-    rule: '友谊度区间为0~100，变化幅度取决于当前关系——例如:泛泛之交打招呼可以+3，而莫逆之交则不会变化；较大利益赠予对泛泛之交+20，但对莫逆之交可能只+10。',
+    rule: '友谊度区间为0~100，变化幅度取决于当前关系——例如:泛泛之交打招呼可以+3，而莫逆之交则不会变化；较大利益赠予对泛泛之交+20，但对莫逆之交可能只+10。修改须判断当前行为在当前关系下是否应产生好感度变化。',
   },
   {
     name: '友谊等级',
