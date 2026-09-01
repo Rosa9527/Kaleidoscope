@@ -1,7 +1,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.4.1';
+const MODULE_VERSION = '1.4.2';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -330,7 +330,7 @@ const VALUES_BUILTIN_KEYS = [
   {
     name: '情欲',
     type: VALUES_KEY_TYPE_PARENT,
-    rule: '情欲值的变化幅度取决于亲密行为的强度,而非日常互动的日积月累——例如:一个暧昧的眼神对视只能有+5左右的小增量,一次亲吻可以带来+20甚至更多的跃迁式增长,发生关系则会直接带来+40以上的大幅跃升;但同样的行为,对情欲值已经很高的关系加成会递减,后期的增长更多依赖亲密互动的频率与默契积累,而非单次行为本身的强度。',
+    rule: '情欲值的变化幅度取决于亲密行为的强度,而非日常互动的日积月累——例如:一个暧昧的眼神对视只能有+5左右的小增量,一次亲吻可以带来+10甚至更多的跃迁式增长,发生关系则会直接带来+30以上的大幅跃升;但同样的行为,对情欲值已经很高的关系（lv3以上）加成会递减,后期的增长更多依赖亲密互动的频率与默契积累,而非单次行为本身的强度。',
   },
   {
     name: '情欲等级',

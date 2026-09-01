@@ -1,11 +1,11 @@
 // ===== 万华镜（Kaleidoscope）index.js — 构建产物，勿手改 =====
-// 构建时间: 2026-09-01 15:56:30 · 文件数: 24 · 指纹: ec28e902
+// 构建时间: 2026-09-01 21:27:08 · 文件数: 24 · 指纹: 4d657e49
 
 // ===== js/constants.js =====
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.4.1';
+const MODULE_VERSION = '1.4.2';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -334,7 +334,7 @@ const VALUES_BUILTIN_KEYS = [
   {
     name: '情欲',
     type: VALUES_KEY_TYPE_PARENT,
-    rule: '情欲值的变化幅度取决于亲密行为的强度,而非日常互动的日积月累——例如:一个暧昧的眼神对视只能有+5左右的小增量,一次亲吻可以带来+20甚至更多的跃迁式增长,发生关系则会直接带来+40以上的大幅跃升;但同样的行为,对情欲值已经很高的关系加成会递减,后期的增长更多依赖亲密互动的频率与默契积累,而非单次行为本身的强度。',
+    rule: '情欲值的变化幅度取决于亲密行为的强度,而非日常互动的日积月累——例如:一个暧昧的眼神对视只能有+5左右的小增量,一次亲吻可以带来+10甚至更多的跃迁式增长,发生关系则会直接带来+30以上的大幅跃升;但同样的行为,对情欲值已经很高的关系（lv3以上）加成会递减,后期的增长更多依赖亲密互动的频率与默契积累,而非单次行为本身的强度。',
   },
   {
     name: '情欲等级',
@@ -8822,9 +8822,12 @@ function serializeValuesGameTree(ctx) {
 // ===== js/values-maintain.js =====
 // ===== 万华镜（Kaleidoscope）变量自动维护：AI 维护管线 =====
 // 触发时机：宿主每轮生成结束（generationEnded）且确实产出了新的 AI 回复。
-// 与 SoulLink 自动档案维护同款稳定设计：
-// - 「generationStarted → generationEnded」配对判定主生成流程，其他插件自行
-//   广播的 generationEnded（无配对 / 末条未变化）直接跳过；
+// 稳定设计（v1.4.2 起，配对守卫自适应）：
+// - 「generationStarted → generationEnded」配对是**加强项而非前提**：确认过宿主
+//   会先发 generationStarted 的（adaptivePairing 置 true），才按配对判定主生成
+//   流程、拦截其他插件自行广播的 generationEnded；从未观察到配对的宿主
+//   （如 TauriTavern 部分版本不发 GENERATION_STARTED）退化为「末条变化 + 去重 +
+//   运行锁 + 中断检查」兜底判定，绝不让自动维护在真实宿主上永远哑火。
 // - 末条签名去重 + 运行锁：同一末条只处理一次，上一轮还在飞时新事件直接跳过；
 // - 中断检查：生成被用户中止时跳过，不对半截回复发起维护；
 // - 失败即跳过本轮：调用失败不降级、不重试轰炸，本轮视为已处理。
@@ -8839,9 +8842,15 @@ const valuesMaintainState = {
   lastSignature: '',
 };
 
-// 主生成流程跟踪：generationStarted 记录末条签名，generationEnded 时末条必须变化。
+// 主生成流程跟踪（自适应配对，同 story-gate 的 strictPairing 思路）：
+// - generationStarted 记录「开始时末条签名」+ 标记本轮见到过 started 事件；
+// - generationEnded 时：startChatSignature 非空 → 严格按配对判定（末条必须变化）；
+//   startChatSignature 为空 → 若从未观察到配对（adaptivePairing=false）则不再拦，
+//   交给后续「末条去重 / 运行锁 / 中断检查」兜底；若确认过配对可用则维持拦截。
+// - generationStopped / chatChanged 清空本轮跟踪（残留签名不跨轮复用）。
 const valuesMainGenerationState = {
   startChatSignature: '',
+  adaptivePairing: false,
 };
 
 function buildValuesSignature(message) {
@@ -8858,6 +8867,8 @@ function onValuesGenerationStarted() {
   const chat = Array.isArray(ctx?.chat) ? ctx.chat : [];
   const last = chat[chat.length - 1];
   valuesMainGenerationState.startChatSignature = last ? buildValuesSignature(last) : '';
+  // 宿主确实会发 generationStarted：此后启用严格配对（拦截无配对的 generationEnded）。
+  valuesMainGenerationState.adaptivePairing = true;
 }
 
 function onValuesGenerationStopped() {
@@ -9040,7 +9051,7 @@ async function runValuesMaintain(ctx, settings, options = {}) {
   }
 }
 
-// generationEnded 入口：主生成配对 + 末条变化 + 去重 + 运行锁 + 配置检查。
+// generationEnded 入口：自适应主生成配对 + 末条变化 + 去重 + 运行锁 + 配置检查。
 async function onValuesGenerationEnded() {
   const ctx = getContextSafe();
   if (!ctx) return;
@@ -9064,15 +9075,22 @@ async function onValuesGenerationEnded() {
     logApp('debug', '变量维护跳过：末条不是 AI 回复');
     return;
   }
-  // 非主生成流程的 generationEnded（其他插件自行广播）直接跳过。
-  if (valuesMainGenerationState.startChatSignature === '') {
-    logApp('debug', '变量维护跳过：非主生成流程的 generationEnded');
-    return;
-  }
+  // 主生成流程判定（自适应配对）：
+  // - 宿主确认会发 generationStarted（adaptivePairing=true）→ 严格配对：无配对的
+  //   generationEnded（其他插件自行广播）直接跳过；
+  // - 宿主从未发过 generationStarted（TauriTavern 部分版本如此）→ 不再因缺配对
+  //   跳过，交给下方「末条签名去重 + 运行锁 + 中断检查」兜底防误触发。
+  // - 配对在途（startChatSignature 非空）→ 一律按配对走，无论 adaptivePairing。
   const startSignature = valuesMainGenerationState.startChatSignature;
   valuesMainGenerationState.startChatSignature = '';
   const signature = buildValuesSignature(lastMessage);
-  if (signature === startSignature) {
+  if (startSignature === '') {
+    if (valuesMainGenerationState.adaptivePairing) {
+      logApp('debug', '变量维护跳过：非主生成流程的 generationEnded');
+      return;
+    }
+    logApp('debug', '变量维护：宿主无 generationStarted 配对，按末条变化兜底判定');
+  } else if (signature === startSignature) {
     logApp('debug', '变量维护跳过：末条消息未变化');
     return;
   }

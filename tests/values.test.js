@@ -1067,4 +1067,127 @@ runner.test('删除依赖检查：公式引用者被列为依赖', () => {
   assert(ctx.getValuesChildKeysByRef(c, '美貌值').length === 0, '未引用不误报');
 });
 
+// ---------- generationEnded 自适应配对入口 ----------
+// onValuesGenerationEnded 经 getContextSafe() 读宿主上下文：测试里 stub
+// globalThis.Luker.getContext 返回当前用例的 ctx，测完还原。
+// ---------- generationEnded 自适应配对入口 ----------
+// 重置维护模块运行态：前一个测试可能残留 lastSignature / running / 配对跟踪，
+// 残留会让本测试被「本轮已处理」等守卫误跳过（跨测试状态污染）。
+function resetMaintainRuntime() {
+  const vm = require('vm');
+  vm.runInContext('valuesMaintainState.lastSignature = ""; valuesMaintainState.running = false;'
+    + 'valuesMainGenerationState.startChatSignature = ""; valuesMainGenerationState.adaptivePairing = false;', ctx);
+}
+
+function withHostContext(c, fn) {
+  const previous = sandbox.Luker;
+  sandbox.Luker = { getContext: () => c };
+  return Promise.resolve()
+    .then(() => {
+      resetMaintainRuntime();
+    })
+    .then(fn)
+    .finally(() => {
+      sandbox.Luker = previous;
+    });
+}
+
+function makeEndedCtx(chatCompletion) {
+  const c = makeChatCtx();
+  c.chat = [
+    { is_user: true, name: '玩家', mes: '送你礼物' },
+    { is_user: false, name: '角色', mes: '谢谢！' },
+  ];
+  c.chatMetadata = {};
+  c.saveChat = () => {};
+  ctx.upsertValuesKey(c, '好感度', '友好互动 +5');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['好感度'], 20);
+  ctx.chatCompletion = chatCompletion;
+  const settings = ctx.getSettings(c);
+  settings.apiUrl = 'https://example.com/v1';
+  settings.model = 'test-model';
+  return c;
+}
+
+runner.test('维护入口：宿主从不发 generationStarted 时仍能自动维护（兜底判定）', async () => {
+  const c = makeEndedCtx(async () => '{"好感度": 40}');
+  // 模拟 TauriTavern：只广播 generationEnded，无 generationStarted 配对。
+  // adaptivePairing=false（默认）：不应被「非主生成流程」拦下。
+  await withHostContext(c, () => ctx.onValuesGenerationEnded());
+  const state = ctx.getValuesChatState(c);
+  assert(state && state.values['好感度'] === 40, '无配对宿主上 generationEnded 应触发维护并写入游戏值');
+});
+
+runner.test('维护入口：确认过配对的宿主上，无配对的 generationEnded 被拦截', async () => {
+  const c = makeEndedCtx(async () => '{"好感度": 40}');
+  // 模拟完整时序：generationStarted 时末条还是「用户消息」（AI 楼层尚未写入），
+  // 生成结束后新增 AI 楼层 → 末条变化 → 配对命中，正常维护。
+  sandbox.Luker = { getContext: () => c };
+  try {
+    resetMaintainRuntime();
+    c.chat = [{ is_user: true, name: '玩家', mes: '送你礼物' }];
+    ctx.onValuesGenerationStarted();
+    c.chat.push({ is_user: false, name: '角色', mes: '谢谢！' });
+    await ctx.onValuesGenerationEnded();
+    const state = ctx.getValuesChatState(c);
+    assert(state && state.values['好感度'] === 40, '配对在途时应正常维护');
+    // 再来一轮「只有 ended、没有 started」的广播（其他插件误触发）：应被拦截。
+    ctx.chatCompletion = async () => '{"好感度": 99}';
+    await ctx.onValuesGenerationEnded();
+    assert(ctx.getValuesChatState(c).values['好感度'] === 40, '确认过配对后，无配对的 generationEnded 不应触发维护');
+  } finally {
+    sandbox.Luker = undefined;
+    resetMaintainRuntime();
+  }
+});
+
+runner.test('维护入口：确认过配对的宿主上，started→ended 末条未变化被跳过', async () => {
+  const c = makeEndedCtx(async () => '{"好感度": 40}');
+  // started 与 ended 之间末条没变（插件广播 / 事件重放）：配对判定拦截。
+  sandbox.Luker = { getContext: () => c };
+  try {
+    resetMaintainRuntime();
+    ctx.onValuesGenerationStarted();
+    await ctx.onValuesGenerationEnded();
+    assert(!ctx.getValuesChatState(c), '末条未变化不应触发维护');
+  } finally {
+    sandbox.Luker = undefined;
+    resetMaintainRuntime();
+  }
+});
+
+runner.test('维护入口：末条是用户消息 / 重复末条在兜底模式下仍被跳过', async () => {
+  const c = makeEndedCtx(async () => '{"好感度": 55}');
+  sandbox.Luker = { getContext: () => c };
+  try {
+    resetMaintainRuntime();
+    // 末条是用户消息：不应触发维护
+    c.chat = [{ is_user: true, name: '玩家', mes: '你好' }];
+    await ctx.onValuesGenerationEnded();
+    assert(!ctx.getValuesChatState(c), '末条是用户消息不应触发维护');
+    // 兜底模式：同一末条签名只处理一次，重复 ended 不重复维护
+    c.chat = [
+      { is_user: true, name: '玩家', mes: '送你礼物' },
+      { is_user: false, name: '角色', mes: '谢谢！' },
+    ];
+    await ctx.onValuesGenerationEnded();
+    assert(ctx.getValuesChatState(c).values['好感度'] === 55, '第一轮应正常维护');
+    ctx.chatCompletion = async () => '{"好感度": 99}';
+    await ctx.onValuesGenerationEnded();
+    assert(ctx.getValuesChatState(c).values['好感度'] === 55, '同签名重复 ended 不应重复维护');
+    // chatChanged 清空配对跟踪：同一聊天里末条推进后可再次维护（去重签名按末条变化自然放行）
+    ctx.onValuesChatChanged();
+    c.chat = [
+      { is_user: true, name: '玩家', mes: '再聊聊' },
+      { is_user: false, name: '角色', mes: '好的，换了个话题' },
+    ];
+    ctx.chatCompletion = async () => '{"好感度": 60}';
+    await ctx.onValuesGenerationEnded();
+    assert(ctx.getValuesChatState(c).values['好感度'] === 60, 'chatChanged 后新末条应正常维护');
+  } finally {
+    sandbox.Luker = undefined;
+    resetMaintainRuntime();
+  }
+});
+
 runner.run();
