@@ -1,11 +1,11 @@
 // ===== 万华镜（Kaleidoscope）index.js — 构建产物，勿手改 =====
-// 构建时间: 2026-09-01 22:14:27 · 文件数: 24 · 指纹: 89738613
+// 构建时间: 2026-09-02 00:23:22 · 文件数: 24 · 指纹: a282a1ec
 
 // ===== js/constants.js =====
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.4.3';
+const MODULE_VERSION = '1.4.4';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -5836,6 +5836,12 @@ function importPromptPreset(ctx, parsed) {
 // 流程：Gate（剧情预筛提示词 + 事件目录 + 最近 4 条消息）→ 解析事件 ID →
 // 拼接 <Story_Event> 块 → setExtensionPrompt(IN_CHAT, depth 0, SYSTEM) 注入到
 // 最后一条用户消息正下方 → 恢复发送；generationEnded / generationStopped 后清空注入。
+// 重新生成（retry）：宿主 Generate('regenerate') 全程不发 messageSent，只在开头发
+// generationStarted（第一参数为 'regenerate'）——此监听器经 onHostEvent 是同步调用
+// （宿主 emit 会 await 监听器，但 onHostEvent 包装器不 await promise），因此重放必须
+// 在处理器内同步完成 setExtensionPrompt，才能赶在宿主组装主请求 prompt 之前生效。
+// 已知限制：群聊「重新生成」删完尾部 AI 楼层后以 type='normal' 重新生成，无法与
+// 群聊正常发送（事件触发时用户消息尚未提交）区分，不覆盖。
 // 稳定性设计（参考 SoulLink 角色预筛 Gate，针对「发送前阻塞」加固）：
 // - 运行锁 + 签名去重：上一轮预筛还在飞时新发送直接放行（本轮内容已覆盖）；
 // - 载荷校验：messageSent 载荷（文本或消息 ID）必须与末条消息一致，其他插件
@@ -6032,9 +6038,98 @@ function buildStoryGateSignature(message) {
   ].join('|');
 }
 
+// 找到当前触发预筛的那条用户消息（retry 时末条是 AI 楼层，需向前回溯最后一条
+// 用户消息），供重放校验「触发消息仍是同一条」使用；找不到时返回 null。
+function findLastUserMessage(chat) {
+  if (!Array.isArray(chat)) return null;
+  for (let i = chat.length - 1; i >= 0; i--) {
+    if (chat[i]?.is_user) return chat[i];
+  }
+  return null;
+}
+
+// 重新生成（retry）重放：上一轮预筛已注入的事件在本轮原样重放。
+// 宿主 retry（Generate('regenerate')）不发 messageSent，预筛管线不会运行；但同一
+// 触发点的判定结论不会变（触发预筛的用户消息、事件目录都没变），因此不重新调用
+// Gate API（避免再次阻塞/等待网络），也不重复应用事件效果（applyValuesTriggerEffects
+// 的加减值会重复计入），只按当前事件目录重新校验入选 ID 后重建注入文本并注入。
+// 校验链（任一不满足则静默放行，绝不阻塞生成）：
+// - 开关开启、上一轮记录存在且 injected=true（0 入选 / 超时 / 失败的轮次无可重放）；
+// - 上一轮的触发用户消息签名与当前聊天中最后一条用户消息一致（期间用户改了消息、
+//   换聊天等场景下结论已失效）；
+// - 入选 ID 与当前激活事件求交集后仍有剩余（事件被删或所在节点被停用则丢弃）。
+// 同步执行：必须在宿主组装 prompt 前完成 setExtensionPrompt（见文件头注释）。
+function replayStoryGateForRetry(ctx, settings) {
+  const round = globalThis[STORY_GATE_LAST_ROUND_KEY] || null;
+  if (!round || !round.injected || !Array.isArray(round.selectedEvents) || round.selectedEvents.length === 0) {
+    logApp('debug', '重新生成：上一轮无已注入的预筛结果，跳过重放');
+    return;
+  }
+  const lastUserMessage = findLastUserMessage(ctx?.chat);
+  if (!lastUserMessage) {
+    logApp('debug', '重新生成：聊天中没有用户消息，跳过重放');
+    return;
+  }
+  const signature = buildStoryGateSignature(lastUserMessage);
+  if (!signature || signature !== String(round.triggerSignature || '')) {
+    logApp('debug', '重新生成：触发消息与上一轮预筛不一致，跳过重放');
+    return;
+  }
+  const scripts = getStoryActiveScripts(ctx);
+  const scriptMap = new Map(scripts.map((script) => [String(script.id), script]));
+  const selected = [];
+  for (const event of round.selectedEvents) {
+    const script = scriptMap.get(String(event?.id || ''));
+    if (script) selected.push(script);
+  }
+  if (selected.length === 0) {
+    logApp('debug', '重新生成：上一轮入选事件已不存在或均已停用，跳过重放');
+    return;
+  }
+  const api = getStoryGateExtensionPromptApi(ctx);
+  if (!api) {
+    logApp('warn', '重新生成：宿主不支持提示词注入，跳过重放');
+    return;
+  }
+  try {
+    const injectionText = buildStoryGateInjectionText(ctx, selected);
+    clearStoryGateInjection(ctx);
+    api.setExtensionPrompt(STORY_GATE_INJECT_KEY, injectionText, api.inChat, 0, false, api.systemRole);
+    // 更新最近一轮记录：内容不变（selectedEvents / raw 原样保留），标记 retried 供
+    // 注入实录区分展示；durationMs / triggeredAt 重置为本轮，首页状态随之刷新。
+    globalThis[STORY_GATE_LAST_ROUND_KEY] = {
+      ...round,
+      triggeredAt: new Date().toISOString(),
+      durationMs: 0,
+      totalEvents: scripts.length,
+      selectedIds: selected.map((script) => script.id),
+      selectedEvents: selected.map((script) => ({
+        id: script.id,
+        name: script.name,
+        trigger: script.trigger,
+        description: script.description,
+        content: script.content,
+      })),
+      injectionText,
+      injected: true,
+      skipped: false,
+      timedOut: false,
+      retried: true,
+    };
+    try {
+      refreshHomeInjectStatus();
+    } catch {}
+    logApp('info', '重新生成：已重放上一轮预筛事件', selected.length + ' 个事件', selected.map((script) => script.id));
+    globalThis.toastr?.success?.('重新生成：已重放 ' + selected.length + ' 个预筛事件', '[' + MODULE_DISPLAY_NAME + ']');
+  } catch (error) {
+    logApp('warn', '重新生成：重放预筛失败，直接放行', String(error?.message || error));
+  }
+}
+
 // 单轮完整管线：Gate → 解析 → 注入。任何一步失败都按「降级放行」处理，
 // 绝不让发送流程卡死；总耗时受 STORY_GATE_TIMEOUT_MS 硬截止。
-async function runStoryGatePipeline(ctx, settings) {
+// signature：本轮触发消息的签名（由屏障任务算出），随轮次记录，供 retry 重放校验。
+async function runStoryGatePipeline(ctx, settings, signature = '') {
   const startedAt = Date.now();
   const controller = new AbortController();
   const deadline = setTimeout(() => controller.abort(), STORY_GATE_TIMEOUT_MS);
@@ -6051,6 +6146,7 @@ async function runStoryGatePipeline(ctx, settings) {
     injected: false,
     skipped: false,
     timedOut: false,
+    triggerSignature: String(signature || ''),
   };
   const finish = (overrides = {}) => {
     clearTimeout(deadline);
@@ -6189,7 +6285,7 @@ function runStoryGateBarrierTask(ctx, payload) {
   }
   storyGateState.running = true;
   storyGateState.lastSignature = signature;
-  return runStoryGatePipeline(ctx, settings)
+  return runStoryGatePipeline(ctx, settings, signature)
     .catch((error) => {
       console.error('[' + MODULE_DISPLAY_NAME + '] 剧情预筛任务异常', error);
     })
@@ -6240,8 +6336,23 @@ function installStoryGateMessageSentHook(ctx) {
 }
 
 // 生成开始：标记主生成在途，供 messageSent 主生成配对使用。
-function onStoryGateGenerationStarted() {
+// 宿主 Generate 的第一参数是类型字符串：retry 为 'regenerate'，正常发送为 'normal'。
+// retry 全程不发 messageSent（预筛管线不会运行），在此同步重放上一轮入选事件——
+// 必须在宿主组装主请求 prompt 之前完成注入，因此这里不能有 await（见文件头注释）。
+// swipe / quiet / impersonate / continue 不重放：swipe 是对同一消息换新回复，预筛
+// 结论已随上一轮生成落地；quiet / impersonate / continue 不是「重放刚发送那一轮」。
+function onStoryGateGenerationStarted(type) {
   storyGateState.generationInProgress = true;
+  if (String(type) !== 'regenerate') return;
+  try {
+    const ctx = getContextSafe();
+    if (!ctx) return;
+    const settings = getSettings(ctx);
+    if (settings.storyGateEnabled === false) return;
+    replayStoryGateForRetry(ctx, settings);
+  } catch (error) {
+    logApp('warn', '重新生成：预筛重放流程异常，直接放行', String(error?.message || error));
+  }
 }
 
 // 生成结束 / 停止后清空注入并复位生成状态：保证 swipes / 重生成 / 后续轮次

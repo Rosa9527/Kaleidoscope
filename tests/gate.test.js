@@ -378,5 +378,109 @@ runner.test('messageSent 主生成配对：无生成在途时跳过，生成在�
   assert(injectCount() === 2, '无生成在途应跳过');
 });
 
+// ---------- retry 重放 ----------
+// 宿主「重新生成」不发 messageSent，只在开头发 generationStarted（type='regenerate'）；
+// 重放在处理器内同步完成（不调 Gate API、不重复应用事件效果）。
+// 注意：onStoryGateGenerationStarted 内部经 getContextSafe() 取上下文，需指向用例 c。
+runner.test('retry 重放：regenerate 时重放上一轮入选事件，效果不重复应用', async () => {
+  const c = fresh();
+  sandbox.Luker.getContext = () => c;
+  const { rain } = makeStory(c);
+  ctx.updateStoryScript(c, rain.id, { effects: [{ path: '张三/好感', op: 'add', value: 30 }] });
+  ctx.upsertValuesKey(c, '好感', '规则');
+  ctx.saveValuesChatState(c, { 张三: { 好感: 30 } }, {});
+  c.chat = [{ is_user: false, name: '蕾姆', mes: '你来了。', id: 0 }, { is_user: true, mes: '我推开门', id: 1 }];
+  setupApi(c);
+  const calls = [];
+  c.setExtensionPrompt = (key, text) => calls.push({ key, text });
+  sandbox.chatCompletion = async () => '{"events":["001"]}';
+  // 正常发送一轮：预筛并注入（记录触发签名），事件效果生效
+  await ctx.runStoryGatePipeline(c, ctx.getSettings(c), ctx.buildStoryGateSignature(c.chat[c.chat.length - 1]));
+  assert(calls.length === 2, '首轮应注入');
+  assert(ctx.getValuesChatState(c).values.张三.好感 === 60, '首轮效果应把 30 加到 60');
+
+  // 模拟 retry：宿主生成完成后 AI 回复已入楼（末条为 AI），retry 删掉末条 AI 楼层
+  // （末条回到用户消息）后重新生成
+  c.chat.push({ is_user: false, name: '蕾姆', mes: '推门后，雨声渐密。', id: 2 });
+  c.chat.pop();
+  calls.length = 0;
+  sandbox.chatCompletion = async () => { throw new Error('重放不应再调用 Gate API'); };
+  ctx.onStoryGateGenerationStarted('regenerate');
+  assert(calls.length === 2, '重放应先清旧注入再写入新注入');
+  const replay = calls.find((call) => call.key === INJECT_KEY && call.text.includes('雨声渐密'));
+  assert(Boolean(replay), '重放应注入事件正文');
+  const round = sandbox[LAST_ROUND_KEY];
+  assert(round && round.retried === true, '应标记重放轮');
+  assert(round.injected === true && round.selectedIds.length === 1 && round.selectedIds[0] === '001', '重放轮应记录入选 ID');
+  assert(round.selectedEvents[0].content === '雨声渐密，窗棂轻响。', '重放轮应保留事件详情');
+  assert(round.injectionText.includes('<Story_Event>'), '重放轮应更新注入原文');
+  assert(ctx.getValuesChatState(c).values.张三.好感 === 60, '重放不得重复应用事件效果');
+});
+
+runner.test('retry 重放：normal / swipe 等类型不触发', async () => {
+  const c = fresh();
+  makeStory(c);
+  c.chat = [{ is_user: true, mes: '我推开门', id: 1 }];
+  setupApi(c);
+  const calls = [];
+  c.setExtensionPrompt = (key, text) => calls.push({ key, text });
+  sandbox.chatCompletion = async () => '{"events":["001"]}';
+  await ctx.runStoryGatePipeline(c, ctx.getSettings(c), ctx.buildStoryGateSignature(c.chat[c.chat.length - 1]));
+  sandbox.chatCompletion = async () => { throw new Error('不应被调用'); };
+  calls.length = 0;
+  ctx.onStoryGateGenerationStarted('normal');
+  ctx.onStoryGateGenerationStarted('swipe');
+  ctx.onStoryGateGenerationStarted(undefined);
+  assert(calls.length === 0, '非 regenerate 类型不应注入');
+  assert(sandbox[LAST_ROUND_KEY].retried === undefined, '不应标记重放轮');
+});
+
+runner.test('retry 重放：上一轮未注入（0 入选 / 失败）不重放', async () => {
+  const c = fresh();
+  makeStory(c);
+  c.chat = [{ is_user: true, mes: '我推开门', id: 1 }];
+  setupApi(c);
+  const calls = [];
+  c.setExtensionPrompt = (key, text) => calls.push({ key, text });
+  // 0 入选：跳过轮
+  sandbox.chatCompletion = async () => '{"events":[]}';
+  await ctx.runStoryGatePipeline(c, ctx.getSettings(c), ctx.buildStoryGateSignature(c.chat[c.chat.length - 1]));
+  calls.length = 0;
+  ctx.onStoryGateGenerationStarted('regenerate');
+  assert(calls.length === 0, '上一轮 0 入选不应重放');
+  // 失败轮
+  sandbox.chatCompletion = async () => { throw new Error('上游超时'); };
+  await ctx.runStoryGatePipeline(c, ctx.getSettings(c), ctx.buildStoryGateSignature(c.chat[c.chat.length - 1]));
+  calls.length = 0;
+  ctx.onStoryGateGenerationStarted('regenerate');
+  assert(calls.length === 0, '上一轮失败不应重放');
+  assert(sandbox[LAST_ROUND_KEY].retried === undefined, '未重放不应标记');
+});
+
+runner.test('retry 重放：触发消息已变化或入选事件已停用时跳过', async () => {
+  const c = fresh();
+  sandbox.Luker.getContext = () => c;
+  const { rain } = makeStory(c);
+  c.chat = [{ is_user: true, mes: '我推开门', id: 1 }];
+  setupApi(c);
+  const calls = [];
+  c.setExtensionPrompt = (key, text) => calls.push({ key, text });
+  sandbox.chatCompletion = async () => '{"events":["001"]}';
+  await ctx.runStoryGatePipeline(c, ctx.getSettings(c), ctx.buildStoryGateSignature(c.chat[c.chat.length - 1]));
+  sandbox.chatCompletion = async () => { throw new Error('不应被调用'); };
+
+  // 签名不符：末条用户消息文本被用户改过（重试时结论已失效）
+  c.chat[c.chat.length - 1].mes = '我改了内容';
+  calls.length = 0;
+  ctx.onStoryGateGenerationStarted('regenerate');
+  assert(calls.length === 0, '触发消息变化不应重放');
+
+  // 入选事件所在节点被停用：交集为空，不重放
+  c.chat[c.chat.length - 1].mes = '我推开门';
+  ctx.toggleStoryNodeEnabled(c, ctx.getStoryNodes(c)[0].id);
+  ctx.onStoryGateGenerationStarted('regenerate');
+  assert(calls.length === 0, '入选事件全部失效不应重放');
+});
+
 runner.run();
 
