@@ -310,6 +310,11 @@ function showPanelView(viewId) {
     title.textContent = PANEL_VIEW_TITLES[viewId] || MODULE_DISPLAY_NAME;
     title.classList.toggle('is-homepage', viewId === HOME_VIEW_ID);
   }
+  if (viewId === HOME_VIEW_ID) {
+    // 从日志页等返回首页时全量刷新首页卡片状态，避免残留打开面板那一刻的旧读数
+    //（如日志已清空仍显示「1 警告」）。openPanel 也是这么刷的，保持一致。
+    refreshHomeStatuses();
+  }
   if (viewId === LOG_VIEW_ID) {
     renderLogList();
     updateLogStats();
@@ -757,7 +762,10 @@ async function checkLatestVersion(force = false) {
     node.dataset.state = 'error';
     node.textContent = '检查失败，点击重试';
     node.title = '联网检查最新版本失败，点击重试';
-    logApp('warn', `版本检查失败: ${String(error?.message || error)}`);
+    // 自动检查失败只记 debug：离线 / 网络受限环境每次打开面板都会失败，记 warn 会让
+    // 首页常驻「1 警告」；失败状态在版本 UI（「检查失败，点击重试」）仍然可见。
+    // 手动点击重试仍记 warn——用户主动触发，值得一条警告。
+    logApp(force ? 'warn' : 'debug', `版本检查失败: ${String(error?.message || error)}`);
   }
 }
 

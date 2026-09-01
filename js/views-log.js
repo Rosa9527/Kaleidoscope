@@ -611,6 +611,9 @@ function updateLogStats() {
     paused.hidden = !logState.paused;
     if (logState.paused) paused.textContent = `已暂停 · 新增 +${logState.pausedCount}`;
   }
+  // 首页「系统日志」卡片与这里的统计同源（logEntries）：清空 / 新增警告后回首页，
+  // 徽标不能残留打开面板那一刻的旧文字（如清空后仍显示「1 警告」）。
+  refreshHomeLogStatus();
   logVisibleCount = getVisibleLogEntries().length;
   syncLogNote(document.getElementById(LOG_LIST_ID));
 }

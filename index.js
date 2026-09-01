@@ -1,11 +1,11 @@
 // ===== 万华镜（Kaleidoscope）index.js — 构建产物，勿手改 =====
-// 构建时间: 2026-09-01 12:55:03 · 文件数: 24 · 指纹: 7fd577c9
+// 构建时间: 2026-09-01 15:56:30 · 文件数: 24 · 指纹: ec28e902
 
 // ===== js/constants.js =====
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.4.0';
+const MODULE_VERSION = '1.4.1';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -1923,6 +1923,11 @@ function showPanelView(viewId) {
     title.textContent = PANEL_VIEW_TITLES[viewId] || MODULE_DISPLAY_NAME;
     title.classList.toggle('is-homepage', viewId === HOME_VIEW_ID);
   }
+  if (viewId === HOME_VIEW_ID) {
+    // 从日志页等返回首页时全量刷新首页卡片状态，避免残留打开面板那一刻的旧读数
+    //（如日志已清空仍显示「1 警告」）。openPanel 也是这么刷的，保持一致。
+    refreshHomeStatuses();
+  }
   if (viewId === LOG_VIEW_ID) {
     renderLogList();
     updateLogStats();
@@ -2370,7 +2375,10 @@ async function checkLatestVersion(force = false) {
     node.dataset.state = 'error';
     node.textContent = '检查失败，点击重试';
     node.title = '联网检查最新版本失败，点击重试';
-    logApp('warn', `版本检查失败: ${String(error?.message || error)}`);
+    // 自动检查失败只记 debug：离线 / 网络受限环境每次打开面板都会失败，记 warn 会让
+    // 首页常驻「1 警告」；失败状态在版本 UI（「检查失败，点击重试」）仍然可见。
+    // 手动点击重试仍记 warn——用户主动触发，值得一条警告。
+    logApp(force ? 'warn' : 'debug', `版本检查失败: ${String(error?.message || error)}`);
   }
 }
 
@@ -3416,6 +3424,9 @@ function updateLogStats() {
     paused.hidden = !logState.paused;
     if (logState.paused) paused.textContent = `已暂停 · 新增 +${logState.pausedCount}`;
   }
+  // 首页「系统日志」卡片与这里的统计同源（logEntries）：清空 / 新增警告后回首页，
+  // 徽标不能残留打开面板那一刻的旧文字（如清空后仍显示「1 警告」）。
+  refreshHomeLogStatus();
   logVisibleCount = getVisibleLogEntries().length;
   syncLogNote(document.getElementById(LOG_LIST_ID));
 }
