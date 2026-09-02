@@ -1,12 +1,14 @@
-// ===== 万华镜（Kaleidoscope）地图系统：游戏模式地图展示 + 变量工作台地图编辑器 =====
+// ===== 万华镜（Kaleidoscope）地图系统：首页入口 + 游戏模式地图展示 + 地图编辑器 =====
 // 两个入口：
 // - 游戏模式（视图内切换）：背景图 + 地点标记的只读展示，数据源与编辑器一致
 //   （getMapBundle：角色卡优先、全局设置兜底）。
-// - 变量工作台「游戏地图」tab：上传图片 → 裁剪成背景 → 双击建点 / 拖动移动 /
-//   选中改名，全部编辑先落内存（mapEditorState），点「保存」才写角色卡。
+// - 地图编辑器（首页「游戏地图」卡片 / 游戏模式空态「去编辑地图」进入）：
+//   上传图片 → 裁剪成背景 → 双击建点 / 拖动移动 / 选中改名，全部编辑先落内存
+//   （mapEditorState），点「保存」才写角色卡。电脑端开独立大窗口工作台、
+//   手机端切面板内视图（与剧情脉络 / 变量系统同款双形态）。
 // 地点坐标一律按背景图百分比（0~100）存取，展示与编辑按比例缩放对齐。
-// 编辑舞台限高（60vh）内部滚动（工作台是固定高度容器，无外层滚动兜底）；
-// 坐标与地点层的基准是画布层 canvas（背景图完整显示区，随滚动移动）。
+// 编辑舞台限高（60vh）内部滚动；坐标与地点层的基准是画布层 canvas
+// （背景图完整显示区，随滚动移动）。
 
 // ---------- 编辑器内存态 ----------
 // { card, dirty, selectedId, rawDataURL, rawImage }
@@ -56,11 +58,11 @@ function renderGameMap(ctx) {
     empty.innerHTML = `
       <span class="kaleido-game-map__empty-icon"><span class="${MAP_ICON_CLASS}"></span></span>
       <p class="kaleido-game-map__empty-title">暂无地图</p>
-      <p class="kaleido-game-map__empty-text">到「变量系统 → 游戏地图」上传背景图、双击添加地点，<br/>保存后这里就能看到当前角色的地图。</p>
+      <p class="kaleido-game-map__empty-text">到首页「游戏地图」上传背景图、双击添加地点，<br/>保存后这里就能看到当前角色的地图。</p>
       <button type="button" id="${MAP_GO_EDIT_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--primary">去编辑地图</button>
     `;
     pane.appendChild(empty);
-    document.getElementById(MAP_GO_EDIT_ID)?.addEventListener('click', () => openValuesMapTab());
+    document.getElementById(MAP_GO_EDIT_ID)?.addEventListener('click', () => openMapEditor());
     return;
   }
   const frame = document.createElement('div');
@@ -142,9 +144,9 @@ function buildMapEditorHTML() {
   `;
 }
 
-// 渲染入口：tab 激活 / 首次打开时调用；内容只建一次，之后按状态刷新。
+// 渲染入口：编辑器打开 / 首次打开时调用；内容只建一次，之后按状态刷新。
 function renderMapEditor() {
-  const pane = document.getElementById(VALUES_MAP_PANE_ID);
+  const pane = document.getElementById(MAP_WORKBENCH_PANE_ID);
   if (!pane) return;
   ensureMapEditorState();
   if (!pane.dataset.ready) {
@@ -708,6 +710,96 @@ function bindMapCropBoxEvents() {
 }
 
 // ---------- 装配入口（ui-shell createPanel 调用） ----------
-function initMapSection() {
+// 电脑端：独立大窗口工作台（与变量工作台同款全屏遮罩 + 960×680）。
+function initMapWorkbench() {
+  if (getMapWorkbench()) return;
+  const dialog = document.createElement('div');
+  dialog.id = MAP_DIALOG_ID;
+  dialog.className = 'kaleido-map-workbench-dialog';
+  dialog.setAttribute('aria-hidden', 'true');
+  dialog.innerHTML = `
+    <div class="kaleido-map-workbench-dialog__inner" role="dialog" aria-label="游戏地图工作台">
+      <div class="kaleido-map-workbench-dialog__header">
+        <span class="kaleido-map-workbench-dialog__title"><span class="${MAP_ICON_CLASS}"></span> 游戏地图</span>
+        <span id="${MAP_BINDING_ID}" class="kaleido-values__binding" data-state="idle" title="地图存储绑定状态">未绑定角色</span>
+        <div class="kaleido-map-workbench-dialog__toolbar">
+          <button type="button" id="${MAP_CLOSE_BTN_ID}" class="kaleido-icon-btn" title="关闭工作台" aria-label="关闭工作台">✕</button>
+        </div>
+      </div>
+      <div class="kaleido-map-workbench-dialog__body">
+        <div id="${MAP_WORKBENCH_PANE_ID}"></div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(dialog);
+  document.getElementById(MAP_CLOSE_BTN_ID)?.addEventListener('click', closeMapWorkbench);
+  if (!globalThis[MAP_DIALOG_KEY]) {
+    globalThis[MAP_DIALOG_KEY] = (event) => {
+      if (event.key !== 'Escape') return;
+      // 裁剪弹层开着时先由地图模块自己的 Esc 处理器关闭，这里不抢。
+      if (isMapCropDialogOpen()) return;
+      if (isMapWorkbenchOpen()) closeMapWorkbench();
+    };
+    document.addEventListener('keydown', globalThis[MAP_DIALOG_KEY]);
+  }
+}
+
+function getMapWorkbench() {
+  return document.getElementById(MAP_DIALOG_ID);
+}
+
+function isMapWorkbenchOpen() {
+  const dialog = getMapWorkbench();
+  return Boolean(dialog && dialog.classList.contains('is-open'));
+}
+
+function openMapWorkbench() {
+  const dialog = getMapWorkbench();
+  if (!dialog) return;
+  dialog.classList.add('is-open');
+  dialog.setAttribute('aria-hidden', 'false');
+  renderMapEditor();
+  logApp('debug', '地图工作台已打开');
+}
+
+function closeMapWorkbench() {
+  const dialog = getMapWorkbench();
+  if (!dialog) return;
+  dialog.classList.remove('is-open');
+  dialog.setAttribute('aria-hidden', 'true');
+  logApp('debug', '地图工作台已关闭');
+}
+
+// 手机端：面板内视图（与其它功能一致，共用面板标题栏与返回键）。
+function initMapPanelView(panel) {
+  if (!panel || document.getElementById(MAP_VIEW_ID)) return;
+  const section = document.createElement('section');
+  section.id = MAP_VIEW_ID;
+  section.className = 'kaleido-view kaleido-map-view';
+  section.setAttribute('aria-hidden', 'true');
+  section.innerHTML = `
+    <div id="${MAP_WORKBENCH_PANE_ID}" class="kaleido-map-view__body"></div>
+  `;
+  panel.querySelector('.kaleido-panel__body')?.appendChild(section);
+}
+
+// ---------- 统一打开入口 ----------
+// 首页卡片 / 游戏模式空态「去编辑地图」都走这里：电脑端开工作台、手机端切
+// 面板视图；地图编辑器内容懒渲染（每次打开都刷新，保证读到最新绑定状态）。
+function openMapEditor() {
+  if (isNarrowViewport()) {
+    showPanelView(MAP_VIEW_ID);
+  } else {
+    openMapWorkbench();
+  }
+  renderMapEditor();
+}
+
+function initMapSection(panel) {
   initMapCropDialog();
+  if (isNarrowViewport()) {
+    initMapPanelView(panel);
+  } else {
+    initMapWorkbench();
+  }
 }

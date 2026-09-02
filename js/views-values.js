@@ -1857,10 +1857,10 @@ function setValuesPaneActive(paneId, active) {
   pane.hidden = !active;
 }
 
-// 统一 tab 切换：5 个 tab 的 is-active 与 5 个 pane 的显隐一次到位，
+// 统一 tab 切换：4 个 tab 的 is-active 与 4 个 pane 的显隐一次到位，
 // 并收尾打开中的编辑器 / 新建菜单。
 function setValuesTabActive(tabId) {
-  const tabs = [VALUES_TAB_TREE_ID, VALUES_TAB_KEYS_ID, VALUES_TAB_TRIGGERS_ID, VALUES_TAB_INJECT_ID, VALUES_TAB_MAP_ID];
+  const tabs = [VALUES_TAB_TREE_ID, VALUES_TAB_KEYS_ID, VALUES_TAB_TRIGGERS_ID, VALUES_TAB_INJECT_ID];
   for (const id of tabs) {
     const tab = document.getElementById(id);
     if (tab) tab.classList.toggle('is-active', id === tabId);
@@ -1869,23 +1869,10 @@ function setValuesTabActive(tabId) {
   setValuesPaneActive(VALUES_KEYS_PANE_ID, tabId === VALUES_TAB_KEYS_ID);
   setValuesPaneActive(VALUES_TRIGGERS_PANE_ID, tabId === VALUES_TAB_TRIGGERS_ID);
   setValuesPaneActive(VALUES_INJECT_PANE_ID, tabId === VALUES_TAB_INJECT_ID);
-  setValuesPaneActive(VALUES_MAP_PANE_ID, tabId === VALUES_TAB_MAP_ID);
   closeValuesEditor();
   closeValuesKeyEditor();
   closeValuesTriggerEditor();
   closeValuesAddMenu();
-}
-
-// 打开「游戏地图」编辑器：桌面开工作台 / 手机切面板视图，并激活地图 tab。
-// （游戏模式空态「去编辑地图」按钮也走这里。）
-function openValuesMapTab() {
-  if (isNarrowViewport()) {
-    showPanelView(VALUES_VIEW_ID);
-  } else {
-    openValuesWorkbench();
-  }
-  setValuesTabActive(VALUES_TAB_MAP_ID);
-  renderMapEditor();
 }
 
 function bindValuesContentEvents() {
@@ -1904,10 +1891,6 @@ function bindValuesContentEvents() {
   document.getElementById(VALUES_TAB_INJECT_ID)?.addEventListener('click', () => {
     setValuesTabActive(VALUES_TAB_INJECT_ID);
     renderValuesInjectPreview();
-  });
-  document.getElementById(VALUES_TAB_MAP_ID)?.addEventListener('click', () => {
-    setValuesTabActive(VALUES_TAB_MAP_ID);
-    renderMapEditor();
   });
   document.getElementById(VALUES_LAYER_DEFAULT_ID)?.addEventListener('click', () => setValuesLayer('default'));
   document.getElementById(VALUES_LAYER_GAME_ID)?.addEventListener('click', () => setValuesLayer('game'));
@@ -2218,10 +2201,6 @@ function buildValuesContentHTML(editorClass) {
               <span class="kaleido-values__nav-icon"><span class="${VALUES_INJECT_PREVIEW_ICON_CLASS}"></span></span>
               <span class="kaleido-values__nav-label">注入预览</span>
             </button>
-            <button type="button" id="${VALUES_TAB_MAP_ID}" class="kaleido-values__nav-item" role="tab" aria-selected="false" title="游戏地图：为当前角色卡上传背景图、添加地点，供游戏模式展示">
-              <span class="kaleido-values__nav-icon"><span class="${MAP_ICON_CLASS}"></span></span>
-              <span class="kaleido-values__nav-label">游戏地图</span>
-            </button>
           </nav>
           <div class="kaleido-values__main">
             <div id="${VALUES_TREE_PANE_ID}" class="kaleido-values__pane is-active">
@@ -2282,7 +2261,6 @@ function buildValuesContentHTML(editorClass) {
               </div>
               <pre id="${VALUES_INJECT_TEXT_ID}" class="kaleido-values__inject-text" spellcheck="false"></pre>
             </div>
-            <div id="${VALUES_MAP_PANE_ID}" class="kaleido-values__pane" hidden></div>
             <div id="${VALUES_EDITOR_ID}" class="${editorClass}" hidden>
               <div class="kaleido-values__editor-head">
                 <span id="${VALUES_EDITOR_TITLE_ID}" class="kaleido-values__editor-title">新建节点</span>

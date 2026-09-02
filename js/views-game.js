@@ -3,7 +3,7 @@
 // 点击某个图标后图标消失、进入对应界面（地图界面 / 数据档案界面，
 // 「变量系统」注入提示词的那些变量总览，展示的就是主模型实际看到的内容）。
 // 界面内点左上角返回键回到图标入口，点右上角 ✕ 关闭面板回悬浮球。
-// 两个区块均只读，无编辑入口；地图编辑在「变量系统 → 游戏地图」tab 里完成。
+// 两个区块均只读，无编辑入口；地图编辑在首页「游戏地图」独立入口里完成。
 // 视觉：档案体例——朱砂印章节 + 点线目次，只呈现数值本身，不做工作台式标注。
 
 let gameActivePane = null; // null（图标入口）| 'map'（游戏地图） | 'data'（游戏数据）
@@ -177,7 +177,7 @@ function initGameSection(panel) {
       </div>
       <!-- 双入口 App 图标：游戏地图 / 游戏数据（点击图标消失、进入对应界面） -->
       <div id="${GAME_SWITCH_ID}" class="kaleido-game__switch" role="tablist" aria-label="游戏模式入口">
-        <button type="button" id="${GAME_MAP_TAB_ID}" class="kaleido-game__switch-btn" role="tab" aria-selected="false" title="进入当前角色绑定的游戏地图（在「变量系统 → 游戏地图」编辑）">
+        <button type="button" id="${GAME_MAP_TAB_ID}" class="kaleido-game__switch-btn" role="tab" aria-selected="false" title="进入当前角色绑定的游戏地图（在首页「游戏地图」编辑）">
           <span class="kaleido-game__switch-icon"><span class="${MAP_ICON_CLASS}"></span></span>
           <span class="kaleido-game__switch-label">游戏地图</span>
         </button>

@@ -882,7 +882,7 @@ textarea.kaleido-input {
   font-weight: 600;
 }
 
-/* 面板宽视图：日志 / 预设 / 注入 / 剧情 / 变量 / 游戏 */
+/* 面板宽视图：日志 / 预设 / 注入 / 剧情 / 变量 / 地图 / 游戏 */
 .kaleido-panel__dialog.is-log-mode {
   width: 640px;
 }
@@ -894,6 +894,7 @@ textarea.kaleido-input {
 .kaleido-panel__dialog.is-preset-mode,
 .kaleido-panel__dialog.is-inject-mode,
 .kaleido-panel__dialog.is-values-mode,
+.kaleido-panel__dialog.is-map-mode,
 .kaleido-panel__dialog.is-game-mode {
   width: 540px;
 }
@@ -4036,6 +4037,104 @@ textarea.kaleido-input {
 }
 
 /* =========================================================
+   地图系统：独立工作台（电脑端大窗口，与变量工作台同款遮罩窗口）
+   ========================================================= */
+.kaleido-map-workbench-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: var(--k-overlay);
+}
+
+.kaleido-map-workbench-dialog.is-open {
+  display: flex;
+}
+
+.kaleido-map-workbench-dialog__inner {
+  width: min(960px, calc(100vw - 24px));
+  height: min(680px, calc(100vh - 24px));
+  height: min(680px, calc(100dvh - 24px));
+  display: flex;
+  flex-direction: column;
+  font-family: var(--k-font);
+  font-size: 14px;
+  color: var(--k-text);
+  background: var(--k-window);
+  border: 0.5px solid var(--k-hairline-strong);
+  border-radius: 14px;
+  box-shadow: var(--k-shadow-window), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.kaleido-map-workbench-dialog__header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 0.5px solid var(--k-hairline);
+}
+
+.kaleido-map-workbench-dialog__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.kaleido-map-workbench-dialog__title .fa-solid {
+  color: var(--k-accent);
+}
+
+.kaleido-map-workbench-dialog__toolbar {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kaleido-map-workbench-dialog__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px 14px;
+}
+
+.kaleido-map-workbench-dialog__body > div {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 手机端面板内视图：地图编辑器撑满面板视图（pane 即视图 body，编辑器自身 flex 撑满） */
+.kaleido-map-view {
+  position: relative;
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.kaleido-map-view.is-active {
+  display: flex;
+  min-height: 100%;
+}
+
+.kaleido-map-view__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* =========================================================
    地图系统：裁剪弹层（全屏遮罩）
    ========================================================= */
 .kaleido-map-dialog {
@@ -4714,7 +4813,8 @@ html[data-theme='gufeng'] .kaleido-panel .kaleido-home__row:nth-child(2) .kaleid
 html[data-theme='gufeng'] .kaleido-panel .kaleido-home__row:nth-child(3) .kaleido-home__row-icon,
 html[data-theme='gufeng'] .kaleido-panel .kaleido-home__row:nth-child(4) .kaleido-home__row-icon,
 html[data-theme='gufeng'] .kaleido-panel .kaleido-home__row:nth-child(5) .kaleido-home__row-icon,
-html[data-theme='gufeng'] .kaleido-panel .kaleido-home__row:nth-child(6) .kaleido-home__row-icon {
+html[data-theme='gufeng'] .kaleido-panel .kaleido-home__row:nth-child(6) .kaleido-home__row-icon,
+html[data-theme='gufeng'] .kaleido-panel .kaleido-home__row:nth-child(7) .kaleido-home__row-icon {
   color: var(--k-accent);
   background: rgba(176, 58, 46, 0.08);
   border: 1px solid rgba(43, 36, 28, 0.18);
@@ -5342,7 +5442,8 @@ html[data-theme='doodle'] .kaleido-panel .kaleido-home__row:nth-child(2) .kaleid
 html[data-theme='doodle'] .kaleido-panel .kaleido-home__row:nth-child(3) .kaleido-home__row-icon,
 html[data-theme='doodle'] .kaleido-panel .kaleido-home__row:nth-child(4) .kaleido-home__row-icon,
 html[data-theme='doodle'] .kaleido-panel .kaleido-home__row:nth-child(5) .kaleido-home__row-icon,
-html[data-theme='doodle'] .kaleido-panel .kaleido-home__row:nth-child(6) .kaleido-home__row-icon {
+html[data-theme='doodle'] .kaleido-panel .kaleido-home__row:nth-child(6) .kaleido-home__row-icon,
+html[data-theme='doodle'] .kaleido-panel .kaleido-home__row:nth-child(7) .kaleido-home__row-icon {
   color: var(--k-accent);
   background: rgba(124, 92, 191, 0.1);
   border: 1px solid rgba(61, 43, 31, 0.15);

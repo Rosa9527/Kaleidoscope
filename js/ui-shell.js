@@ -332,6 +332,10 @@ function showPanelView(viewId) {
     setValuesLayer('game');
     refreshHomeValuesStatus();
   }
+  if (viewId === MAP_VIEW_ID) {
+    // 地图编辑器每次进入都重渲染：读到最新的绑定状态与已保存数据。
+    renderMapEditor();
+  }
   if (viewId === PRESET_VIEW_ID) {
     // 预设选择器与编辑器都依赖当前角色卡数据（激活预设 / 预设列表随卡切换），
     // 每次进入视图重渲染，避免显示别的角色卡的旧列表。
@@ -364,6 +368,10 @@ function initPanelViews(panel) {
   document.getElementById(HOME_GAME_BUTTON_ID)?.addEventListener('click', () => showPanelView(GAME_VIEW_ID));
   document.getElementById(HOME_PRESET_CARD_ID)?.addEventListener('click', () => showPanelView(PRESET_VIEW_ID));
   document.getElementById(HOME_INJECT_CARD_ID)?.addEventListener('click', () => showPanelView(INJECT_VIEW_ID));
+  document.getElementById(HOME_MAP_CARD_ID)?.addEventListener('click', () => {
+    if (isNarrowViewport()) showPanelView(MAP_VIEW_ID);
+    else openMapEditor();
+  });
   document.getElementById(HOME_VALUES_CARD_ID)?.addEventListener('click', () => {
     if (isNarrowViewport()) showPanelView(VALUES_VIEW_ID);
     else openValuesWorkbench();
@@ -418,6 +426,12 @@ function createPanel() {
                 <span class="kaleido-home__row-icon"><span class="${VALUES_ICON_CLASS}"></span></span>
                 <span class="kaleido-home__row-label">变量系统</span>
                 <span id="${HOME_VALUES_STATUS_ID}" class="kaleido-home__row-status" data-state="idle">尚未添加</span>
+                <span class="kaleido-home__row-chevron" aria-hidden="true"></span>
+              </button>
+              <button type="button" id="${HOME_MAP_CARD_ID}" class="kaleido-home__row" title="游戏地图：为当前角色卡上传背景图、添加地点，游戏模式中展示">
+                <span class="kaleido-home__row-icon"><span class="${MAP_ICON_CLASS}"></span></span>
+                <span class="kaleido-home__row-label">游戏地图</span>
+                <span id="${HOME_MAP_STATUS_ID}" class="kaleido-home__row-status" data-state="idle">尚未制作</span>
                 <span class="kaleido-home__row-chevron" aria-hidden="true"></span>
               </button>
               <button type="button" id="${HOME_STORY_CARD_ID}" class="kaleido-home__row" title="剧情脉络：节点与事件的工作台">
@@ -640,7 +654,7 @@ function createPanel() {
   initStorySection(panel);
   initValuesSection(panel);
   initGameSection(panel);
-  initMapSection();
+  initMapSection(panel);
   initLogView(panel);
   initPresetSection(panel);
   initThemeSection(panel);

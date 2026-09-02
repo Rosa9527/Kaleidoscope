@@ -1,7 +1,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.4.5';
+const MODULE_VERSION = '1.4.6';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -473,9 +473,15 @@ const MAP_ICON_CLASS = 'fa-solid fa-map';
 const MAP_DATA_ICON_CLASS = 'fa-solid fa-chart-simple';
 const MAP_POINT_ICON_CLASS = 'fa-solid fa-location-dot';
 const MAP_CROP_ICON_CLASS = 'fa-solid fa-crop';
-// 变量工作台 · 地图编辑器（第 5 个 tab）
-const VALUES_TAB_MAP_ID = 'kaleido-values-tab-map';
-const VALUES_MAP_PANE_ID = 'kaleido-values-map-pane';
+// 地图系统独立入口（面板内视图 + 桌面工作台，与剧情脉络 / 变量系统同款双形态）
+const MAP_VIEW_ID = 'kaleido-map-view';
+const MAP_DIALOG_ID = 'kaleido-map-dialog';
+const MAP_DIALOG_KEY = '__kaleido_map_dialog_key__';
+const MAP_CLOSE_BTN_ID = 'kaleido-map-close-btn';
+const HOME_MAP_CARD_ID = 'kaleido-home-map-card';
+const HOME_MAP_STATUS_ID = 'kaleido-home-map-status';
+// 变量工作台 · 地图编辑器（已迁出为独立入口，pane 保留供编辑器挂载）
+const MAP_WORKBENCH_PANE_ID = 'kaleido-map-workbench-pane';
 const MAP_BINDING_ID = 'kaleido-map-binding';
 const MAP_UPLOAD_BTN_ID = 'kaleido-map-upload-btn';
 const MAP_UPLOAD_INPUT_ID = 'kaleido-map-upload-input';
@@ -765,6 +771,7 @@ const PANEL_VIEW_TITLES = Object.freeze({
   [INJECT_VIEW_ID]: '注入实录',
   [STORY_VIEW_ID]: '剧情脉络',
   [VALUES_VIEW_ID]: '变量系统',
+  [MAP_VIEW_ID]: '游戏地图',
   [GAME_VIEW_ID]: '游戏模式',
 });
 // 宽视图模式：日志视图需要更宽的窗口展示时间/级别/来源/内容。
@@ -775,6 +782,7 @@ const PANEL_WIDE_MODES = Object.freeze({
   [INJECT_VIEW_ID]: 'is-inject-mode',
   [STORY_VIEW_ID]: 'is-story-mode',
   [VALUES_VIEW_ID]: 'is-values-mode',
+  [MAP_VIEW_ID]: 'is-map-mode',
   [GAME_VIEW_ID]: 'is-game-mode',
 });
 const ESC_KEY_HANDLER_KEY = '__kaleido_esc_key_handler__';

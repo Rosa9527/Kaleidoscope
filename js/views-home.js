@@ -151,11 +151,43 @@ function refreshHomeValuesStatus() {
   }
 }
 
+// 首页「游戏地图」卡片状态：背景图 / 地点数量 + 绑定提示。
+function refreshHomeMapStatus() {
+  const status = document.getElementById(HOME_MAP_STATUS_ID);
+  if (!status) return;
+  try {
+    const ctx = getContextSafe();
+    const map = ctx ? getMapBundle(ctx) : null;
+    const character = ctx ? getStoryCharacter(ctx) : null;
+    if (character) {
+      status.title = map
+        ? `地图已绑定角色卡「${character.name || ''}」：随角色卡导入导出自动携带`
+        : '当前角色卡还没有地图：到游戏地图编辑器制作一张';
+    } else {
+      status.title = '未绑定角色（群聊/未选角色）：地图存全局设置，不随角色卡导入导出';
+    }
+    if (!map || (!map.background && map.points.length === 0)) {
+      status.textContent = '尚未制作';
+      status.dataset.state = 'idle';
+      return;
+    }
+    const parts = [];
+    if (map.background) parts.push('有背景图');
+    parts.push(`${map.points.length} 地点`);
+    status.textContent = parts.join(' · ');
+    status.dataset.state = 'ok';
+  } catch (error) {
+    status.textContent = '尚未制作';
+    status.dataset.state = 'idle';
+  }
+}
+
 // 首页状态统一刷新入口：后续新增卡片状态时在此挂接。
 function refreshHomeStatuses() {
   refreshHomeApiStatus();
   refreshHomeStoryStatus();
   refreshHomeValuesStatus();
+  refreshHomeMapStatus();
   refreshHomeLogStatus();
   refreshHomeInjectStatus();
   refreshHomePresetStatus();

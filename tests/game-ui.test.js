@@ -73,6 +73,46 @@ runner.test('createPanel 创建游戏模式视图与首页卡片', () => {
   assert($('kaleido-game-view').classList.contains('is-active') === false, '初始不应激活');
 });
 
+// ---------- 地图系统独立入口 ----------
+runner.test('首页应有「游戏地图」卡片，点击打开地图工作台', () => {
+  assert($('kaleido-home-map-card'), '首页应有游戏地图卡片');
+  assert($('kaleido-home-map-status'), '游戏地图卡片应有状态位');
+  click($('kaleido-home-map-card'));
+  assert($('kaleido-map-dialog').classList.contains('is-open'), '点击卡片应打开地图工作台');
+  assert(dom.window.document.querySelector('.kaleido-map-editor'), '地图编辑器内容应已渲染');
+  // 关闭工作台，不影响后续用例
+  click($('kaleido-map-close-btn'));
+  assert($('kaleido-map-dialog').classList.contains('is-open') === false, '关闭按钮应能关闭工作台');
+});
+
+runner.test('首页地图卡片状态：无地图显示「尚未制作」，有地图显示地点数', () => {
+  ui.refreshHomeMapStatus();
+  assert($('kaleido-home-map-status').textContent === '尚未制作', '无地图应显示尚未制作');
+  const mapCtx = makeContext();
+  mapCtx.extensionSettings.Kaleidoscope = {
+    mapData: {
+      version: 1,
+      background: 'data:image/png;base64,AAAA',
+      points: [{ id: 'p_1', name: '学校', x: 30, y: 40 }],
+      updatedAt: '2026-08-16T00:00:00.000Z',
+    },
+  };
+  const prev = sandbox.Luker.getContext;
+  sandbox.Luker.getContext = () => mapCtx;
+  try {
+    ui.refreshHomeMapStatus();
+    assert($('kaleido-home-map-status').textContent.includes('1 地点'), '有地图应显示地点数');
+  } finally {
+    sandbox.Luker.getContext = prev;
+    ui.refreshHomeMapStatus();
+  }
+});
+
+runner.test('变量工作台不应再有游戏地图 tab', () => {
+  assert($('kaleido-values-tab-map') === null, '变量工作台不应有游戏地图 tab');
+  assert($('kaleido-values-map-pane') === null, '变量工作台不应有地图 pane');
+});
+
 // ---------- 数据准备 ----------
 runner.test('游戏模式：档案展示游戏值，无工程标注', () => {
   // 注册键 + 默认值
@@ -281,7 +321,7 @@ runner.test('游戏模式：有地图时展示背景图与地点标记（名称�
   }
 });
 
-runner.test('游戏模式：空态「去编辑地图」打开变量工作台并激活游戏地图 tab', () => {
+runner.test('游戏模式：空态「去编辑地图」打开地图工作台并渲染编辑器', () => {
   const emptyCtx = makeContext();
   emptyCtx.chatMetadata = {};
   emptyCtx.saveChat = () => {};
@@ -290,8 +330,7 @@ runner.test('游戏模式：空态「去编辑地图」打开变量工作台并�
   try {
     ui.renderGameView();
     click($('kaleido-map-go-edit'));
-    assert($('kaleido-values-dialog').classList.contains('is-open'), '应打开变量工作台');
-    assert($('kaleido-values-tab-map').classList.contains('is-active'), '应激活游戏地图 tab');
+    assert($('kaleido-map-dialog').classList.contains('is-open'), '应打开地图工作台');
     assert(dom.window.document.querySelector('.kaleido-map-editor'), '地图编辑器内容应已渲染');
     assert($('kaleido-map-stage'), '应有编辑舞台');
   } finally {
