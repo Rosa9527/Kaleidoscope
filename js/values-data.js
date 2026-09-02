@@ -861,8 +861,8 @@ function deriveValuesChildAt(tree, path, childKey) {
 }
 
 // 剔除树中所有已注册子变量叶子（返回新树，不修改入参）：仅按叶子名匹配，
-// 容器与父变量原样保留。用于 AI 维护：发给 AI 的值表只含父变量，子变量是
-// 派生变量由系统计算，不发送也不允许 AI 改动。
+// 容器与父变量原样保留。用于 AI 维护：子变量是派生变量由系统计算，对 AI 只读，
+// 发给 AI 的补丁解析时用它剔除子变量，AI 对子变量的修改一律无视。
 function stripValuesChildLeaves(tree, keys) {
   const childNames = new Set();
   for (const key of Array.isArray(keys) ? keys : []) {

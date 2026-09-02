@@ -271,7 +271,7 @@ runner.test('内置变量：子变量参与派生 / 维护提示词只在树中�
   assert(msgs2[1].content.includes('友谊: 友谊度区间为0~100'), '树中出现友谊时内置规则应列入');
   assert(msgs2[1].content.includes('友谊等级'), '子变量派生说明应列入');
   assert(msgs2[2].content.includes('友谊: 68'), '当前值应发送父变量');
-  assert(!msgs2[2].content.includes('友谊等级'), '内置子变量叶子应被剔除，不发送给 AI');
+  assert(msgs2[2].content.includes('友谊等级'), '子变量对 AI 可见（只读），当前值应含子变量');
   assert(!msgs2[1].content.includes('情欲'), '树中没有情欲时内置情欲规则不应列入');
 });
 
@@ -608,20 +608,21 @@ runner.test('维护消息：子变量不列入键规则并注明派生关系', (
   assert(rulesBlock.includes('态度 ← 好感度'), '应注明子变量派生关系');
 });
 
-runner.test('维护消息：Current_Values 只含父变量，子变量叶子不发送', () => {
+runner.test('维护消息：Current_Values 含子变量（只读可见），说明注明不可修改', () => {
   const c = makeChatCtx();
   ctx.upsertValuesKey(c, '好感度', '友好互动 +5');
   ctx.upsertValuesKey(c, '金钱', '按剧情收支变化');
   ctx.upsertValuesKey(c, '态度', '', { type: 'child', parent: '好感度', rules: [{ min: 0, max: 100, value: '友好' }] });
   ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['张三', '好感度'], 40);
-  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['张三', '态度'], '未知');
+  ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['张三', '态度'], '友好');
   ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['金钱'], 1000);
   const messages = ctx.buildValuesMaintainMessages(c, '系统提示词');
   const valuesBlock = messages[2].content;
   assert(valuesBlock.includes('好感度: 40'), '应包含父变量当前值');
   assert(valuesBlock.includes('金钱: 1000'), '应包含其他父变量当前值');
-  assert(!valuesBlock.includes('态度'), 'Current_Values 不应包含子变量');
-  assert(valuesBlock.includes('仅含父变量'), '应注明只含父变量');
+  assert(valuesBlock.includes('态度'), 'Current_Values 应包含子变量（对 AI 只读可见）');
+  assert(valuesBlock.includes('子变量'), '应注明子变量派生只读、禁止修改');
+  assert(!valuesBlock.includes('仅含父变量'), '不应再注明只含父变量');
 });
 
 runner.test('stripValuesChildLeaves：仅剔除子变量叶子，容器与父变量保留且不修改入参', () => {

@@ -1,11 +1,11 @@
 // ===== 万华镜（Kaleidoscope）index.js — 构建产物，勿手改 =====
-// 构建时间: 2026-09-02 00:23:22 · 文件数: 24 · 指纹: a282a1ec
+// 构建时间: 2026-09-02 22:13:43 · 文件数: 24 · 指纹: f4e8e0ff
 
 // ===== js/constants.js =====
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.4.4';
+const MODULE_VERSION = '1.4.5';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -712,7 +712,7 @@ const DEFAULT_VALUES_MAINTAIN_PROMPT = [
   '【输入】',
   '本轮输入包含三份材料：',
   '- <Key_Rules>：全部已注册变量及其变化规则。规则是变量变化的唯一依据，规则之外的变量不要随意改动。',
-  '- <Current_Values>：当前游戏变量（YAML 格式，仅含父变量；子变量为派生变量由系统自动计算，不要输出子变量）。这是唯一可改动的数据，结构、条目名与层级必须原样保留。',
+  '- <Current_Values>：当前游戏变量（YAML 格式，完整变量树，含父变量与子变量）。父变量是唯一可改动的数据，结构、条目名与层级必须原样保留；子变量为派生变量由系统自动计算，只读禁止修改。',
   '- <Recent_Messages>：最新两条消息（用户消息 + AI 回复），是本轮维护的依据。',
   '',
   '【维护原则】',
@@ -721,7 +721,7 @@ const DEFAULT_VALUES_MAINTAIN_PROMPT = [
   '3. 消息中没有明确体现的变化不要改；拿不准时保持不变，宁可漏更也不可乱更。',
   '4. 保持结构与命名：顶层条目（人名、资源名）与层级不要删除、改名或合并，除非剧情明确要求；只更新叶子值。',
   '5. 变量必须是 YAML 标量（数字 / 字符串 / 布尔）：数字保留变量形态，字符串按剧情原样书写。',
-  '6. 子变量是派生变量：<Current_Values> 中不会出现子变量，输出中也一律不要出现子变量，子变量由系统按父变量自动计算。',
+  '6. 子变量是派生变量：<Current_Values> 中的子变量只读，输出中一律不要出现子变量，子变量由系统按父变量自动计算。',
   '',
   '【输出】',
   '你的回复必须且只能是一个 YAML 映射（可用 ```yaml 代码块包裹），内容是本次需要更新的变量：只列出有变化的键，不是完整变量树。',
@@ -8136,8 +8136,8 @@ function deriveValuesChildAt(tree, path, childKey) {
 }
 
 // 剔除树中所有已注册子变量叶子（返回新树，不修改入参）：仅按叶子名匹配，
-// 容器与父变量原样保留。用于 AI 维护：发给 AI 的值表只含父变量，子变量是
-// 派生变量由系统计算，不发送也不允许 AI 改动。
+// 容器与父变量原样保留。用于 AI 维护：子变量是派生变量由系统计算，对 AI 只读，
+// 发给 AI 的补丁解析时用它剔除子变量，AI 对子变量的修改一律无视。
 function stripValuesChildLeaves(tree, keys) {
   const childNames = new Set();
   for (const key of Array.isArray(keys) ? keys : []) {
@@ -8943,10 +8943,10 @@ function serializeValuesGameTree(ctx) {
 // - 中断检查：生成被用户中止时跳过，不对半截回复发起维护；
 // - 失败即跳过本轮：调用失败不降级、不重试轰炸，本轮视为已处理。
 // 请求体：system 维护提示词 → <Key_Rules>（键注册表 + 变化规则）→
-// <Current_Values>（当前游戏值 YAML，仅父变量；子变量是派生变量不发送）→
+// <Current_Values>（当前游戏值 YAML，完整树含子变量；子变量对 AI 只读）→
 // <Recent_Messages>（最新 2 条消息）。
-// 解析：AI 返回 YAML/JSON 补丁 → 剔除子变量（不允许 AI 改动）→ 与当前树合并
-// （仅已注册键可新增）→ 按最新父变量重算子变量 → 有变化才写聊天文件。
+// 解析：AI 返回 YAML/JSON 补丁 → 剔除子变量（对 AI 只读，输出带了也一律无视）→
+// 与当前树合并（仅已注册键可新增）→ 按最新父变量重算子变量 → 有变化才写聊天文件。
 
 const valuesMaintainState = {
   running: false,
@@ -9022,13 +9022,13 @@ function buildValuesMaintainMessages(ctx, prompt) {
     return `${String(key?.name || '')} ← ${String(key?.parent || '')}`;
   };
   const childNote = childKeysInUse.length > 0
-    ? '\n\n（子变量为派生变量，由系统按派生规则自动计算，禁止修改：' +
+    ? '\n\n（子变量为派生变量，由系统按派生规则自动计算，只读禁止修改：' +
       childKeysInUse.map(describeChildSource).join('、') +
       '）'
     : '';
-  // 子变量是派生变量：发给 AI 的值表只含父变量，子变量不发送（也不允许 AI 改动）。
-  const parentCurrent = stripValuesChildLeaves(current, keys);
-  const currentText = serializeValuesTree(parentCurrent, '') || '{}';
+  // 子变量对 AI 可见但只读：值表发完整树（含子变量，便于 AI 参照派生结果），
+  // AI 输出里即使带了子变量也会在解析时被剔除（见 runValuesMaintain）。
+  const currentText = serializeValuesTree(current, '') || '{}';
   const recentMessages = getStoryGateRecentMessages(VALUES_MAINTAIN_RECENT_COUNT, ctx);
   return [
     { role: 'system', content: prompt },
@@ -9042,7 +9042,7 @@ function buildValuesMaintainMessages(ctx, prompt) {
     {
       role: 'user',
       content: [
-        '以下被 <Current_Values>...</Current_Values> 包裹的是当前游戏变量（YAML 格式，仅含父变量；子变量为派生变量由系统计算，不在此列出），这是唯一可改动的数据，结构、条目名与层级必须原样保留。',
+        '以下被 <Current_Values>...</Current_Values> 包裹的是当前游戏变量（YAML 格式，完整变量树，含父变量与子变量）。父变量是唯一可改动的数据，结构、条目名与层级必须原样保留；子变量为派生变量由系统自动计算，只读禁止修改，输出中不要出现子变量。',
         '<Current_Values>\n' + currentText + '\n</Current_Values>',
       ].join('\n'),
     },
@@ -9122,12 +9122,12 @@ async function runValuesMaintain(ctx, settings, options = {}) {
       finish({ error: 'AI 返回无法解析' });
       return record;
     }
-    // 子变量是派生变量：AI 输出里即使带了子变量也一律剔除（不允许增删改），
+    // 子变量对 AI 只读：AI 输出里即使带了子变量也一律剔除（无视对子变量的修改），
     // 子变量最终值一律由合并后的父变量派生，保证与父变量一致。
     const parentPatch = stripValuesChildLeaves(patch, keys);
     const merged = mergeValuesPatch(current, parentPatch, getValuesRegistryNames(ctx));
-    // 子变量派生：AI 可能改了父变量，合并后按最新父变量重算子变量（子变量没有
-    // 发给 AI、补丁里的子变量也被剔除，这里只负责把父变量变化落到子变量上）。
+    // 子变量派生：AI 可能改了父变量，合并后按最新父变量重算子变量（补丁里的
+    // 子变量已被剔除，这里只负责把父变量变化落到子变量上）。
     deriveValuesChildren(merged.tree, keys);
     // 子变量路径不计入变化：其值由父变量决定，父变量变化时已体现在父变量路径上。
     const childKeyNames = new Set(getValuesChildKeys(ctx).map((key) => String(key.name || '').trim()));

@@ -1,7 +1,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.4.4';
+const MODULE_VERSION = '1.4.5';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -708,7 +708,7 @@ const DEFAULT_VALUES_MAINTAIN_PROMPT = [
   '【输入】',
   '本轮输入包含三份材料：',
   '- <Key_Rules>：全部已注册变量及其变化规则。规则是变量变化的唯一依据，规则之外的变量不要随意改动。',
-  '- <Current_Values>：当前游戏变量（YAML 格式，仅含父变量；子变量为派生变量由系统自动计算，不要输出子变量）。这是唯一可改动的数据，结构、条目名与层级必须原样保留。',
+  '- <Current_Values>：当前游戏变量（YAML 格式，完整变量树，含父变量与子变量）。父变量是唯一可改动的数据，结构、条目名与层级必须原样保留；子变量为派生变量由系统自动计算，只读禁止修改。',
   '- <Recent_Messages>：最新两条消息（用户消息 + AI 回复），是本轮维护的依据。',
   '',
   '【维护原则】',
@@ -717,7 +717,7 @@ const DEFAULT_VALUES_MAINTAIN_PROMPT = [
   '3. 消息中没有明确体现的变化不要改；拿不准时保持不变，宁可漏更也不可乱更。',
   '4. 保持结构与命名：顶层条目（人名、资源名）与层级不要删除、改名或合并，除非剧情明确要求；只更新叶子值。',
   '5. 变量必须是 YAML 标量（数字 / 字符串 / 布尔）：数字保留变量形态，字符串按剧情原样书写。',
-  '6. 子变量是派生变量：<Current_Values> 中不会出现子变量，输出中也一律不要出现子变量，子变量由系统按父变量自动计算。',
+  '6. 子变量是派生变量：<Current_Values> 中的子变量只读，输出中一律不要出现子变量，子变量由系统按父变量自动计算。',
   '',
   '【输出】',
   '你的回复必须且只能是一个 YAML 映射（可用 ```yaml 代码块包裹），内容是本次需要更新的变量：只列出有变化的键，不是完整变量树。',
