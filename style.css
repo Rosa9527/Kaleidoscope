@@ -20,6 +20,7 @@
 .kaleido-story-dialog,
 .kaleido-values-dialog,
 .kaleido-map-dialog,
+.kaleido-map-workbench-dialog,
 .kaleido-confirm {
   --k-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI Variable", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", sans-serif;
   --k-mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, "Courier New", monospace;
@@ -76,6 +77,7 @@
   .kaleido-story-dialog,
   .kaleido-values-dialog,
   .kaleido-map-dialog,
+  .kaleido-map-workbench-dialog,
   .kaleido-confirm {
     --k-text: #f5f5f7;
     --k-text-2: rgba(235, 235, 245, 0.6);
@@ -4330,13 +4332,27 @@ textarea.kaleido-input {
     border: none;
   }
 
+  .kaleido-map-workbench-dialog__inner {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    border-radius: 0;
+    border: none;
+  }
+
+  .kaleido-map-workbench-dialog {
+    padding: 0;
+  }
+
   .kaleido-story-dialog,
   .kaleido-values-dialog {
     padding: 0;
   }
 
   .kaleido-story-dialog__header,
-  .kaleido-values-dialog__header {
+  .kaleido-values-dialog__header,
+  .kaleido-map-workbench-dialog__header {
     flex-wrap: wrap;
     row-gap: 6px;
     padding-bottom: 8px;
@@ -4364,6 +4380,10 @@ textarea.kaleido-input {
   }
 
   .kaleido-values-dialog__body {
+    padding: 8px;
+  }
+
+  .kaleido-map-workbench-dialog__body {
     padding: 8px;
   }
 
@@ -4606,6 +4626,7 @@ html[data-theme='gufeng'] .kaleido-panel,
 html[data-theme='gufeng'] .kaleido-story-dialog,
 html[data-theme='gufeng'] .kaleido-values-dialog,
 html[data-theme='gufeng'] .kaleido-map-dialog,
+html[data-theme='gufeng'] .kaleido-map-workbench-dialog,
 html[data-theme='gufeng'] .kaleido-confirm {
   --k-font: "Kaiti SC", "STKaiti", "KaiTi", "Songti SC", "SimSun", serif;
   --k-mono: "Kaiti SC", "STKaiti", "KaiTi", "Songti SC", ui-monospace, Consolas, monospace;
@@ -4950,9 +4971,10 @@ html[data-theme='gufeng'] .kaleido-confirm .kaleido-confirm__ok:hover {
   background: var(--k-accent-deep) !important;
 }
 
-/* 工作台对话框（剧情脉络 / 变量系统）：宣纸 + 墨框 */
+/* 工作台对话框（剧情脉络 / 变量系统 / 地图工作台）：宣纸 + 墨框 */
 html[data-theme='gufeng'] .kaleido-story-dialog .kaleido-story-dialog__inner,
 html[data-theme='gufeng'] .kaleido-values-dialog .kaleido-values-dialog__editor,
+html[data-theme='gufeng'] .kaleido-map-workbench-dialog .kaleido-map-workbench-dialog__inner,
 html[data-theme='gufeng'] .kaleido-story-dialog .kaleido-story__editor,
 html[data-theme='gufeng'] .kaleido-values-dialog .kaleido-values__editor {
   border: 1.5px solid var(--k-text);
@@ -4964,7 +4986,8 @@ html[data-theme='gufeng'] .kaleido-values-dialog .kaleido-values__editor {
 
 /* 工作台标题栏：墨色横带 + 鎏金字 */
 html[data-theme='gufeng'] .kaleido-story-dialog .kaleido-story-dialog__header,
-html[data-theme='gufeng'] .kaleido-values-dialog .kaleido-values-dialog__header {
+html[data-theme='gufeng'] .kaleido-values-dialog .kaleido-values-dialog__header,
+html[data-theme='gufeng'] .kaleido-map-workbench-dialog .kaleido-map-workbench-dialog__header {
   background:
     linear-gradient(180deg, rgba(201, 162, 39, 0.16), transparent 60%),
     var(--k-titlebar);
@@ -4972,7 +4995,8 @@ html[data-theme='gufeng'] .kaleido-values-dialog .kaleido-values-dialog__header 
 }
 
 html[data-theme='gufeng'] .kaleido-story-dialog .kaleido-story-dialog__header .kaleido-story-dialog__title,
-html[data-theme='gufeng'] .kaleido-values-dialog .kaleido-values-dialog__header .kaleido-values-dialog__title {
+html[data-theme='gufeng'] .kaleido-values-dialog .kaleido-values-dialog__header .kaleido-values-dialog__title,
+html[data-theme='gufeng'] .kaleido-map-workbench-dialog .kaleido-map-workbench-dialog__header .kaleido-map-workbench-dialog__title {
   color: #f5e6c4;
   font-weight: 700;
   letter-spacing: 3px;
@@ -4981,8 +5005,10 @@ html[data-theme='gufeng'] .kaleido-values-dialog .kaleido-values-dialog__header 
 /* 工作台标题栏工具行（导入/导出按钮 + 关闭叉号）：墨色横带上用浅描边印章，保证可读 */
 html[data-theme='gufeng'] .kaleido-story-dialog .kaleido-story-dialog__header .kaleido-btn,
 html[data-theme='gufeng'] .kaleido-values-dialog .kaleido-values-dialog__header .kaleido-btn,
+html[data-theme='gufeng'] .kaleido-map-workbench-dialog .kaleido-map-workbench-dialog__header .kaleido-btn,
 html[data-theme='gufeng'] .kaleido-story-dialog .kaleido-story-dialog__header .kaleido-icon-btn,
-html[data-theme='gufeng'] .kaleido-values-dialog .kaleido-values-dialog__header .kaleido-icon-btn {
+html[data-theme='gufeng'] .kaleido-values-dialog .kaleido-values-dialog__header .kaleido-icon-btn,
+html[data-theme='gufeng'] .kaleido-map-workbench-dialog .kaleido-map-workbench-dialog__header .kaleido-icon-btn {
   color: #f7f1e3;
   background: transparent;
   border: 1.5px solid rgba(247, 241, 227, 0.55);
@@ -4992,8 +5018,10 @@ html[data-theme='gufeng'] .kaleido-values-dialog .kaleido-values-dialog__header 
 
 html[data-theme='gufeng'] .kaleido-story-dialog .kaleido-story-dialog__header .kaleido-btn:hover,
 html[data-theme='gufeng'] .kaleido-values-dialog .kaleido-values-dialog__header .kaleido-btn:hover,
+html[data-theme='gufeng'] .kaleido-map-workbench-dialog .kaleido-map-workbench-dialog__header .kaleido-btn:hover,
 html[data-theme='gufeng'] .kaleido-story-dialog .kaleido-story-dialog__header .kaleido-icon-btn:hover,
-html[data-theme='gufeng'] .kaleido-values-dialog .kaleido-values-dialog__header .kaleido-icon-btn:hover {
+html[data-theme='gufeng'] .kaleido-values-dialog .kaleido-values-dialog__header .kaleido-icon-btn:hover,
+html[data-theme='gufeng'] .kaleido-map-workbench-dialog .kaleido-map-workbench-dialog__header .kaleido-icon-btn:hover {
   color: #f7f1e3;
   background: #a63a2e;
   border-color: #a63a2e;
@@ -5002,6 +5030,7 @@ html[data-theme='gufeng'] .kaleido-values-dialog .kaleido-values-dialog__header 
 
 /* 工作台标题栏绑定徽标：宣纸底上正常显示，不受墨色横带影响 */
 html[data-theme='gufeng'] .kaleido-story-dialog .kaleido-story-dialog__header .kaleido-story__binding,
+html[data-theme='gufeng'] .kaleido-map-workbench-dialog .kaleido-map-workbench-dialog__header .kaleido-values__binding,
 html[data-theme='gufeng'] .kaleido-values-dialog .kaleido-values-dialog__header .kaleido-values__binding {
   color: var(--k-text-2);
   background: var(--k-card);
@@ -5211,6 +5240,7 @@ html[data-theme='doodle'] .kaleido-panel,
 html[data-theme='doodle'] .kaleido-story-dialog,
 html[data-theme='doodle'] .kaleido-values-dialog,
 html[data-theme='doodle'] .kaleido-map-dialog,
+html[data-theme='doodle'] .kaleido-map-workbench-dialog,
 html[data-theme='doodle'] .kaleido-confirm {
   --k-font: "Comic Sans MS", "Segoe Print", "Chalkboard SE", "Marker Felt", "Bradley Hand", "KaiTi", "STKaiti", "PingFang SC", "Microsoft YaHei", cursive;
   --k-mono: "Comic Sans MS", "Segoe Print", ui-monospace, Consolas, monospace;
@@ -5270,6 +5300,10 @@ html[data-theme='doodle'] .kaleido-story-dialog,
 html[data-theme='doodle'] .kaleido-story-dialog *,
 html[data-theme='doodle'] .kaleido-values-dialog,
 html[data-theme='doodle'] .kaleido-values-dialog *,
+html[data-theme='doodle'] .kaleido-map-dialog,
+html[data-theme='doodle'] .kaleido-map-dialog *,
+html[data-theme='doodle'] .kaleido-map-workbench-dialog,
+html[data-theme='doodle'] .kaleido-map-workbench-dialog *,
 html[data-theme='doodle'] .kaleido-confirm,
 html[data-theme='doodle'] .kaleido-confirm * {
   border-radius: 0;
@@ -5574,9 +5608,10 @@ html[data-theme='doodle'] .kaleido-confirm .kaleido-confirm__ok:hover {
   background: var(--k-accent-deep) !important;
 }
 
-/* 工作台对话框（剧情脉络 / 变量系统）：牛皮纸 + 墨棕粗框 */
+/* 工作台对话框（剧情脉络 / 变量系统 / 地图工作台）：牛皮纸 + 墨棕粗框 */
 html[data-theme='doodle'] .kaleido-story-dialog .kaleido-story-dialog__inner,
 html[data-theme='doodle'] .kaleido-values-dialog .kaleido-values-dialog__editor,
+html[data-theme='doodle'] .kaleido-map-workbench-dialog .kaleido-map-workbench-dialog__inner,
 html[data-theme='doodle'] .kaleido-story-dialog .kaleido-story__editor,
 html[data-theme='doodle'] .kaleido-values-dialog .kaleido-values__editor {
   border: 3px solid var(--k-text);
@@ -5585,13 +5620,15 @@ html[data-theme='doodle'] .kaleido-values-dialog .kaleido-values__editor {
 
 /* 工作台标题栏：牛皮纸 + 墨色虚线底边（浅底，直接沿用主题色） */
 html[data-theme='doodle'] .kaleido-story-dialog .kaleido-story-dialog__header,
-html[data-theme='doodle'] .kaleido-values-dialog .kaleido-values-dialog__header {
+html[data-theme='doodle'] .kaleido-values-dialog .kaleido-values-dialog__header,
+html[data-theme='doodle'] .kaleido-map-workbench-dialog .kaleido-map-workbench-dialog__header {
   background: var(--k-titlebar);
   border-bottom: 2px dashed rgba(61, 43, 31, 0.35);
 }
 
 html[data-theme='doodle'] .kaleido-story-dialog .kaleido-story-dialog__header .kaleido-story-dialog__title,
-html[data-theme='doodle'] .kaleido-values-dialog .kaleido-values-dialog__header .kaleido-values-dialog__title {
+html[data-theme='doodle'] .kaleido-values-dialog .kaleido-values-dialog__header .kaleido-values-dialog__title,
+html[data-theme='doodle'] .kaleido-map-workbench-dialog .kaleido-map-workbench-dialog__header .kaleido-map-workbench-dialog__title {
   color: var(--k-accent);
   font-weight: 700;
   letter-spacing: 1px;
@@ -5600,8 +5637,10 @@ html[data-theme='doodle'] .kaleido-values-dialog .kaleido-values-dialog__header 
 /* 工作台标题栏工具行（导入/导出按钮 + 关闭叉号）：小贴纸 */
 html[data-theme='doodle'] .kaleido-story-dialog .kaleido-story-dialog__header .kaleido-btn,
 html[data-theme='doodle'] .kaleido-values-dialog .kaleido-values-dialog__header .kaleido-btn,
+html[data-theme='doodle'] .kaleido-map-workbench-dialog .kaleido-map-workbench-dialog__header .kaleido-btn,
 html[data-theme='doodle'] .kaleido-story-dialog .kaleido-story-dialog__header .kaleido-icon-btn,
-html[data-theme='doodle'] .kaleido-values-dialog .kaleido-values-dialog__header .kaleido-icon-btn {
+html[data-theme='doodle'] .kaleido-values-dialog .kaleido-values-dialog__header .kaleido-icon-btn,
+html[data-theme='doodle'] .kaleido-map-workbench-dialog .kaleido-map-workbench-dialog__header .kaleido-icon-btn {
   color: var(--k-text);
   background: var(--k-card);
   border: 1.5px solid var(--k-hairline);
@@ -5610,8 +5649,10 @@ html[data-theme='doodle'] .kaleido-values-dialog .kaleido-values-dialog__header 
 
 html[data-theme='doodle'] .kaleido-story-dialog .kaleido-story-dialog__header .kaleido-btn:hover,
 html[data-theme='doodle'] .kaleido-values-dialog .kaleido-values-dialog__header .kaleido-btn:hover,
+html[data-theme='doodle'] .kaleido-map-workbench-dialog .kaleido-map-workbench-dialog__header .kaleido-btn:hover,
 html[data-theme='doodle'] .kaleido-story-dialog .kaleido-story-dialog__header .kaleido-icon-btn:hover,
-html[data-theme='doodle'] .kaleido-values-dialog .kaleido-values-dialog__header .kaleido-icon-btn:hover {
+html[data-theme='doodle'] .kaleido-values-dialog .kaleido-values-dialog__header .kaleido-icon-btn:hover,
+html[data-theme='doodle'] .kaleido-map-workbench-dialog .kaleido-map-workbench-dialog__header .kaleido-icon-btn:hover {
   color: #fffdf5;
   background: var(--k-accent);
   border-color: var(--k-accent);
@@ -5620,6 +5661,7 @@ html[data-theme='doodle'] .kaleido-values-dialog .kaleido-values-dialog__header 
 
 /* 工作台标题栏绑定徽标：白纸底上正常显示 */
 html[data-theme='doodle'] .kaleido-story-dialog .kaleido-story-dialog__header .kaleido-story__binding,
+html[data-theme='doodle'] .kaleido-map-workbench-dialog .kaleido-map-workbench-dialog__header .kaleido-values__binding,
 html[data-theme='doodle'] .kaleido-values-dialog .kaleido-values-dialog__header .kaleido-values__binding {
   color: var(--k-text-2);
   background: var(--k-card);
