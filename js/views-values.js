@@ -12,6 +12,10 @@ let valuesAddMenuContext = null;    // 「＋」菜单上下文：{ root: true }
 let valuesTriggerEditorId = null;        // 正在编辑的触发 id（null = 新建）
 let valuesTriggerEditorConditions = [];  // 编辑器中的条件草稿
 let valuesTriggerEditorEffects = [];     // 编辑器中的事件效果草稿
+let valuesTriggerCategoryEditorId = null; // 正在编辑的分类 id（null = 新建）
+let valuesTriggerExpanded = new Set();   // 已展开的分类 id
+let valuesTriggerPresetCategoryId = '';  // 新建触发时预设的所属分类
+let valuesTriggerCategoryPresetParentId = ''; // 新建分类时预设的上级分类
 
 function valuesToastr(kind, message) {
   try {
@@ -379,10 +383,14 @@ function renderValuesTree() {
   renderValuesTreeRows(body, ctx, valuesActiveTree, [], 0);
 }
 // ---------- 「＋」新建菜单 ----------
-function openValuesAddMenu(anchor, context) {
-  const menu = document.getElementById(VALUES_ADD_MENU_ID);
+// 「＋」菜单通用定位：贴按钮下方展开，越界时翻转 / 收进视口（各页菜单共用）。
+function openValuesMenu(menuId, anchor, context, setContext) {
+  const menu = document.getElementById(menuId);
   if (!menu) return;
-  valuesAddMenuContext = context || { root: true };
+  // 两个「＋」菜单互斥：打开一个时收起另一个（变量树 / 剧情触发）。
+  if (menuId === VALUES_ADD_MENU_ID) closeValuesTriggerAddMenu();
+  else if (menuId === VALUES_TRIGGER_ADD_MENU_ID) closeValuesAddMenu();
+  setContext(context || { root: true });
   menu.hidden = false;
   const rect = anchor.getBoundingClientRect();
   let top = rect.bottom + 4;
@@ -398,6 +406,10 @@ function openValuesAddMenu(anchor, context) {
   menu.style.top = `${top}px`;
 }
 
+function openValuesAddMenu(anchor, context) {
+  openValuesMenu(VALUES_ADD_MENU_ID, anchor, context, (ctx) => { valuesAddMenuContext = ctx; });
+}
+
 function closeValuesAddMenu() {
   const menu = document.getElementById(VALUES_ADD_MENU_ID);
   if (menu) menu.hidden = true;
@@ -410,6 +422,27 @@ function handleValuesAddMenuPick(kind) {
   const parentPath = context.root ? [] : (context.path || []);
   if (kind === 'node') openValuesNodeEditor(parentPath, null);
   else if (kind === 'key') openValuesKeyEntryEditor(parentPath, null);
+}
+
+// ---------- 剧情触发页「＋ 新建」菜单（与剧情脉络同款：分类 / 事件 二选一） ----------
+let valuesTriggerAddMenuContext = null; // { root: true } | { categoryId: '...' }
+
+function openValuesTriggerAddMenu(anchor, context) {
+  openValuesMenu(VALUES_TRIGGER_ADD_MENU_ID, anchor, context, (ctx) => { valuesTriggerAddMenuContext = ctx; });
+}
+
+function closeValuesTriggerAddMenu() {
+  const menu = document.getElementById(VALUES_TRIGGER_ADD_MENU_ID);
+  if (menu) menu.hidden = true;
+  valuesTriggerAddMenuContext = null;
+}
+
+function handleValuesTriggerAddMenuPick(kind) {
+  const context = valuesTriggerAddMenuContext || { root: true };
+  closeValuesTriggerAddMenu();
+  const presetCategoryId = context.root ? '' : String(context.categoryId || '').trim();
+  if (kind === 'category') openValuesTriggerCategoryEditor(null, presetCategoryId);
+  else if (kind === 'trigger') openValuesTriggerEditor(null, presetCategoryId);
 }// ---------- 节点 / 变量编辑器 ----------
 // 上级节点下拉：列出全部节点路径（排除自身与后代），只认显式预设。
 function populateValuesParentSelect(currentPath, selectedParentPath) {
@@ -799,13 +832,25 @@ function handleValuesKeysReorder() {
   logApp('info', '变量注册顺序已调整');
 }
 
-function handleValuesTriggersReorder() {
+// 触发页组内重排：同分类（含未分类组）的行视为同级，跨组拖动不参与。
+function valuesTriggerSiblingsOf(row) {
+  const body = document.getElementById(VALUES_TRIGGERS_BODY_ID);
+  if (!body) return [];
+  const groupKey = String(row?.dataset.categoryId || '');
+  return Array.from(body.querySelectorAll('.kaleido-values__row--trigger'))
+    .filter((item) => String(item.dataset.categoryId || '') === groupKey);
+}
+
+function handleValuesTriggersReorder(row) {
   const ctx = getContextSafe();
   if (!ctx) return;
+  const categoryId = String(row?.dataset.categoryId || '');
   const body = document.getElementById(VALUES_TRIGGERS_BODY_ID);
   if (!body) return;
-  const ids = Array.from(body.querySelectorAll('.kaleido-values__row')).map((row) => String(row.dataset.id || ''));
-  reorderValuesTriggers(ctx, ids);
+  const ids = Array.from(body.querySelectorAll('.kaleido-values__row--trigger'))
+    .filter((item) => String(item.dataset.categoryId || '') === categoryId)
+    .map((item) => String(item.dataset.id || ''));
+  reorderValuesTriggersInCategory(ctx, categoryId, ids);
   renderValuesTriggers();
   logApp('info', '剧情触发顺序已调整');
 }
@@ -1326,10 +1371,12 @@ function toggleValuesTriggerSystem() {
 }
 
 // 触发列表：名称 + 条件摘要 + 启用开关 + 编辑 / 删除。
-function buildValuesTriggerRow(trigger) {
+function buildValuesTriggerRow(trigger, depth) {
   const row = document.createElement('div');
   row.className = 'kaleido-values__row kaleido-values__row--trigger';
   row.dataset.id = String(trigger.id || '');
+  row.dataset.categoryId = String(trigger.categoryId || '');
+  row.style.setProperty('--depth', String(depth || 0));
   const enabled = trigger.enabled !== false;
   const conditionsText = formatValuesTriggerConditions(trigger);
   const effectsText = formatValuesTriggerEffects(trigger);
@@ -1352,20 +1399,85 @@ function buildValuesTriggerRow(trigger) {
   return row;
 }
 
+// 触发页树状渲染：分类为节点（可嵌套子分类），事件挂接在分类下；未分类
+// （无分类 / 分类已删除）事件收进底部「未分类事件」组——与剧情脉络的节点树
+// 同构。旧存档无分类数据时全部事件落在未分类组，展示与旧版一致。
 function renderValuesTriggers() {
   const body = document.getElementById(VALUES_TRIGGERS_BODY_ID);
   if (!body) return;
   const ctx = getContextSafe();
   const triggers = ctx ? getValuesTriggers(ctx) : [];
+  const categories = ctx ? getValuesTriggerCategories(ctx) : [];
   refreshValuesTriggerStatus();
   body.innerHTML = '';
-  if (triggers.length === 0) {
-    body.appendChild(buildValuesEmpty('还没有剧情触发。点击上方「＋ 新建触发」创建：\n设置变量条件（如 张三/好感 >= 70），条件满足时自动注入对应剧情事件。'));
+  if (triggers.length === 0 && categories.length === 0) {
+    body.appendChild(buildValuesEmpty('还没有剧情触发。点击上方「＋ 新建」创建分类或事件：\n设置变量条件（如 张三/好感 ≥ 70），条件满足时自动注入对应剧情事件。'));
     return;
   }
-  for (const trigger of triggers) {
-    body.appendChild(buildValuesTriggerRow(trigger));
+  const roots = getValuesTriggerRootCategories(ctx);
+  for (const category of roots) {
+    renderValuesTriggerCategory(body, ctx, category, 0);
   }
+  // 未分类事件（无分类 / 分类已不存在），含分类全删后的旧数据。
+  const unassigned = getValuesTriggersByCategory(ctx, '').filter((trigger) => {
+    const categoryId = String(trigger.categoryId || '').trim();
+    return !categoryId || !getValuesTriggerCategoryById(ctx, categoryId);
+  });
+  if (unassigned.length > 0) {
+    const group = document.createElement('div');
+    group.className = 'kaleido-values__trigger-group';
+    const title = document.createElement('span');
+    title.className = 'kaleido-values__trigger-group-title';
+    title.textContent = `未分类事件（${unassigned.length}）`;
+    group.appendChild(title);
+    for (const trigger of unassigned) {
+      group.appendChild(buildValuesTriggerRow(trigger, 0));
+    }
+    body.appendChild(group);
+  }
+}
+
+// 单个分类下的行：分类行 + （展开时）其下子分类与触发行（深度优先递归）。
+function renderValuesTriggerCategory(container, ctx, category, depth) {
+  const expanded = valuesTriggerExpanded.has(category.id);
+  const children = getValuesTriggerCategoryChildren(ctx, category.id);
+  const triggers = getValuesTriggersByCategory(ctx, category.id);
+  container.appendChild(
+    buildValuesTriggerCategoryRow(category, depth, expanded, children.length + triggers.length),
+  );
+  if (!expanded) return;
+  for (const child of children) {
+    renderValuesTriggerCategory(container, ctx, child, depth + 1);
+  }
+  for (const trigger of triggers) {
+    container.appendChild(buildValuesTriggerRow(trigger, depth + 1));
+  }
+}
+
+// 分类行：展开箭头 + 图标 + 名称 + 计数 + 启停 + 编辑 / 删除。
+function buildValuesTriggerCategoryRow(category, depth, expanded, childCount) {
+  const row = document.createElement('div');
+  row.className = 'kaleido-values__row kaleido-values__row--trigger-category';
+  row.dataset.id = String(category.id || '');
+  row.style.setProperty('--depth', String(depth || 0));
+  const enabled = category.enabled !== false;
+  row.innerHTML = `
+    <button type="button" class="kaleido-values__trigger-chevron${childCount > 0 ? '' : ' is-empty'}" data-action="toggle-category" data-id="${escapeHtml(String(category.id || ''))}" title="展开 / 收起" aria-label="展开 / 收起">
+      <span class="${VALUES_CHEVRON_ICON_CLASS}"></span>
+    </button>
+    <span class="kaleido-values__row-icon"><span class="${expanded ? VALUES_TRIGGER_CATEGORY_OPEN_ICON_CLASS : VALUES_TRIGGER_CATEGORY_ICON_CLASS}"></span></span>
+    <span class="kaleido-values__row-name" title="${escapeHtml(category.description || category.name)}">${escapeHtml(category.name)}</span>
+    <span class="kaleido-values__row-count">${childCount} 项</span>
+    <button type="button" class="kaleido-values__inject-switch${enabled ? '' : ' is-off'}" data-action="toggle-category" data-id="${escapeHtml(String(category.id || ''))}" role="switch" aria-checked="${enabled}" title="${enabled ? '点击关闭：本分类及其子分类、事件不再参与判定' : '点击激活：本分类及其子分类、事件重新参与判定'}" aria-label="启用 / 关闭分类"><span class="kaleido-values__inject-switch-thumb"></span></button>
+    <span class="kaleido-values__row-actions">
+      <button type="button" class="kaleido-values__icon-btn" data-action="add-menu" data-id="${escapeHtml(String(category.id || ''))}" title="新建子分类 / 事件" aria-label="新建子分类 / 事件"><span class="${VALUES_ADD_CHILD_ICON_CLASS}"></span></button>
+      <button type="button" class="kaleido-values__icon-btn" data-action="edit-category" data-id="${escapeHtml(String(category.id || ''))}" title="编辑分类" aria-label="编辑分类"><span class="${VALUES_EDIT_ICON_CLASS}"></span></button>
+      <button type="button" class="kaleido-values__icon-btn kaleido-values__icon-btn--danger" data-action="delete-category" data-id="${escapeHtml(String(category.id || ''))}" title="删除分类（其下事件转为未分类，子分类上提）" aria-label="删除分类"><span class="${VALUES_DELETE_ICON_CLASS}"></span></button>
+    </span>
+  `;
+  if (expanded) row.classList.add('is-expanded');
+  if (!enabled) row.classList.add('is-disabled');
+  return row;
 }
 
 // 条件路径下拉：列出变量树全部叶子路径（结构以默认值为准，游戏值同构）。
@@ -1457,7 +1569,8 @@ function buildValuesTriggerConditionRow(condition) {
   for (const op of VALUES_TRIGGER_OPS) {
     const option = document.createElement('option');
     option.value = op.value;
-    option.textContent = op.label;
+    // 下拉里也直接显示符号（≥ / ≤ / ＝ / ≠），名称留给悬停提示。
+    option.textContent = op.display || op.value;
     opSelect.appendChild(option);
   }
   opSelect.value = VALUES_TRIGGER_OPS.some((op) => op.value === String(condition?.op || '').trim())
@@ -1509,6 +1622,8 @@ function renderValuesTriggerConditionRows() {
 }
 
 function addValuesTriggerConditionRow() {
+  // 先读回已填内容再追加：整表重渲染以草稿数组为准，不回读会丢掉未保存的输入。
+  valuesTriggerEditorConditions = readValuesTriggerConditionRows();
   valuesTriggerEditorConditions.push({ path: '', op: '==', value: null });
   renderValuesTriggerConditionRows();
 }
@@ -1547,6 +1662,7 @@ function buildValuesTriggerEffectRow(effect) {
   for (const op of VALUES_TRIGGER_EFFECT_OPS) {
     const option = document.createElement('option');
     option.value = op.value;
+    // 效果类型是两种语义（加减 / 覆盖），保留完整名称而非裸符号。
     option.textContent = op.label;
     opSelect.appendChild(option);
   }
@@ -1589,6 +1705,8 @@ function renderValuesTriggerEffectRows() {
 }
 
 function addValuesTriggerEffectRow() {
+  // 同上：先回读当前草稿，避免重渲染覆盖未保存的输入。
+  valuesTriggerEditorEffects = readValuesTriggerEffectRows();
   valuesTriggerEditorEffects.push({ path: '', op: 'add', value: null });
   renderValuesTriggerEffectRows();
 }
@@ -1607,7 +1725,7 @@ function readValuesTriggerEffectRows() {
   return effects;
 }
 
-function openValuesTriggerEditor(item) {
+function openValuesTriggerEditor(item, presetCategoryId) {
   const editor = document.getElementById(VALUES_TRIGGER_EDITOR_ID);
   if (!editor) return;
   valuesTriggerEditorId = item && item.id ? item.id : null;
@@ -1617,6 +1735,9 @@ function openValuesTriggerEditor(item) {
   valuesTriggerEditorEffects = Array.isArray(item?.effects)
     ? item.effects.map((effect) => ({ ...effect }))
     : [];
+  valuesTriggerPresetCategoryId = valuesTriggerEditorId
+    ? String(item?.categoryId || '').trim()
+    : String(presetCategoryId || '').trim();
   const title = document.getElementById(VALUES_TRIGGER_EDITOR_TITLE_ID);
   const nameInput = document.getElementById(VALUES_TRIGGER_EDITOR_NAME_ID);
   const logicSelect = document.getElementById(VALUES_TRIGGER_EDITOR_LOGIC_ID);
@@ -1647,14 +1768,91 @@ function openValuesTriggerEditor(item) {
   }
   if (descInput) descInput.value = item?.description || '';
   if (contentInput) contentInput.value = item?.content || '';
+  populateValuesTriggerCategorySelect(valuesTriggerPresetCategoryId);
   renderValuesTriggerConditionRows();
   renderValuesTriggerEffectRows();
   editor.hidden = false;
   closeValuesEditor();
   closeValuesKeyEditor();
   closeValuesAddMenu();
+  closeValuesTriggerAddMenu();
   nameInput?.focus();
 }
+
+// 上级分类下拉：顶层 + 全部分类（排除自己与自己的后代，防环）。
+function populateValuesTriggerCategoryParentSelect(currentId, selectedParentId) {
+  const select = document.getElementById(VALUES_TRIGGER_CATEGORY_PARENT_ID);
+  if (!select) return;
+  const ctx = getContextSafe();
+  const categories = ctx ? getValuesTriggerCategories(ctx) : [];
+  select.innerHTML = '';
+  const top = document.createElement('option');
+  top.value = '';
+  top.textContent = '（顶层 · 根分类）';
+  select.appendChild(top);
+  for (const category of categories) {
+    if (currentId && category.id === currentId) continue;
+    if (currentId && isValuesTriggerCategoryAncestor(ctx, currentId, category.id)) continue;
+    const option = document.createElement('option');
+    option.value = category.id;
+    option.textContent = category.name;
+    select.appendChild(option);
+  }
+  // 只认显式预设，避免沿用上一次会话的旧值导致误挂父级
+  select.value = categories.some((category) => category.id === selectedParentId) ? selectedParentId : '';
+}
+
+// 分类下拉：全部分类 + 「未分类」兜底；引用的分类已删除时显示回退到未分类。
+function populateValuesTriggerCategorySelect(selectedCategoryId) {
+  const select = document.getElementById(VALUES_TRIGGER_CATEGORY_SELECT_ID);
+  if (!select) return;
+  const ctx = getContextSafe();
+  const categories = ctx ? getValuesTriggerCategories(ctx) : [];
+  const byId = new Map(categories.map((category) => [String(category.id || ''), category]));
+  const depthOf = (category) => {
+    let depth = 0;
+    let current = category;
+    let guard = 0;
+    while (current && guard < 100) {
+      const parentId = String(current.parentId || '').trim();
+      if (!parentId || !byId.has(parentId)) break;
+      current = byId.get(parentId);
+      depth += 1;
+      guard += 1;
+    }
+    return depth;
+  };
+  select.innerHTML = '';
+  const unassigned = document.createElement('option');
+  unassigned.value = '';
+  unassigned.textContent = '未分类';
+  select.appendChild(unassigned);
+  // 按树序展示（根分类在前，子分类缩进），与列表页层级一致。
+  const walk = (category, depth) => {
+    const option = document.createElement('option');
+    option.value = category.id;
+    option.textContent = `${'　'.repeat(depth)}${category.name}`;
+    select.appendChild(option);
+    for (const child of categories.filter((item) => String(item.parentId || '').trim() === category.id)) {
+      walk(child, depth + 1);
+    }
+  };
+  for (const root of getValuesTriggerRootCategories(ctx)) {
+    walk(root, depthOf(root));
+  }
+  for (const category of categories) {
+    // 父分类悬空的分类（渲染树时会被当作根，walk 可能漏掉）单独补上。
+    const parentId = String(category.parentId || '').trim();
+    if (parentId && !byId.has(parentId)) {
+      const option = document.createElement('option');
+      option.value = category.id;
+      option.textContent = category.name;
+      select.appendChild(option);
+    }
+  }
+  select.value = categories.some((category) => category.id === selectedCategoryId) ? selectedCategoryId : '';
+}
+
 
 function closeValuesTriggerEditor() {
   const editor = document.getElementById(VALUES_TRIGGER_EDITOR_ID);
@@ -1662,6 +1860,7 @@ function closeValuesTriggerEditor() {
   valuesTriggerEditorId = null;
   valuesTriggerEditorConditions = [];
   valuesTriggerEditorEffects = [];
+  valuesTriggerPresetCategoryId = '';
 }
 
 function saveValuesTriggerEditor() {
@@ -1704,6 +1903,7 @@ function saveValuesTriggerEditor() {
     name,
     logic: logic === 'any' ? 'any' : 'all',
     once,
+    categoryId: String(document.getElementById(VALUES_TRIGGER_CATEGORY_SELECT_ID)?.value || '').trim(),
     description: String(document.getElementById(VALUES_TRIGGER_EDITOR_DESC_ID)?.value || '').trim(),
     conditions,
     effects,
@@ -1737,6 +1937,111 @@ function handleValuesToggleTrigger(id) {
   const trigger = toggleValuesTriggerEnabled(ctx, id);
   if (!trigger) return;
   logApp('info', trigger.enabled ? '剧情触发已激活' : '剧情触发已关闭', trigger.name);
+  renderValuesTriggers();
+}
+
+// ---------- 触发分类：编辑器 / 删除 / 启停 ----------
+function openValuesTriggerCategoryEditor(item, presetParentId) {
+  const editor = document.getElementById(VALUES_TRIGGER_CATEGORY_EDITOR_ID);
+  if (!editor) return;
+  valuesTriggerCategoryEditorId = item && item.id ? item.id : null;
+  valuesTriggerCategoryPresetParentId = valuesTriggerCategoryEditorId
+    ? ''
+    : String(presetParentId || '').trim();
+  const title = document.getElementById(VALUES_TRIGGER_CATEGORY_EDITOR_TITLE_ID);
+  const nameInput = document.getElementById(VALUES_TRIGGER_CATEGORY_EDITOR_NAME_ID);
+  const descInput = document.getElementById(VALUES_TRIGGER_CATEGORY_EDITOR_DESC_ID);
+  if (title) {
+    title.textContent = valuesTriggerCategoryEditorId
+      ? '编辑分类'
+      : (valuesTriggerCategoryPresetParentId ? '添加子分类' : '新建分类');
+  }
+  if (nameInput) nameInput.value = item?.name || '';
+  if (descInput) descInput.value = item?.description || '';
+  populateValuesTriggerCategoryParentSelect(
+    valuesTriggerCategoryEditorId,
+    valuesTriggerCategoryEditorId
+      ? String(item?.parentId || '').trim()
+      : valuesTriggerCategoryPresetParentId,
+  );
+  editor.hidden = false;
+  closeValuesTriggerEditor();
+  closeValuesEditor();
+  closeValuesKeyEditor();
+  closeValuesAddMenu();
+  closeValuesTriggerAddMenu();
+  nameInput?.focus();
+}
+
+function closeValuesTriggerCategoryEditor() {
+  const editor = document.getElementById(VALUES_TRIGGER_CATEGORY_EDITOR_ID);
+  if (editor) editor.hidden = true;
+  valuesTriggerCategoryEditorId = null;
+  valuesTriggerCategoryPresetParentId = '';
+}
+
+function saveValuesTriggerCategoryEditor() {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const name = String(document.getElementById(VALUES_TRIGGER_CATEGORY_EDITOR_NAME_ID)?.value || '').trim();
+  if (!name) {
+    valuesToastr('warning', '请填写分类名称');
+    return;
+  }
+  const data = {
+    name,
+    description: String(document.getElementById(VALUES_TRIGGER_CATEGORY_EDITOR_DESC_ID)?.value || '').trim(),
+    parentId: String(document.getElementById(VALUES_TRIGGER_CATEGORY_PARENT_ID)?.value || '').trim(),
+  };
+  if (valuesTriggerCategoryEditorId) {
+    updateValuesTriggerCategory(ctx, valuesTriggerCategoryEditorId, data);
+    logApp('info', '触发分类已更新', name);
+  } else {
+    const category = createValuesTriggerCategory(ctx, data);
+    // 新建分类默认展开，玩家能立即看到空分类下的新事件挂上来。
+    valuesTriggerExpanded.add(category.id);
+    logApp('info', '分类已添加', name);
+    valuesToastr('success', `分类「${name}」已创建`);
+  }
+  closeValuesTriggerCategoryEditor();
+  renderValuesTriggers();
+  refreshHomeValuesStatus();
+}
+
+async function handleValuesDeleteTriggerCategory(id) {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const category = getValuesTriggerCategoryById(ctx, id);
+  if (!category) return;
+  const count = getValuesTriggersByCategory(ctx, id).length;
+  const subCount = getValuesTriggerCategoryChildren(ctx, id).length;
+  const parts = [];
+  if (subCount > 0) parts.push(`${subCount} 个子分类上提一层`);
+  if (count > 0) parts.push(`${count} 个事件转为「未分类」`);
+  const note = parts.length > 0 ? parts.join('，') : '分类下暂无子分类与事件';
+  if (!(await kaleidoConfirm(`确定删除分类「${category.name}」吗？\n${note}。`))) return;
+  const result = deleteValuesTriggerCategory(ctx, id);
+  valuesTriggerExpanded.delete(id);
+  logApp('info', '触发分类已删除', category.name,
+    `${result.movedCategories} 个子分类上提，${result.detachedTriggers.length} 个事件转为未分类`);
+  valuesToastr('success', '分类已删除');
+  renderValuesTriggers();
+  refreshHomeValuesStatus();
+}
+
+
+function handleValuesToggleTriggerCategory(id) {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const category = toggleValuesTriggerCategoryEnabled(ctx, id);
+  if (!category) return;
+  logApp('info', category.enabled ? '分类已激活（其下事件重新参与判定）' : '分类已关闭（其下事件不再参与判定）', category.name);
+  renderValuesTriggers();
+}
+
+function valuesTriggerToggleExpanded(id) {
+  if (valuesTriggerExpanded.has(id)) valuesTriggerExpanded.delete(id);
+  else valuesTriggerExpanded.add(id);
   renderValuesTriggers();
 }
 
@@ -1930,9 +2235,15 @@ function bindValuesContentEvents() {
   });
 
   document.getElementById(VALUES_TRIGGERS_TOGGLE_ID)?.addEventListener('click', toggleValuesTriggerSystem);
-  document.getElementById(VALUES_TRIGGERS_ADD_ID)?.addEventListener('click', () => openValuesTriggerEditor(null));
+  document.getElementById(VALUES_TRIGGER_ADD_ID)?.addEventListener('click', (event) => {
+    openValuesTriggerAddMenu(event.currentTarget, { root: true });
+  });
+  document.getElementById(VALUES_TRIGGER_ADD_MENU_CATEGORY_ID)?.addEventListener('click', () => handleValuesTriggerAddMenuPick('category'));
+  document.getElementById(VALUES_TRIGGER_ADD_MENU_TRIGGER_ID)?.addEventListener('click', () => handleValuesTriggerAddMenuPick('trigger'));
   document.getElementById(VALUES_TRIGGER_EDITOR_CANCEL_ID)?.addEventListener('click', closeValuesTriggerEditor);
   document.getElementById(VALUES_TRIGGER_EDITOR_SAVE_ID)?.addEventListener('click', saveValuesTriggerEditor);
+  document.getElementById(VALUES_TRIGGER_CATEGORY_EDITOR_CANCEL_ID)?.addEventListener('click', closeValuesTriggerCategoryEditor);
+  document.getElementById(VALUES_TRIGGER_CATEGORY_EDITOR_SAVE_ID)?.addEventListener('click', saveValuesTriggerCategoryEditor);
   document.getElementById(VALUES_TRIGGER_EDITOR_CONDITION_ADD_ID)?.addEventListener('click', addValuesTriggerConditionRow);
   document.getElementById(VALUES_TRIGGER_EDITOR_CONDITIONS_ID)?.addEventListener('click', (event) => {
     const button = event.target instanceof Element ? event.target.closest('.' + VALUES_TRIGGER_CONDITION_REMOVE_CLASS) : null;
@@ -2077,6 +2388,32 @@ function bindValuesContentEvents() {
         handleValuesToggleTrigger(id);
         break;
       }
+      case 'toggle-category': {
+        // 分类行：点展开箭头 = 展开 / 收起；点开关 = 启停分类。
+        if (button.classList.contains('kaleido-values__trigger-chevron')) {
+          valuesTriggerToggleExpanded(id);
+          break;
+        }
+        handleValuesToggleTriggerCategory(id);
+        break;
+      }
+      case 'edit-category': {
+        const category = getValuesTriggerCategoryById(getContextSafe(), id);
+        if (category) openValuesTriggerCategoryEditor(category);
+        break;
+      }
+      case 'delete-category': {
+        handleValuesDeleteTriggerCategory(id);
+        break;
+      }
+      case 'add-menu': {
+        // 分类行「＋」：在此分类下新建子分类 / 事件（与剧情脉络节点行一致）。
+        const category = getValuesTriggerCategoryById(getContextSafe(), id);
+        if (!category) break;
+        valuesTriggerExpanded.add(id);
+        openValuesTriggerAddMenu(button, { categoryId: id });
+        break;
+      }
       default:
         break;
     }
@@ -2153,20 +2490,20 @@ function bindValuesContentEvents() {
   initValuesDragReorder(
     document.getElementById(VALUES_TRIGGERS_BODY_ID),
     '.kaleido-values__drag-handle',
-    valuesListSiblingsOf(document.getElementById(VALUES_TRIGGERS_BODY_ID)),
+    valuesTriggerSiblingsOf,
     handleValuesTriggersReorder
   );
 
   if (!globalThis[VALUES_DIALOG_KEY + '_menu']) {
     globalThis[VALUES_DIALOG_KEY + '_menu'] = (event) => {
-      const menu = document.getElementById(VALUES_ADD_MENU_ID);
-      if (!menu || menu.hidden) return;
       const target = event.target instanceof Element ? event.target : null;
       if (!target) return;
-      if (menu.contains(target)) return;
       // 点「＋」按钮本身不算外部：按钮的 click 会负责打开/重定位菜单
-      if (target.closest(`#${VALUES_ADD_ROOT_ID}, [data-action="add-menu"]`)) return;
-      closeValuesAddMenu();
+      if (target.closest(`#${VALUES_ADD_ROOT_ID}, #${VALUES_TRIGGER_ADD_ID}, [data-action="add-menu"]`)) return;
+      const treeMenu = document.getElementById(VALUES_ADD_MENU_ID);
+      if (treeMenu && !treeMenu.hidden && !treeMenu.contains(target)) closeValuesAddMenu();
+      const triggerMenu = document.getElementById(VALUES_TRIGGER_ADD_MENU_ID);
+      if (triggerMenu && !triggerMenu.hidden && !triggerMenu.contains(target)) closeValuesTriggerAddMenu();
     };
     document.addEventListener('click', globalThis[VALUES_DIALOG_KEY + '_menu']);
   }
@@ -2251,9 +2588,17 @@ function buildValuesContentHTML(editorClass) {
                   <span class="kaleido-values__inject-toggle-label"><span class="${VALUES_TRIGGER_ICON_CLASS}"></span> 剧情触发</span>
                 </div>
                 <span class="kaleido-values__toolbar-spacer"></span>
-                <button type="button" id="${VALUES_TRIGGERS_ADD_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--primary" title="新建剧情触发事件">＋ 新建触发</button>
+                <button type="button" id="${VALUES_TRIGGER_ADD_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--primary" title="新建分类或事件（分类可整体启停）">＋ 新建</button>
               </div>
               <div id="${VALUES_TRIGGERS_BODY_ID}" class="kaleido-values__triggers-body"></div>
+              <div id="${VALUES_TRIGGER_ADD_MENU_ID}" class="kaleido-values__add-menu" hidden role="menu" aria-label="新建">
+                <button type="button" id="${VALUES_TRIGGER_ADD_MENU_CATEGORY_ID}" class="kaleido-values__add-menu-item" role="menuitem" data-kind="category">
+                  <span class="${VALUES_TRIGGER_CATEGORY_ICON_CLASS}"></span> 新建分类
+                </button>
+                <button type="button" id="${VALUES_TRIGGER_ADD_MENU_TRIGGER_ID}" class="kaleido-values__add-menu-item" role="menuitem" data-kind="trigger">
+                  <span class="${VALUES_TRIGGER_ICON_CLASS}"></span> 新建事件
+                </button>
+              </div>
             </div>
             <div id="${VALUES_INJECT_PANE_ID}" class="kaleido-values__pane" hidden>
               <div class="kaleido-values__inject-preview-head">
@@ -2384,6 +2729,10 @@ function buildValuesContentHTML(editorClass) {
                 <span class="kaleido-api__label">事件名称 *</span>
                 <input id="${VALUES_TRIGGER_EDITOR_NAME_ID}" class="kaleido-input" type="text" placeholder="如：告白事件 / 战争爆发" autocomplete="off" spellcheck="false" />
               </label>
+              <label class="kaleido-api__field" for="${VALUES_TRIGGER_CATEGORY_SELECT_ID}">
+                <span class="kaleido-api__label">所属分类</span>
+                <select id="${VALUES_TRIGGER_CATEGORY_SELECT_ID}" class="kaleido-input" title="事件归入的分类；未分类事件不挂在任何分类下，照常参与判定"></select>
+              </label>
               <label class="kaleido-api__field" for="${VALUES_TRIGGER_EDITOR_LOGIC_ID}">
                 <span class="kaleido-api__label">条件逻辑</span>
                 <select id="${VALUES_TRIGGER_EDITOR_LOGIC_ID}" class="kaleido-input" title="全部满足（且）= 所有条件都满足才触发；任一满足（或）= 满足任意一条即触发"></select>
@@ -2413,6 +2762,29 @@ function buildValuesContentHTML(editorClass) {
               <div class="kaleido-values__editor-actions">
                 <span class="kaleido-values__editor-spacer"></span>
                 <button type="button" id="${VALUES_TRIGGER_EDITOR_SAVE_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--primary">保存</button>
+              </div>
+            </div>
+            <div id="${VALUES_TRIGGER_CATEGORY_EDITOR_ID}" class="${editorClass}" hidden>
+              <div class="kaleido-values__editor-head">
+                <span id="${VALUES_TRIGGER_CATEGORY_EDITOR_TITLE_ID}" class="kaleido-values__editor-title">新建分类</span>
+                <span class="kaleido-values__editor-spacer"></span>
+                <button type="button" id="${VALUES_TRIGGER_CATEGORY_EDITOR_CANCEL_ID}" class="kaleido-icon-btn" title="取消" aria-label="取消">✕</button>
+              </div>
+              <label class="kaleido-api__field" for="${VALUES_TRIGGER_CATEGORY_PARENT_ID}">
+                <span class="kaleido-api__label">上级分类</span>
+                <select id="${VALUES_TRIGGER_CATEGORY_PARENT_ID}" class="kaleido-input" title="分类挂在哪个上级分类下；顶层分类不挂任何上级"></select>
+              </label>
+              <label class="kaleido-api__field" for="${VALUES_TRIGGER_CATEGORY_EDITOR_NAME_ID}">
+                <span class="kaleido-api__label">分类名称 *</span>
+                <input id="${VALUES_TRIGGER_CATEGORY_EDITOR_NAME_ID}" class="kaleido-input" type="text" placeholder="如：主线剧情 / 支线 / 日常" autocomplete="off" spellcheck="false" />
+              </label>
+              <label class="kaleido-api__field" for="${VALUES_TRIGGER_CATEGORY_EDITOR_DESC_ID}">
+                <span class="kaleido-api__label">分类说明</span>
+                <input id="${VALUES_TRIGGER_CATEGORY_EDITOR_DESC_ID}" class="kaleido-input" type="text" placeholder="可选：一句话说明用途" autocomplete="off" spellcheck="false" />
+              </label>
+              <div class="kaleido-values__editor-actions">
+                <span class="kaleido-values__editor-spacer"></span>
+                <button type="button" id="${VALUES_TRIGGER_CATEGORY_EDITOR_SAVE_ID}" class="kaleido-btn kaleido-btn--mini kaleido-btn--primary">保存</button>
               </div>
             </div>
             <div id="${VALUES_ADD_MENU_ID}" class="kaleido-values__add-menu" hidden role="menu" aria-label="新建">
@@ -2459,6 +2831,7 @@ ${buildValuesContentHTML('kaleido-values-dialog__editor')}
       const editor = document.getElementById(VALUES_EDITOR_ID);
       const keyEditor = document.getElementById(VALUES_KEY_EDITOR_ID);
       const triggerEditor = document.getElementById(VALUES_TRIGGER_EDITOR_ID);
+      const triggerCategoryEditor = document.getElementById(VALUES_TRIGGER_CATEGORY_EDITOR_ID);
       if (editor && !editor.hidden) {
         closeValuesEditor();
         return;
@@ -2471,6 +2844,12 @@ ${buildValuesContentHTML('kaleido-values-dialog__editor')}
         closeValuesTriggerEditor();
         return;
       }
+      if (triggerCategoryEditor && !triggerCategoryEditor.hidden) {
+        closeValuesTriggerCategoryEditor();
+        return;
+      }
+      closeValuesAddMenu();
+      closeValuesTriggerAddMenu();
       if (isValuesWorkbenchOpen()) closeValuesWorkbench();
     };
     document.addEventListener('keydown', globalThis[VALUES_DIALOG_KEY]);

@@ -253,16 +253,16 @@ runner.test('注入文本：<Story_Trigger> 块含事件与条件摘要', () => 
   const text = ctx.buildValuesTriggerInjectionText(c, [t]);
   assert(text.startsWith('<Story_Trigger>') && text.endsWith('</Story_Trigger>'), '应以 <Story_Trigger> 块包裹');
   assert(text.includes('告白事件'), '应包含事件名');
-  assert(text.includes('张三/好感 >= 70'), '应包含条件摘要');
+  assert(text.includes('张三/好感 ≥ 70'), '应包含条件摘要（符号展示）');
   assert(text.includes('张三向你表白了。'), '应包含事件正文');
 });
 
 runner.test('条件摘要：且 / 或 连接词与 exists 无值', () => {
   const c = fresh();
   const t1 = { logic: 'all', conditions: [{ path: '张三/好感', op: '>=', value: 70 }, { path: '张三/是否已知真相', op: '==', value: true }] };
-  assert(ctx.formatValuesTriggerConditions(t1) === '张三/好感 >= 70 且 张三/是否已知真相 == true', '且连接');
+  assert(ctx.formatValuesTriggerConditions(t1) === '张三/好感 ≥ 70 且 张三/是否已知真相 ＝ true', '且连接');
   const t2 = { logic: 'any', conditions: [{ path: '张三/好感', op: '>=', value: 70 }, { path: '张三/是否已知真相', op: 'exists', value: null }] };
-  assert(ctx.formatValuesTriggerConditions(t2) === '张三/好感 >= 70 或 张三/是否已知真相 exists', '或连接与 exists');
+  assert(ctx.formatValuesTriggerConditions(t2) === '张三/好感 ≥ 70 或 张三/是否已知真相 存在', '或连接与 exists');
 });
 
 // ---------- 发送前任务 ----------

@@ -3008,6 +3008,89 @@ textarea.kaleido-input {
   opacity: 0.55;
 }
 
+/* 触发分类行（事件分组，与剧情脉络节点行同构：箭头 + 图标 + 计数 + 启停）。
+   展开箭头复用 .kaleido-values__chevron 的视觉参数，独立命名避免与变量树
+   展开箭头的 is-expanded 选择器（按 entry 行写的）互相干扰。 */
+.kaleido-values__row--trigger-category {
+  padding-left: calc(8px + var(--depth, 0) * 20px);
+}
+
+.kaleido-values__row--trigger-category.is-disabled {
+  opacity: 0.55;
+}
+
+.kaleido-values__row--trigger-category.is-disabled .kaleido-values__row-icon,
+.kaleido-values__row--trigger-category.is-disabled .kaleido-values__row-count {
+  color: var(--k-text-3);
+}
+
+.kaleido-values__trigger-chevron {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 11px;
+  color: var(--k-text-3);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.13s ease, color 0.13s ease;
+}
+
+.kaleido-values__trigger-chevron:hover {
+  color: var(--k-text);
+  background: var(--k-hover);
+}
+
+.kaleido-values__trigger-chevron span {
+  transition: transform 0.18s ease;
+}
+
+.kaleido-values__row.is-expanded .kaleido-values__trigger-chevron span {
+  transform: rotate(90deg);
+}
+
+.kaleido-values__trigger-chevron.is-empty {
+  visibility: hidden;
+}
+
+.kaleido-values__row--trigger-category .kaleido-values__row-icon {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--k-blue);
+  background: rgba(10, 132, 255, 0.13);
+  border-radius: 7px;
+}
+
+/* 分类行不参与拖动：分类顺序用不到，把手只出现在触发行上（同剧情脉络）。 */
+.kaleido-values__row--trigger-category .kaleido-values__row-count {
+  margin-left: auto;
+}
+
+.kaleido-values__trigger-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 6px;
+}
+
+.kaleido-values__trigger-group-title {
+  padding: 6px 10px 2px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--k-text-3);
+}
+
 /* 拖动把手 */
 .kaleido-values__drag-handle {
   flex: none;

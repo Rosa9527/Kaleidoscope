@@ -1,7 +1,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.4.6';
+const MODULE_VERSION = '1.4.7';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -375,7 +375,6 @@ const VALUES_TRIGGER_ICON_CLASS = 'fa-solid fa-bolt';
 const VALUES_TAB_TRIGGERS_ID = 'kaleido-values-tab-triggers';
 const VALUES_TRIGGERS_PANE_ID = 'kaleido-values-triggers-pane';
 const VALUES_TRIGGERS_TOGGLE_ID = 'kaleido-values-triggers-toggle';
-const VALUES_TRIGGERS_ADD_ID = 'kaleido-values-triggers-add';
 const VALUES_TRIGGERS_BODY_ID = 'kaleido-values-triggers-body';
 const VALUES_TRIGGER_EDITOR_ID = 'kaleido-values-trigger-editor';
 const VALUES_TRIGGER_EDITOR_TITLE_ID = 'kaleido-values-trigger-editor-title';
@@ -413,12 +412,29 @@ const VALUES_TRIGGER_EFFECT_OPS = Object.freeze([
   { value: 'add', display: '+/-', label: '加减值（+/-，正加负减）' },
   { value: 'set', display: '＝', label: '覆盖（直接设为指定值）' },
 ]);
+// 剧情触发 · 事件分类（把触发事件分组，语义与剧情脉络节点一致：级联启停 / 未分类兜底）。
+const VALUES_TRIGGER_CATEGORY_ICON_CLASS = 'fa-solid fa-folder';
+const VALUES_TRIGGER_CATEGORY_OPEN_ICON_CLASS = 'fa-solid fa-folder-open';
+const VALUES_TRIGGER_CATEGORY_EDITOR_ID = 'kaleido-values-trigger-category-editor';
+const VALUES_TRIGGER_CATEGORY_EDITOR_TITLE_ID = 'kaleido-values-trigger-category-editor-title';
+const VALUES_TRIGGER_CATEGORY_EDITOR_NAME_ID = 'kaleido-values-trigger-category-editor-name';
+const VALUES_TRIGGER_CATEGORY_EDITOR_DESC_ID = 'kaleido-values-trigger-category-editor-desc';
+const VALUES_TRIGGER_CATEGORY_EDITOR_SAVE_ID = 'kaleido-values-trigger-category-editor-save';
+const VALUES_TRIGGER_CATEGORY_EDITOR_CANCEL_ID = 'kaleido-values-trigger-category-editor-cancel';
+const VALUES_TRIGGER_CATEGORY_SELECT_ID = 'kaleido-values-trigger-editor-category';
+const VALUES_TRIGGER_CATEGORY_PARENT_ID = 'kaleido-values-trigger-category-editor-parent';
+const VALUES_TRIGGER_ADD_ID = 'kaleido-values-triggers-add';
+const VALUES_TRIGGER_ADD_MENU_ID = 'kaleido-values-triggers-add-menu';
+const VALUES_TRIGGER_ADD_MENU_KEY = '__kaleido_values_trigger_add_menu_key__';
+const VALUES_TRIGGER_ADD_MENU_CATEGORY_ID = 'kaleido-values-triggers-add-menu-category';
+const VALUES_TRIGGER_ADD_MENU_TRIGGER_ID = 'kaleido-values-triggers-add-menu-trigger';
 // 剧情触发 · 注入与轮次记录
 const VALUES_TRIGGER_INJECT_KEY = 'Kaleidoscope_Trigger_Event';
 const VALUES_TRIGGER_LAST_ROUND_KEY = '__kaleido_values_trigger_last_round__';
 const VALUES_TRIGGER_CLEANUP_ENDED_KEY = '__kaleido_values_trigger_cleanup_ended__';
 const VALUES_TRIGGER_CLEANUP_STOPPED_KEY = '__kaleido_values_trigger_cleanup_stopped__';
 // 剧情触发 · 条件运算符与逻辑选项
+// 运算符展示：下拉与摘要一律用符号本身（≥ / ≤ / ＝ / ≠），label 只作悬停说明。
 const VALUES_TRIGGER_OPS = Object.freeze([
   { value: '==', display: '＝', label: '等于（==）' },
   { value: '!=', display: '≠', label: '不等于（!=）' },
@@ -430,6 +446,12 @@ const VALUES_TRIGGER_OPS = Object.freeze([
   { value: 'exists', display: '存在', label: '存在（exists）' },
   { value: 'not exists', display: '不存在', label: '不存在（not exists）' },
 ]);
+// 运算符 → 展示符号（找不到时回退原值，未知运算符照常显示）。
+function valuesTriggerOpDisplay(op) {
+  const value = String(op || '').trim();
+  const matched = VALUES_TRIGGER_OPS.find((item) => item.value === value);
+  return matched ? (matched.display || matched.value) : value;
+}
 const VALUES_TRIGGER_LOGIC_OPTIONS = Object.freeze([
   { value: 'all', label: '全部满足（且）' },
   { value: 'any', label: '任一满足（或）' },

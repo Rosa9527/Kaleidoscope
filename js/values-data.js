@@ -259,6 +259,7 @@ function getValuesBundle(ctx) {
     fallback.defaults = {};
   }
   if (!Array.isArray(fallback.triggers)) fallback.triggers = [];
+  if (!Array.isArray(fallback.categories)) fallback.categories = [];
   if (!fallback.order || typeof fallback.order !== 'object' || Array.isArray(fallback.order)) fallback.order = {};
   return fallback;
 }
@@ -278,6 +279,7 @@ function saveValuesData(ctx) {
         ? bundle.inject
         : { enabled: false, paths: [] },
       triggers: Array.isArray(bundle.triggers) ? bundle.triggers : [],
+      categories: Array.isArray(bundle.categories) ? bundle.categories : [],
       order: bundle.order && typeof bundle.order === 'object' && !Array.isArray(bundle.order)
         ? bundle.order
         : {},
@@ -1421,6 +1423,8 @@ function serializeValuesBundle(ctx) {
       lines.push(`    enabled: ${trigger?.enabled === false ? 'false' : 'true'}`);
       lines.push(`    once: ${trigger?.once === false ? 'false' : 'true'}`);
       lines.push(`    logic: ${String(trigger?.logic || 'all') === 'any' ? 'any' : 'all'}`);
+      // 分类（可空 = 未分类）：旧版万华镜导入时忽略此字段，事件回退未分类。
+      lines.push(`    categoryId: ${yamlScalar(String(trigger?.categoryId || ''))}`);
       if (String(trigger?.description || '').trim()) {
         lines.push(`    description: ${yamlScalar(String(trigger?.description || ''))}`);
       }
@@ -1447,6 +1451,23 @@ function serializeValuesBundle(ctx) {
         }
       }
       lines.push(`    content: ${yamlBlockScalarText(String(trigger?.content || ''), '    ')}`);
+    }
+  }
+  // 事件分类段：只在有分类时输出（旧版万华镜 / 其他工具不识别也能忽略）。
+  const categories = Array.isArray(bundle.categories) ? bundle.categories : [];
+  if (categories.length === 0) {
+    lines.push('triggerCategories: []');
+  } else {
+    lines.push('triggerCategories:');
+    for (const category of categories) {
+      lines.push(`  - id: ${yamlScalar(String(category?.id || ''))}`);
+      const parentId = String(category?.parentId || '').trim();
+      if (parentId) lines.push(`    parentId: ${yamlScalar(parentId)}`);
+      lines.push(`    name: ${yamlScalar(String(category?.name || ''))}`);
+      lines.push(`    enabled: ${category?.enabled === false ? 'false' : 'true'}`);
+      if (String(category?.description || '').trim()) {
+        lines.push(`    description: ${yamlScalar(String(category?.description || ''))}`);
+      }
     }
   }
   return lines.join('\n');
@@ -1537,10 +1558,32 @@ function parseValuesBundle(text) {
         enabled: item.enabled !== false,
         once: item.once !== false,
         logic: String(item.logic || 'all').trim() === 'any' ? 'any' : 'all',
+        // 可空 = 未分类：旧版导出的触发无此字段，照常导入为未分类事件。
+        categoryId: String(item.categoryId || '').trim(),
         description: String(item.description || '').trim(),
         conditions,
         effects,
         content: String(item.content || ''),
+      });
+    }
+  }
+  // 事件分类段：可省略（旧版导出无此段），缺省空数组；非法条目（缺 id / 重复 id）丢弃。
+  const categories = [];
+  if (parsed.triggerCategories !== undefined) {
+    if (!Array.isArray(parsed.triggerCategories)) throw new Error('triggerCategories 必须是列表');
+    const seenCategoryIds = new Set();
+    for (const item of parsed.triggerCategories) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+      const id = String(item.id || '').trim();
+      if (!id) throw new Error('触发分类缺少 id');
+      if (seenCategoryIds.has(id)) continue;
+      seenCategoryIds.add(id);
+      categories.push({
+        id,
+        parentId: String(item.parentId || '').trim(),
+        name: String(item.name || '').trim() || '未命名分类',
+        enabled: item.enabled !== false,
+        description: String(item.description || '').trim(),
       });
     }
   }
@@ -1556,7 +1599,7 @@ function parseValuesBundle(text) {
       if (names.length > 0) order[path] = names;
     }
   }
-  return { keys, defaults, triggers, order };
+  return { keys, defaults, triggers, categories, order };
 }
 
 // 整包导出文件名：绑定角色卡 → 「变量: 角色卡名.yaml」；群聊 / 未选角色时回退时间戳名。
@@ -1567,13 +1610,18 @@ function getValuesBundleFilename(ctx) {
 }
 
 // 导入合并：同名校的键更新规则，其余追加；defaults 深合并（同路径补丁覆盖，其余保留）。
+// 触发分类同 id 更新、其余追加；事件引用的分类不存在时转为「未分类」（旧版
+// 导出文件无分类段，其事件的 categoryId 本就为空，不受影响）。
 function applyValuesBundle(ctx, parsed, mode) {
   const bundle = getValuesBundle(ctx);
   if (mode === 'replace') {
     bundle.keys.length = 0;
     bundle.defaults = {};
     bundle.order = {};
+    if (!Array.isArray(bundle.categories)) bundle.categories = [];
+    bundle.categories.length = 0;
   }
+  if (!Array.isArray(bundle.categories)) bundle.categories = [];
   for (const key of parsed.keys) {
     const existing = bundle.keys.find((item) => String(item?.name || '').trim() === String(key.name || '').trim());
     if (existing) {
@@ -1628,8 +1676,30 @@ function applyValuesBundle(ctx, parsed, mode) {
     if (existing) Object.assign(existing, cloneValue(trigger));
     else triggers.push(cloneValue(trigger));
   }
+  // 分类合并：同 id 更新，其余追加；随后清掉指向不存在分类的事件引用。
+  const categories = getValuesTriggerCategories(ctx);
+  for (const category of Array.isArray(parsed.categories) ? parsed.categories : []) {
+    const existing = categories.find((item) => item.id === category.id);
+    if (existing) Object.assign(existing, cloneValue(category));
+    else categories.push(cloneValue(category));
+  }
+  const knownCategoryIds = new Set(categories.map((category) => category.id));
+  for (const trigger of triggers) {
+    const categoryId = String(trigger.categoryId || '').trim();
+    if (categoryId && !knownCategoryIds.has(categoryId)) trigger.categoryId = '';
+  }
+  // 分类父引用清理：指向不存在分类的 parentId 一律回退顶层（防悬空环）。
+  for (const category of categories) {
+    const parentId = String(category.parentId || '').trim();
+    if (parentId && !knownCategoryIds.has(parentId)) category.parentId = '';
+  }
   saveValuesData(ctx);
-  return { keyCount: bundle.keys.length, defaults: bundle.defaults, triggerCount: triggers.length };
+  return {
+    keyCount: bundle.keys.length,
+    defaults: bundle.defaults,
+    triggerCount: triggers.length,
+    categoryCount: categories.length,
+  };
 }
 
 // 深合并两个映射（补丁覆盖，其余保留；不处理 null 删除，导入即覆盖语义）。

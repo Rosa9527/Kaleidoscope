@@ -361,6 +361,8 @@ function renderStoryScriptEffectRows() {
 }
 
 function addStoryScriptEffectRow() {
+  // 先读回已填内容再追加：整表重渲染以草稿数组为准，不回读会丢掉未保存的输入。
+  storyScriptEditorEffects = readStoryScriptEffectRows();
   storyScriptEditorEffects.push({ path: '', op: 'add', value: null });
   renderStoryScriptEffectRows();
 }

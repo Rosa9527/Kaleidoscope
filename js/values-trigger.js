@@ -19,6 +19,205 @@ function getValuesTriggerById(ctx, id) {
   return getValuesTriggers(ctx).find((trigger) => trigger.id === id) || null;
 }
 
+// ---------- 事件分类 ----------
+// 分类（categories）：把触发事件分组展示，语义与剧情脉络的节点一致——
+// 分类行可展开 / 收起、可整体启停（关闭 = 其下事件不参与判定），删除分类时
+// 其下事件转为「未分类」，事件本身不删除。数据随变量包 categories 字段保存；
+// 旧存档 / 旧 YAML 没有该字段时归一化为空数组，trigger.categoryId 缺省为空
+// （= 未分类），保证旧数据照常加载、照常判定。
+function getValuesTriggerCategories(ctx) {
+  const bundle = ctx ? getValuesBundle(ctx) : null;
+  if (!bundle) return [];
+  if (!Array.isArray(bundle.categories)) bundle.categories = [];
+  return bundle.categories;
+}
+
+function getValuesTriggerCategoryById(ctx, id) {
+  const target = String(id || '').trim();
+  if (!target) return null;
+  return getValuesTriggerCategories(ctx).find((category) => category.id === target) || null;
+}
+
+// 指定分类的直接子分类（按创建顺序）。
+function getValuesTriggerCategoryChildren(ctx, parentId) {
+  const target = String(parentId || '').trim();
+  return getValuesTriggerCategories(ctx)
+    .filter((category) => String(category.parentId || '').trim() === target);
+}
+
+// 全部顶层分类（parentId 为空或父分类已不存在）。
+function getValuesTriggerRootCategories(ctx) {
+  const categories = getValuesTriggerCategories(ctx);
+  const known = new Set(categories.map((category) => String(category.id || '').trim()));
+  return categories.filter((category) => {
+    const parentId = String(category.parentId || '').trim();
+    return !parentId || !known.has(parentId);
+  });
+}
+
+// parentId 是否为 categoryId 的祖先（沿父链向上查，防环）。categoryId 为空时恒为否。
+function isValuesTriggerCategoryAncestor(ctx, ancestorId, categoryId) {
+  const ancestor = String(ancestorId || '').trim();
+  if (!ancestor) return false;
+  let current = getValuesTriggerCategoryById(ctx, categoryId);
+  let guard = 0;
+  while (current && guard < 1000) {
+    if (current.id === ancestor) return true;
+    current = getValuesTriggerCategoryById(ctx, String(current.parentId || ''));
+    guard += 1;
+  }
+  return false;
+}
+
+// 计算分类可用的 parentId：空 = 顶层；指向自己或自己的后代 = 回退顶层；
+// 指向不存在的分类 = 回退顶层。excludeId 为正在编辑的分类自身 id（允许保持原父级）。
+function resolveValuesTriggerCategoryParent(ctx, requested, excludeId) {
+  const target = String(requested ?? '').trim();
+  if (!target) return '';
+  if (excludeId && target === String(excludeId).trim()) return '';
+  if (isValuesTriggerCategoryAncestor(ctx, String(excludeId || '').trim(), target)) return '';
+  return getValuesTriggerCategoryById(ctx, target) ? target : '';
+}
+
+// 分类 ID：默认从 C001 开始逐次递增；excludeId 为正在编辑的分类自身 id（不计入）。
+function nextValuesTriggerCategoryId(ctx, excludeId) {
+  const categories = getValuesTriggerCategories(ctx);
+  let max = 0;
+  for (const category of categories) {
+    if (category.id === excludeId) continue;
+    const match = /(?:^|\D)C(\d+)$/.exec(String(category.id || ''));
+    if (match) max = Math.max(max, parseInt(match[1], 10));
+  }
+  return 'C' + String(max + 1).padStart(3, '0');
+}
+
+// 计算分类实际使用的 id：给定 id 非空且未被占用则沿用；为空或重复时自动顺延。
+function resolveValuesTriggerCategoryId(ctx, requested, excludeId) {
+  const categories = getValuesTriggerCategories(ctx);
+  const used = new Set();
+  for (const category of categories) {
+    if (category.id !== excludeId) used.add(category.id);
+  }
+  const candidate = String(requested ?? '').trim();
+  if (candidate && !used.has(candidate)) return candidate;
+  let id = nextValuesTriggerCategoryId(ctx, excludeId);
+  while (used.has(id)) {
+    const match = /C(\d+)$/.exec(id);
+    id = 'C' + String((match ? parseInt(match[1], 10) : 0) + 1).padStart(3, '0');
+  }
+  return id;
+}
+
+// 归一化单条分类：补全字段。
+function normalizeValuesTriggerCategory(raw) {
+  const now = new Date().toISOString();
+  return {
+    id: String(raw?.id || '').trim(),
+    parentId: String(raw?.parentId || '').trim(),
+    name: String(raw?.name || '').trim() || '未命名分类',
+    enabled: raw?.enabled !== false,
+    description: String(raw?.description || '').trim(),
+    createdAt: String(raw?.createdAt || '').trim() || now,
+    updatedAt: String(raw?.updatedAt || '').trim() || now,
+  };
+}
+
+function createValuesTriggerCategory(ctx, data) {
+  const categories = getValuesTriggerCategories(ctx);
+  const now = new Date().toISOString();
+  const category = {
+    ...normalizeValuesTriggerCategory(data),
+    id: resolveValuesTriggerCategoryId(ctx, data?.id, ''),
+    // 父分类无效（不存在 / 指向自己）时回退顶层。
+    parentId: resolveValuesTriggerCategoryParent(ctx, data?.parentId, ''),
+    createdAt: now,
+    updatedAt: now,
+  };
+  categories.push(category);
+  saveValuesData(ctx);
+  return category;
+}
+
+function updateValuesTriggerCategory(ctx, id, data) {
+  const category = getValuesTriggerCategoryById(ctx, id);
+  if (!category) return null;
+  if (data && typeof data === 'object') {
+    if (data.name !== undefined) category.name = String(data.name).trim() || category.name;
+    if (data.description !== undefined) category.description = String(data.description).trim();
+    if (data.enabled !== undefined) category.enabled = Boolean(data.enabled);
+    if (data.parentId !== undefined) {
+      category.parentId = resolveValuesTriggerCategoryParent(
+        ctx, data.parentId, id,
+      );
+    }
+  }
+  category.updatedAt = nowIso();
+  saveValuesData(ctx);
+  return category;
+}
+
+// 删除分类（与剧情脉络删节点同语义）：子分类上提到被删分类的原父级下，
+// 其下事件转为「未分类」（categoryId 清空），事件本身不删除。
+// 返回 { detachedTriggers, movedCategories }。
+function deleteValuesTriggerCategory(ctx, id) {
+  const categories = getValuesTriggerCategories(ctx);
+  const index = categories.findIndex((category) => category.id === id);
+  if (index < 0) return { detachedTriggers: [], movedCategories: 0 };
+  const parentId = String(categories[index].parentId || '');
+  categories.splice(index, 1);
+  let movedCategories = 0;
+  const now = nowIso();
+  for (const child of categories) {
+    if (String(child.parentId || '') === id) {
+      child.parentId = parentId;
+      child.updatedAt = now;
+      movedCategories += 1;
+    }
+  }
+  const detachedTriggers = [];
+  for (const trigger of getValuesTriggers(ctx)) {
+    if (String(trigger.categoryId || '').trim() === id) {
+      trigger.categoryId = '';
+      trigger.updatedAt = now;
+      detachedTriggers.push(trigger.id);
+    }
+  }
+  saveValuesData(ctx);
+  return { detachedTriggers, movedCategories };
+}
+
+// 分类启用开关：关闭后其下事件不再参与判定；再点一次重新激活。
+function toggleValuesTriggerCategoryEnabled(ctx, id) {
+  const category = getValuesTriggerCategoryById(ctx, id);
+  if (!category) return null;
+  category.enabled = category.enabled === false;
+  category.updatedAt = nowIso();
+  saveValuesData(ctx);
+  return category;
+}
+
+// 分类是否激活（级联）：分类不存在视为激活；祖先链上任一分类停用即视为停用。
+function isValuesTriggerCategoryActive(ctx, trigger) {
+  const id = String(trigger?.categoryId || '').trim();
+  if (!id) return true;
+  let current = getValuesTriggerCategoryById(ctx, id);
+  let guard = 0;
+  while (current && guard < 1000) {
+    if (current.enabled === false) return false;
+    current = getValuesTriggerCategoryById(ctx, String(current.parentId || ''));
+    guard += 1;
+  }
+  return true;
+}
+
+// 指定分类下的触发（按创建顺序）；uncategorized 为 true 时返回未分类事件。
+function getValuesTriggersByCategory(ctx, categoryId) {
+  const target = String(categoryId || '').trim();
+  return getValuesTriggers(ctx).filter(
+    (trigger) => String(trigger.categoryId || '').trim() === target,
+  );
+}
+
 // 按 id 重排触发列表顺序（拖动排序用）；未列出的触发按原相对顺序追加在末尾。
 function reorderValuesTriggers(ctx, ids) {
   const triggers = getValuesTriggers(ctx);
@@ -39,6 +238,42 @@ function reorderValuesTriggers(ctx, ids) {
   }
   triggers.length = 0;
   for (const trigger of reordered) triggers.push(trigger);
+  saveValuesData(ctx);
+  return triggers;
+}
+
+// 组内重排（拖动排序用）：只重排「指定分类下（categoryId 为空 = 未分类）」的
+// 触发，其余触发的相对顺序不变——整体插入到原组成员序列的起始位置。
+function reorderValuesTriggersInCategory(ctx, categoryId, ids) {
+  const triggers = getValuesTriggers(ctx);
+  const target = String(categoryId || '').trim();
+  const members = triggers.filter((trigger) => String(trigger.categoryId || '').trim() === target);
+  if (members.length === 0) return triggers;
+  const memberIds = new Set(members.map((trigger) => String(trigger?.id || '').trim()));
+  const byId = new Map(members.map((trigger) => [String(trigger?.id || '').trim(), trigger]));
+  const wanted = Array.isArray(ids) ? ids.map((id) => String(id || '').trim()).filter(Boolean) : [];
+  const group = [];
+  const seen = new Set();
+  for (const id of wanted) {
+    const trigger = byId.get(id);
+    if (trigger && !seen.has(id)) {
+      group.push(trigger);
+      seen.add(id);
+    }
+  }
+  for (const trigger of members) {
+    const id = String(trigger?.id || '').trim();
+    if (!seen.has(id)) group.push(trigger);
+  }
+  const rest = triggers.filter((trigger) => !memberIds.has(String(trigger?.id || '').trim()));
+  const firstIndex = triggers.findIndex((trigger) => memberIds.has(String(trigger?.id || '').trim()));
+  let insertAt = 0;
+  for (let i = 0; i < firstIndex; i += 1) {
+    if (!memberIds.has(String(triggers[i]?.id || '').trim())) insertAt += 1;
+  }
+  rest.splice(Math.min(insertAt, rest.length), 0, ...group);
+  triggers.length = 0;
+  for (const trigger of rest) triggers.push(trigger);
   saveValuesData(ctx);
   return triggers;
 }
@@ -74,6 +309,7 @@ function resolveValuesTriggerId(ctx, requested, excludeId) {
 }
 
 // 归一化单条触发：补全字段、过滤非法条件（空路径丢弃）、归一化事件效果。
+// categoryId 缺省为空（= 未分类）：旧存档无此字段照常加载。
 function normalizeValuesTrigger(raw) {
   const conditions = Array.isArray(raw?.conditions) ? raw.conditions : [];
   const effects = Array.isArray(raw?.effects) ? raw.effects : [];
@@ -83,6 +319,7 @@ function normalizeValuesTrigger(raw) {
     enabled: raw?.enabled !== false,
     once: raw?.once !== false,
     logic: String(raw?.logic || 'all').trim() === 'any' ? 'any' : 'all',
+    categoryId: String(raw?.categoryId || '').trim(),
     description: String(raw?.description || '').trim(),
     conditions: conditions
       .filter((condition) => condition && typeof condition === 'object' && !Array.isArray(condition))
@@ -210,21 +447,27 @@ function evaluateValuesTrigger(ctx, trigger) {
   return String(trigger?.logic || 'all') === 'any' ? results.some(Boolean) : results.every(Boolean);
 }
 
-// 当前满足条件且启用的触发（按创建顺序）。
+// 当前满足条件且启用的触发（按创建顺序）：挂接分类被关闭的事件不参与判定
+// （分类被删除 / 未分类恒有效，与剧情脉络节点启停语义一致）。
 function evaluateValuesTriggers(ctx) {
-  return getValuesTriggers(ctx).filter((trigger) => trigger.enabled !== false && evaluateValuesTrigger(ctx, trigger));
+  return getValuesTriggers(ctx).filter((trigger) => {
+    if (trigger.enabled === false) return false;
+    if (!isValuesTriggerCategoryActive(ctx, trigger)) return false;
+    return evaluateValuesTrigger(ctx, trigger);
+  });
 }
 
-// 条件摘要文本：张三/好感 >= 70 且 张三/是否已知真相 == true。
+// 条件摘要文本：张三/好感 ≥ 70 且 张三/是否已知真相 ＝ true（运算符用符号展示）。
 function formatValuesTriggerConditions(trigger) {
   const conditions = Array.isArray(trigger?.conditions) ? trigger.conditions : [];
   const parts = conditions.map((condition) => {
     const path = String(condition?.path || '');
     const op = String(condition?.op || '==').trim();
-    if (op === 'exists' || op === 'not exists') return `${path} ${op}`;
+    const display = typeof valuesTriggerOpDisplay === 'function' ? valuesTriggerOpDisplay(op) : op;
+    if (op === 'exists' || op === 'not exists') return `${path} ${display}`;
     const value = condition?.value;
     const valueText = value === null || value === undefined ? 'null' : String(value);
-    return `${path} ${op} ${valueText}`;
+    return `${path} ${display} ${valueText}`;
   });
   if (parts.length === 0) return '（无条件）';
   const joiner = String(trigger?.logic || 'all') === 'any' ? ' 或 ' : ' 且 ';

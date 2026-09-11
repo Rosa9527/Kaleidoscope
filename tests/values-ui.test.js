@@ -917,6 +917,18 @@ function triggerRows() {
   return Array.from($('kaleido-values-triggers-body').querySelectorAll('.kaleido-values__row--trigger'));
 }
 
+// 顶栏「＋ 新建」菜单：选择 新建分类 / 新建事件（category | trigger）。
+function pickTriggerAddMenu(kind) {
+  click($('kaleido-values-triggers-add'));
+  const menu = $('kaleido-values-triggers-add-menu');
+  assert(menu && !menu.hidden, '应打开新建菜单');
+  const item = kind === 'category'
+    ? $('kaleido-values-triggers-add-menu-category')
+    : $('kaleido-values-triggers-add-menu-trigger');
+  assert(item, `缺少菜单项 ${kind}`);
+  click(item);
+}
+
 function openTriggersTab() {
   click($('kaleido-values-tab-triggers'));
   assert($('kaleido-values-triggers-pane').classList.contains('is-active'), '应显示剧情触发面板');
@@ -929,6 +941,16 @@ runner.test('剧情触发：标签页与总开关', () => {
   assert($('kaleido-values-triggers-toggle'), '应有总开关');
 
   assert($('kaleido-values-triggers-add'), '应有新建按钮');
+  // 「＋ 新建」二选一菜单（与剧情脉络同款）
+  click($('kaleido-values-triggers-add'));
+  assert(!$('kaleido-values-triggers-add-menu').hidden, '应打开新建菜单');
+  assert($('kaleido-values-triggers-add-menu-category'), '菜单应有新建分类');
+  assert($('kaleido-values-triggers-add-menu-trigger'), '菜单应有新建事件');
+  // 重复点击 = 重定位（与剧情脉络 / 变量树一致，外点才收起）
+  click($('kaleido-values-triggers-add'));
+  assert(!$('kaleido-values-triggers-add-menu').hidden, '再点应保持打开（重定位）');
+  click(dom.window.document.body);
+  assert($('kaleido-values-triggers-add-menu').hidden, '点击外部应收起菜单');
   const toggle = $('kaleido-values-triggers-toggle');
   assert(!toggle.classList.contains('is-off'), '默认应开启');
   click(toggle);
@@ -943,7 +965,7 @@ runner.test('剧情触发：新建触发（名称 / 逻辑 / 条件 / 正文）'
   defaults['张三'] = { '好感': 30, '是否已知真相': false };
   ui.saveValuesData(hostCtx);
   openTriggersTab();
-  click($('kaleido-values-triggers-add'));
+  pickTriggerAddMenu('trigger');
   assert(!$('kaleido-values-trigger-editor').hidden, '应打开触发编辑器');
   setValue('kaleido-values-trigger-editor-name', '告白事件');
   const logic = $('kaleido-values-trigger-editor-logic');
@@ -982,7 +1004,7 @@ runner.test('剧情触发：新建触发（名称 / 逻辑 / 条件 / 正文）'
   // 列表行显示条件摘要
   const listRows = triggerRows();
   assert(listRows.length === 1, '列表应有 1 行');
-  assert(listRows[0].querySelector('.kaleido-values__row-trigger').textContent.includes('张三/好感 >= 70'), '应显示条件摘要');
+  assert(listRows[0].querySelector('.kaleido-values__row-trigger').textContent.includes('张三/好感 ≥ 70'), '应显示条件摘要（符号展示）');
   assert(listRows[0].querySelector('.kaleido-values__row-trigger-type').textContent === '一次性', '应显示一次性徽标');
   // 编辑为常驻事件
   click(listRows[0].querySelector('[data-action="edit-trigger"]'));
@@ -1022,7 +1044,7 @@ runner.test('剧情触发：事件效果（加减 / 覆盖）填写与保存，�
   defaults['张三'] = { '好感': 30, '态度': '冷淡', '是否已知真相': false };
   ui.saveValuesData(hostCtx);
   openTriggersTab();
-  click($('kaleido-values-triggers-add'));
+  pickTriggerAddMenu('trigger');
   setValue('kaleido-values-trigger-editor-name', '好感上升');
   click($('kaleido-values-trigger-editor-condition-add'));
   const condRow = $('kaleido-values-trigger-editor-conditions').querySelector('.kaleido-values__trigger-condition');
@@ -1186,7 +1208,7 @@ runner.test('剧情触发：拖动把手改变触发顺序', () => {
   click($('kaleido-values-tab-triggers'));
   for (const trigger of ui.getValuesTriggers(hostCtx).slice()) ui.deleteValuesTrigger(hostCtx, trigger.id);
   for (const name of ['事件A', '事件B', '事件C']) {
-    click($('kaleido-values-triggers-add'));
+    pickTriggerAddMenu('trigger');
     setValue('kaleido-values-trigger-editor-name', name);
     setValue('kaleido-values-trigger-editor-content', '触发内容');
     click($('kaleido-values-trigger-editor-condition-add'));
@@ -1205,6 +1227,294 @@ runner.test('剧情触发：拖动把手改变触发顺序', () => {
   const dataIds = ui.getValuesTriggers(hostCtx).map((t) => t.id).join(',');
   assert(domIds === dataIds, '数据层顺序应与 DOM 一致');
   assert(rows()[2].querySelector('.kaleido-values__row-name').textContent === '事件A', '事件A 应拖到末尾');
+});
+
+// ---------- 剧情触发：分类树（回归：分类行「＋」二选一菜单） ----------
+function categoryRows() {
+  return Array.from($('kaleido-values-triggers-body').querySelectorAll('.kaleido-values__row--trigger-category'));
+}
+
+function categoryRowByName(name) {
+  const row = categoryRows().find((r) => (r.querySelector('.kaleido-values__row-name')?.textContent || '') === name);
+  assert(row, `未找到分类行：${name}`);
+  return row;
+}
+
+// 分类行「＋」：在此分类下新建子分类 / 事件。
+function pickCategoryAddMenu(row, kind) {
+  click(row.querySelector('[data-action="add-menu"]'));
+  const menu = $('kaleido-values-triggers-add-menu');
+  assert(menu && !menu.hidden, '分类行「＋」应打开新建菜单');
+  const item = kind === 'category'
+    ? $('kaleido-values-triggers-add-menu-category')
+    : $('kaleido-values-triggers-add-menu-trigger');
+  click(item);
+}
+
+runner.test('剧情触发分类树：分类行「＋」新建子分类（预选上级 + 树形嵌套）', () => {
+  for (const trigger of ui.getValuesTriggers(hostCtx).slice()) ui.deleteValuesTrigger(hostCtx, trigger.id);
+  for (const category of ui.getValuesTriggerCategories(hostCtx).slice()) ui.deleteValuesTriggerCategory(hostCtx, category.id);
+  const defaults = ui.getValuesDefaults(hostCtx);
+  defaults['张三'] = { '好感': 30 };
+  ui.saveValuesData(hostCtx);
+  openTriggersTab();
+  // 顶栏新建分类「主线」
+  pickTriggerAddMenu('category');
+  setValue('kaleido-values-trigger-category-editor-name', '主线');
+  click($('kaleido-values-trigger-category-editor-save'));
+  assert(ui.getValuesTriggerCategories(hostCtx).length === 1, '应创建 1 个分类');
+  const mainRow = categoryRowByName('主线');
+  assert(mainRow.dataset.id === ui.getValuesTriggerCategories(hostCtx)[0].id, '分类行 id 应正确');
+  // 分类行「＋」→ 新建子分类：上级分类应预选「主线」
+  pickCategoryAddMenu(mainRow, 'category');
+  assert(!$('kaleido-values-trigger-category-editor').hidden, '应打开分类编辑器');
+  assert($('kaleido-values-trigger-category-editor-title').textContent === '添加子分类', '标题应显示添加子分类');
+  const parentSelect = $('kaleido-values-trigger-category-editor-parent');
+  assert(parentSelect.value === mainRow.dataset.id, '上级分类应预选「主线」');
+  // 上级下拉应排除自己与后代（编辑自身时）；此处新建只校验选项存在
+  setValue('kaleido-values-trigger-category-editor-name', '后期');
+  click($('kaleido-values-trigger-category-editor-save'));
+  const categories = ui.getValuesTriggerCategories(hostCtx);
+  const child = categories.find((c) => c.name === '后期');
+  assert(child && child.parentId === mainRow.dataset.id, '子分类 parentId 应指向「主线」');
+  // 树形渲染：展开主线后应能看到子分类行（深度 1）
+  const childRow = categoryRowByName('后期');
+  assert(childRow.style.getPropertyValue('--depth') === '1', '子分类应缩进一层');
+  // 分类行「＋」→ 在此分类下新建事件：编辑器分类下拉应预选
+  pickCategoryAddMenu(childRow, 'trigger');
+  assert(!$('kaleido-values-trigger-editor').hidden, '应打开触发编辑器');
+  assert($('kaleido-values-trigger-editor-category').value === child.id, '所属分类应预选子分类');
+  setValue('kaleido-values-trigger-editor-name', '子分类事件');
+  setValue('kaleido-values-trigger-editor-content', '内容');
+  click($('kaleido-values-trigger-editor-condition-add'));
+  const condRow = $('kaleido-values-trigger-editor-conditions').querySelector('.kaleido-values__trigger-condition');
+  condRow.querySelector('.kaleido-values__trigger-condition-path').value = '张三/好感';
+  condRow.querySelector('.kaleido-values__trigger-condition-op').value = '>=';
+  condRow.querySelector('.kaleido-values__trigger-condition-value').value = '20';
+  click($('kaleido-values-trigger-editor-save'));
+  const saved = ui.getValuesTriggers(hostCtx).find((t) => t.name === '子分类事件');
+  assert(saved && saved.categoryId === child.id, '事件应挂到子分类下');
+});
+
+runner.test('剧情触发分类树：级联停用（父分类关闭 → 子分类事件不参与判定）', () => {
+  const categories = ui.getValuesTriggerCategories(hostCtx);
+  const main = categories.find((c) => c.name === '主线');
+  const trigger = ui.getValuesTriggers(hostCtx).find((t) => t.name === '子分类事件');
+  assert(main && trigger, '前置：应有主线与子分类事件');
+  // 游戏值树优先读聊天文件：显式播种，避免被前面测试的聊天状态覆盖
+  hostCtx.chatMetadata.kaleidoscope_values = {
+    version: 1,
+    values: { '张三': { '好感': 30 } },
+    updatedAt: new Date().toISOString(),
+    lastSignature: '',
+  };
+  assert(ui.evaluateValuesTriggers(hostCtx).some((t) => t.id === trigger.id), '前置：条件满足应入选');
+  ui.toggleValuesTriggerCategoryEnabled(hostCtx, main.id);
+  assert(!ui.evaluateValuesTriggers(hostCtx).some((t) => t.id === trigger.id), '父分类停用应级联停用子分类事件');
+  ui.toggleValuesTriggerCategoryEnabled(hostCtx, main.id);
+  assert(ui.evaluateValuesTriggers(hostCtx).some((t) => t.id === trigger.id), '重新启用应恢复');
+});
+
+runner.test('剧情触发分类树：删除父分类 → 子分类上提、事件转未分类', async () => {
+  const categories = ui.getValuesTriggerCategories(hostCtx);
+  const main = categories.find((c) => c.name === '主线');
+  const child = categories.find((c) => c.name === '后期');
+  assert(main && child, '前置：应有主线与后期');
+  ui.deleteValuesTriggerCategory(hostCtx, main.id);
+  const after = ui.getValuesTriggerCategories(hostCtx);
+  const childAfter = after.find((c) => c.id === child.id);
+  assert(childAfter, '子分类应保留');
+  assert(childAfter.parentId === '', '子分类应上提到顶层');
+  const trigger = ui.getValuesTriggers(hostCtx).find((t) => t.name === '子分类事件');
+  assert(trigger.categoryId === child.id, '子分类下的事件应随子分类保留');
+});
+
+runner.test('剧情触发分类树：上级分类下拉排除自己与后代（防环）', () => {
+  openTriggersTab();
+  const childRow = categoryRowByName('后期');
+  click(childRow.querySelector('[data-action="edit-category"]'));
+  const select = $('kaleido-values-trigger-category-editor-parent');
+  const values = Array.from(select.options).map((option) => option.value);
+  assert(!values.includes(childRow.dataset.id), '下拉不应包含自己');
+  click($('kaleido-values-trigger-category-editor-cancel'));
+});
+
+runner.test('剧情触发：点「＋ 添加条件」不丢失已填内容（含未保存草稿）', () => {
+  const defaults = ui.getValuesDefaults(hostCtx);
+  defaults['张三'] = { '好感': 30, '是否已知真相': false };
+  ui.saveValuesData(hostCtx);
+  openTriggersTab();
+  pickTriggerAddMenu('trigger');
+  setValue('kaleido-values-trigger-editor-name', '连续添加条件');
+  click($('kaleido-values-trigger-editor-condition-add'));
+  const conds = () => Array.from($('kaleido-values-trigger-editor-conditions').querySelectorAll('.kaleido-values__trigger-condition'));
+  const fill = (row, path, op, value) => {
+    row.querySelector('.kaleido-values__trigger-condition-path').value = path;
+    row.querySelector('.kaleido-values__trigger-condition-op').value = op;
+    row.querySelector('.kaleido-values__trigger-condition-value').value = value;
+  };
+  fill(conds()[0], '张三/好感', '>=', '70');
+  // 再点两次添加：第一行已填内容必须保留，且新增行为空
+  click($('kaleido-values-trigger-editor-condition-add'));
+  click($('kaleido-values-trigger-editor-condition-add'));
+  assert(conds().length === 3, '应有 3 个条件行');
+  const first = conds()[0];
+  assert(first.querySelector('.kaleido-values__trigger-condition-path').value === '张三/好感', '第一行路径应保留');
+  assert(first.querySelector('.kaleido-values__trigger-condition-op').value === '>=', '第一行运算符应保留');
+  assert(first.querySelector('.kaleido-values__trigger-condition-value').value === '70', '第一行值应保留');
+  assert(conds()[2].querySelector('.kaleido-values__trigger-condition-path').value === '', '新增行应为空');
+  // 填第二行后保存：两条条件都应落盘
+  fill(conds()[1], '张三/是否已知真相', '==', 'true');
+  setValue('kaleido-values-trigger-editor-content', '内容');
+  click($('kaleido-values-trigger-editor-save'));
+  const saved = ui.getValuesTriggers(hostCtx).find((t) => t.name === '连续添加条件');
+  assert(saved && saved.conditions.length === 2, '保存后应有 2 条有效条件');
+  assert(saved.conditions[0].path === '张三/好感' && saved.conditions[0].op === '>=' && saved.conditions[0].value === 70, '第一条条件应正确');
+  assert(saved.conditions[1].path === '张三/是否已知真相' && saved.conditions[1].value === true, '第二条条件应正确');
+});
+
+runner.test('剧情触发：点「＋ 添加效果」不丢失已填内容', () => {
+  const defaults = ui.getValuesDefaults(hostCtx);
+  defaults['张三'] = { '好感': 30 };
+  ui.saveValuesData(hostCtx);
+  openTriggersTab();
+  pickTriggerAddMenu('trigger');
+  setValue('kaleido-values-trigger-editor-name', '连续添加效果');
+  click($('kaleido-values-trigger-editor-condition-add'));
+  const condRow = $('kaleido-values-trigger-editor-conditions').querySelector('.kaleido-values__trigger-condition');
+  condRow.querySelector('.kaleido-values__trigger-condition-path').value = '张三/好感';
+  condRow.querySelector('.kaleido-values__trigger-condition-op').value = '>=';
+  condRow.querySelector('.kaleido-values__trigger-condition-value').value = '30';
+  click($('kaleido-values-trigger-editor-effect-add'));
+  const effects = () => Array.from($('kaleido-values-trigger-editor-effects').querySelectorAll('.kaleido-values__trigger-effect'));
+  const fillEffect = (row, path, op, value) => {
+    row.querySelector('.kaleido-values__trigger-effect-path').value = path;
+    row.querySelector('.kaleido-values__trigger-effect-op').value = op;
+    row.querySelector('.kaleido-values__trigger-effect-value').value = value;
+  };
+  fillEffect(effects()[0], '张三/好感', 'add', '10');
+  click($('kaleido-values-trigger-editor-effect-add'));
+  assert(effects().length === 2, '应有 2 个效果行');
+  const first = effects()[0];
+  assert(first.querySelector('.kaleido-values__trigger-effect-path').value === '张三/好感', '第一行效果路径应保留');
+  assert(first.querySelector('.kaleido-values__trigger-effect-op').value === 'add', '第一行效果类型应保留');
+  assert(first.querySelector('.kaleido-values__trigger-effect-value').value === '10', '第一行效果值应保留');
+  fillEffect(effects()[1], '张三/好感', 'set', '99');
+  setValue('kaleido-values-trigger-editor-content', '内容');
+  click($('kaleido-values-trigger-editor-save'));
+  const saved = ui.getValuesTriggers(hostCtx).find((t) => t.name === '连续添加效果');
+  assert(saved && saved.effects.length === 2, '保存后应有 2 条效果');
+  assert(saved.effects[0].op === 'add' && saved.effects[0].value === 10, '第一条效果应正确');
+  assert(saved.effects[1].op === 'set' && saved.effects[1].value === 99, '第二条效果应正确');
+});
+
+runner.test('剧情触发：条件运算符下拉直接显示符号（≥ / ≤ / ＝ / ≠）', () => {
+  openTriggersTab();
+  pickTriggerAddMenu('trigger');
+  click($('kaleido-values-trigger-editor-condition-add'));
+  const row = $('kaleido-values-trigger-editor-conditions').querySelector('.kaleido-values__trigger-condition');
+  const opSelect = row.querySelector('.kaleido-values__trigger-condition-op');
+  const optionTexts = Array.from(opSelect.options).map((option) => option.textContent);
+  assert(optionTexts.includes('≥'), '下拉应显示 ≥');
+  assert(optionTexts.includes('≤'), '下拉应显示 ≤');
+  assert(optionTexts.includes('＝'), '下拉应显示 ＝');
+  assert(optionTexts.includes('≠'), '下拉应显示 ≠');
+  assert(!optionTexts.some((text) => text.includes('>=')), '下拉不应出现 ASCII >=');
+  assert(!optionTexts.some((text) => text.includes('==')), '下拉不应出现 ASCII ==');
+  // 选中 ≥ 后，折叠显示与悬停提示应同步
+  opSelect.value = '>=';
+  opSelect.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+  assert(row.querySelector('.kaleido-values__trigger-condition-op-text').textContent === '≥', '折叠显示应为 ≥');
+  assert(row.querySelector('.kaleido-values__trigger-condition-op-wrap').title === '大于等于（>=）', '悬停提示应保留完整名称');
+  click($('kaleido-values-trigger-editor-cancel'));
+});
+
+runner.test('兼容旧存档：无 categories / 无 categoryId 的旧数据照常加载与判定', () => {
+  // 旧版存档：bundle 只有 keys / defaults / triggers，事件没有 categoryId 字段
+  const legacy = makeCharacter('旧档', 'legacy.png');
+  legacy.data.extensions.kaleidoscope_values = {
+    version: 1,
+    keys: [{ name: '好感', rule: '' }],
+    defaults: { '张三': { '好感': 30 } },
+    order: {},
+    triggers: [
+      { id: '001', name: '旧事件', enabled: true, once: true, logic: 'all', description: '',
+        conditions: [{ path: '张三/好感', op: '>=', value: 20 }], effects: [], content: '旧内容' },
+    ],
+  };
+  const legacyCtx = makeContext({ characters: [legacy], characterId: 0 });
+  legacyCtx.chatMetadata = {};
+  legacyCtx.saveChat = () => {};
+  // 加载即归一化：categories 补空数组，事件 categoryId 补空串（未分类）
+  const categories = ui.getValuesTriggerCategories(legacyCtx);
+  assert(Array.isArray(categories) && categories.length === 0, '旧档应补出空分类数组');
+  const triggers = ui.getValuesTriggers(legacyCtx);
+  assert(triggers.length === 1, '旧档事件应照常加载');
+  assert(String(triggers[0].categoryId || '') === '', '旧事件 categoryId 应归一化为未分类');
+  // 未分类事件恒参与判定（无分类可停用）
+  assert(ui.evaluateValuesTriggers(legacyCtx).some((t) => t.id === '001'), '旧事件应照常参与判定');
+});
+
+runner.test('兼容旧存档：悬空的 categoryId / parentId 在导入时清空', () => {
+  const text = [
+    'format: kaleidoscope-values',
+    'keys: []',
+    'defaults: {}',
+    'triggers:',
+    '  - id: "001"',
+    '    name: 悬空事件',
+    '    enabled: true',
+    '    once: true',
+    '    logic: all',
+    '    categoryId: "C999"',
+    '    conditions: []',
+    '    effects: []',
+    'triggerCategories:',
+    '  - id: "C001"',
+    '    parentId: "C999"',
+    '    name: 悬空父分类',
+    '    enabled: true',
+  ].join('\n');
+  const parsed = ui.parseValuesBundle(text);
+  const ctx = makeContext();
+  ctx.chatMetadata = {};
+  ctx.saveChat = () => {};
+  ui.applyValuesBundle(ctx, parsed, 'replace');
+  const triggers = ui.getValuesTriggers(ctx);
+  assert(triggers[0].categoryId === '', '指向不存在分类的 categoryId 应清空');
+  const categories = ui.getValuesTriggerCategories(ctx);
+  assert(categories[0].parentId === '', '指向不存在分类的 parentId 应回退顶层');
+  // 清空后事件应能正常参与判定（不被悬空分类静默停用）
+  assert(ui.evaluateValuesTriggers(ctx).length === 0, '无条件事件不触发，但不应抛错');
+});
+
+runner.test('兼容旧存档：旧版 YAML（无 triggerCategories 段）解析成功', () => {
+  const text = [
+    'format: kaleidoscope-values',
+    'keys:',
+    '  - name: 好感',
+    'defaults:',
+    '  张三:',
+    '    好感: 30',
+    'triggers:',
+    '  - id: "001"',
+    '    name: 旧事件',
+    '    enabled: true',
+    '    once: true',
+    '    logic: all',
+    '    conditions:',
+    '      - path: 张三/好感',
+    '        op: ">="',
+    '        value: 20',
+    '    effects: []',
+  ].join('\n');
+  const parsed = ui.parseValuesBundle(text);
+  assert(Array.isArray(parsed.categories) && parsed.categories.length === 0, '缺 triggerCategories 段应解析为空分类');
+  const ctx = makeContext();
+  ctx.chatMetadata = {};
+  ctx.saveChat = () => {};
+  ui.applyValuesBundle(ctx, parsed, 'replace');
+  assert(ui.getValuesTriggers(ctx).length === 1, '旧 YAML 事件应照常导入');
 });
 
 runner.run();
