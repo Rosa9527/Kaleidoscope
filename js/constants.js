@@ -1,7 +1,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.4.7';
+const MODULE_VERSION = '1.4.9';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -471,6 +471,7 @@ const GAME_UPDATED_ID = 'kaleido-game-updated';
 const GAME_REFRESH_ID = 'kaleido-game-refresh';
 const GAME_GEAR_ID = 'kaleido-game-gear';
 const GAME_TREE_ID = 'kaleido-game-tree';
+const GAME_CHEVRON_ICON_CLASS = 'fa-solid fa-chevron-right';
 const GAME_REFRESH_ENDED_KEY = '__kaleido_game_refresh_ended__';
 // ---------- 地图系统（游戏地图：角色卡绑定）----------
 // 地图数据存角色卡 extensions['kaleidoscope_map']，随角色卡导入/导出自动携带；
@@ -676,6 +677,10 @@ const DEFAULT_SETTINGS = Object.freeze({
   promptPresets: [],
   promptPresetsActiveId: PROMPT_PRESET_DEFAULT_ID,
   valuesNavCollapsed: false,
+  // 游戏模式「游戏数据」已展开的章节路径（path.join('/') 字符串数组）：
+  // 记住玩家的展开操作，下次打开仍是上次的样子；路径在当前变量树里不存在时
+  // 自然不命中（等于默认折叠），无需清理。
+  gameExpandedChapters: [],
   theme: DEFAULT_THEME,
   mapData: null,
 });

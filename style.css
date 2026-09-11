@@ -3681,12 +3681,58 @@ textarea.kaleido-input {
   gap: 2px;
 }
 
+/* 章节头：整行可点（折叠 / 展开），章节默认折叠。
+   宽度交给父级 flex 拉伸（不写 width:100%，避免 content-box 下 padding 溢出）。 */
 .kaleido-game__chapter-head {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 2px 4px 8px;
-  padding-left: calc(4px + var(--depth, 0) * 16px);
+  gap: 8px;
+  min-height: 32px;
+  padding: 6px 4px 8px;
+  padding-left: calc(8px + var(--depth, 0) * 16px);
+  font-family: var(--k-font);
+  text-align: left;
+  color: var(--k-text);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.13s ease;
+}
+
+.kaleido-game__chapter:not(.is-empty) > .kaleido-game__chapter-head:hover {
+  background: var(--k-hover);
+}
+
+/* 空容器（没有子条目）只是题签：无箭头、不响应点击 */
+.kaleido-game__chapter.is-empty > .kaleido-game__chapter-head {
+  cursor: default;
+}
+
+.kaleido-game__chapter.is-empty > .kaleido-game__chapter-head .kaleido-game__chapter-chevron {
+  visibility: hidden;
+}
+
+/* 展开箭头：折叠朝右，展开后转 90°（尺寸与变量树 / 剧情脉络的箭头一致） */
+.kaleido-game__chapter-chevron {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--k-text-3);
+  transition: transform 0.18s ease, color 0.13s ease;
+}
+
+.kaleido-game__chapter:not(.is-empty) > .kaleido-game__chapter-head:hover .kaleido-game__chapter-chevron {
+  color: var(--k-text);
+}
+
+.kaleido-game__chapter.is-expanded > .kaleido-game__chapter-head .kaleido-game__chapter-chevron {
+  transform: rotate(90deg);
 }
 
 .kaleido-game__chapter-seal {
@@ -4678,6 +4724,7 @@ textarea.kaleido-input {
   .kaleido-game__refresh:hover,
   .kaleido-game__gear:hover,
   .kaleido-game__switch-btn:hover,
+  .kaleido-game__chapter:not(.is-empty) > .kaleido-game__chapter-head:hover,
   .kaleido-game-map__point:hover,
   .kaleido-map-editor__point:hover {
     background: transparent;
@@ -4689,6 +4736,11 @@ textarea.kaleido-input {
   .kaleido-story__row-actions,
   .kaleido-values__row-actions {
     opacity: 1;
+  }
+
+  /* 触屏：章节箭头不保留粘滞的 hover 加深 */
+  .kaleido-game__chapter:not(.is-empty) > .kaleido-game__chapter-head:hover .kaleido-game__chapter-chevron {
+    color: var(--k-text-3);
   }
 }
 

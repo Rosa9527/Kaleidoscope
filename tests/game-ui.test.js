@@ -62,6 +62,17 @@ function entryByPath(path) {
   return entry;
 }
 
+// 折叠场景：条目不渲染时返回 null（不抛错）。
+function entryByPathMaybe(path) {
+  const key = path.join('/');
+  return entries().find((r) => JSON.parse(r.dataset.path || '[]').join('/') === key) || null;
+}
+
+function chapterByPath(path) {
+  const key = path.join('/');
+  return chapters().find((c) => JSON.parse(c.dataset.path || '[]').join('/') === key) || null;
+}
+
 // ---------- 初始化 ----------
 runner.test('createPanel 创建游戏模式视图与首页卡片', () => {
   ui.createPanel();
@@ -144,7 +155,6 @@ runner.test('游戏模式：档案展示游戏值，无工程标注', () => {
   assert(!$('kaleido-game-tree').textContent.includes('注入'), '档案不应出现注入标注');
   assert(!$('kaleido-game-tree').textContent.includes('派生'), '档案不应出现派生标注');
   assert(!$('kaleido-game-tree').querySelector('.kaleido-game__row-count'), '不应有项数徽标');
-  assert(!$('kaleido-game-tree').querySelector('[data-action="toggle"]'), '档案不应有折叠按钮');
 
   // 值显示
   const haoganRow = entryByPath(['好感']);
@@ -153,12 +163,142 @@ runner.test('游戏模式：档案展示游戏值，无工程标注', () => {
   assert(coinRow.querySelector('.kaleido-game__entry-value').textContent === '120', '金币值应显示 120');
 });
 
-// ---------- 章节内容平铺展示 ----------
-runner.test('游戏模式：章节内容直接展示，无需展开', () => {
-  const childNames = entries().map((row) => row.querySelector('.kaleido-game__entry-name')?.textContent || '');
-  assert(childNames.includes('状态'), '章节内条目应直接展示');
-  const zhangState = entryByPath(['张三', '状态']);
-  assert(zhangState.querySelector('.kaleido-game__entry-value').textContent === '清醒', '章节内值应显示');
+// ---------- 章节默认折叠 ----------
+runner.test('游戏模式：章节默认折叠，只显示章节头不显示内容', () => {
+  const zhangChapter = chapters().find((c) => c.querySelector('.kaleido-game__chapter-seal')?.textContent === '张三');
+  assert(zhangChapter, '应有张三章节');
+  assert(!zhangChapter.classList.contains('is-expanded'), '章节默认应为折叠态');
+  const head = zhangChapter.querySelector('.kaleido-game__chapter-head');
+  assert(head && head.getAttribute('aria-expanded') === 'false', '折叠态章节头 aria-expanded 应为 false');
+  assert(head.querySelector('.kaleido-game__chapter-chevron'), '章节头应有展开箭头');
+  assert(!entryByPathMaybe(['张三', '状态']), '折叠时章节内条目不渲染');
+  assert(entries().every((row) => JSON.parse(row.dataset.path || '[]')[0] !== '张三'), '折叠时不应出现章节内条目');
+});
+
+runner.test('游戏模式：点章节头展开显示内容，再点收起', () => {
+  const zhangChapter = chapters().find((c) => c.querySelector('.kaleido-game__chapter-seal')?.textContent === '张三');
+  click(zhangChapter.querySelector('.kaleido-game__chapter-head'));
+  const expandedChapter = chapters().find((c) => c.querySelector('.kaleido-game__chapter-seal')?.textContent === '张三');
+  assert(expandedChapter.classList.contains('is-expanded'), '点击后章节应展开');
+  assert(
+    expandedChapter.querySelector('.kaleido-game__chapter-head').getAttribute('aria-expanded') === 'true',
+    '展开后 aria-expanded 应为 true',
+  );
+  const state = entryByPath(['张三', '状态']);
+  assert(state.querySelector('.kaleido-game__entry-value').textContent === '清醒', '展开后章节内值应显示');
+  assert(entryByPath(['张三', '好感']), '展开后章节内全部条目应显示');
+  // 再点一次收起
+  click(expandedChapter.querySelector('.kaleido-game__chapter-head'));
+  const collapsedChapter = chapters().find((c) => c.querySelector('.kaleido-game__chapter-seal')?.textContent === '张三');
+  assert(!collapsedChapter.classList.contains('is-expanded'), '再次点击应收起章节');
+  assert(!entryByPathMaybe(['张三', '状态']), '收起后章节内条目应消失');
+});
+
+runner.test('游戏模式：手动刷新保留已展开的章节，重新进入视图仍保持展开', () => {
+  ui.showPanelView('kaleido-game-view');
+  const zhangChapter = chapters().find((c) => c.querySelector('.kaleido-game__chapter-seal')?.textContent === '张三');
+  click(zhangChapter.querySelector('.kaleido-game__chapter-head'));
+  click($('kaleido-game-refresh'));
+  const afterRefresh = chapters().find((c) => c.querySelector('.kaleido-game__chapter-seal')?.textContent === '张三');
+  assert(afterRefresh.classList.contains('is-expanded'), '刷新应保留展开状态');
+  // 离开再进入：展开状态从设置恢复，仍是上次的样子
+  ui.showPanelView('kaleido-home-view');
+  ui.showPanelView('kaleido-game-view');
+  click($('kaleido-game-data-tab'));
+  const afterReenter = chapters().find((c) => c.querySelector('.kaleido-game__chapter-seal')?.textContent === '张三');
+  assert(afterReenter.classList.contains('is-expanded'), '重新进入应保持上次的展开状态');
+  // 收起后同样记住：重新进入是折叠的
+  click(afterReenter.querySelector('.kaleido-game__chapter-head'));
+  ui.showPanelView('kaleido-home-view');
+  ui.showPanelView('kaleido-game-view');
+  click($('kaleido-game-data-tab'));
+  const collapsedAgain = chapters().find((c) => c.querySelector('.kaleido-game__chapter-seal')?.textContent === '张三');
+  assert(!collapsedAgain.classList.contains('is-expanded'), '收起操作也应被记住');
+});
+
+// ---------- 展开状态持久化 ----------
+runner.test('游戏模式：展开状态写入设置（路径数组），换角色卡不命中的路径自然折叠', () => {
+  ui.saveValuesChatState(hostCtx, { 好感: 55, 张三: { 好感: 20 } }, { immediate: true });
+  ui.showPanelView('kaleido-game-view');
+  click($('kaleido-game-data-tab'));
+  const zhang = chapters().find((c) => c.querySelector('.kaleido-game__chapter-seal')?.textContent === '张三');
+  click(zhang.querySelector('.kaleido-game__chapter-head'));
+  const saved = hostCtx.extensionSettings.Kaleidoscope.gameExpandedChapters;
+  assert(Array.isArray(saved), '展开状态应以数组形式写入设置');
+  assert(saved.includes('张三'), '设置里应记录已展开的章节路径');
+  // 换角色卡：设置里的旧路径（张三 / 不存在/的/路径）在新变量树里不命中，
+  // 新树里的章节照常默认折叠，陈旧项不影响渲染。
+  const otherCtx = makeContext();
+  otherCtx.chatMetadata = {};
+  otherCtx.saveChat = () => {};
+  otherCtx.extensionSettings.Kaleidoscope = {
+    ...hostCtx.extensionSettings.Kaleidoscope,
+    gameExpandedChapters: ['张三', '不存在/的/路径'],
+  };
+  ui.saveValuesChatState(otherCtx, { 李四: { 状态: '清醒' } }, { immediate: true });
+  const prev = sandbox.Luker.getContext;
+  sandbox.Luker.getContext = () => otherCtx;
+  try {
+    ui.renderGameView(true);
+    const lisi = chapters().find((c) => c.querySelector('.kaleido-game__chapter-seal')?.textContent === '李四');
+    assert(lisi, '新变量树的章节应正常渲染');
+    assert(!lisi.classList.contains('is-expanded'), '陈旧路径不应展开其它章节');
+  } finally {
+    sandbox.Luker.getContext = prev;
+  }
+  // 还原：清掉本用例写入的展开路径并复位内存状态，避免影响后续用例
+  hostCtx.extensionSettings.Kaleidoscope.gameExpandedChapters = [];
+  ui.saveValuesChatState(hostCtx, { 好感: 55, 金币: 80, 张三: { 好感: 20, 状态: '疲惫' } }, { immediate: true });
+  ui.renderGameView(true);
+});
+
+runner.test('游戏模式：嵌套章节逐级折叠展开', () => {
+  ui.saveValuesChatState(hostCtx, {
+    好感: 55,
+    张三: { 装备: { 佩剑: '精钢长剑' } },
+  }, { immediate: true });
+  ui.renderGameView();
+  // 顶层折叠 → 内层章节不可见
+  assert(chapters().length === 1, '顶层只应有张三章节');
+  click(chapters()[0].querySelector('.kaleido-game__chapter-head'));
+  // 展开张三 → 露出嵌套的装备章节（仍是折叠态）
+  const zhang = chapters().find((c) => c.querySelector('.kaleido-game__chapter-seal')?.textContent === '张三');
+  assert(zhang.classList.contains('is-expanded'), '张三应展开');
+  const gear = chapters().find((c) => c.querySelector('.kaleido-game__chapter-seal')?.textContent === '装备');
+  assert(gear && !gear.classList.contains('is-expanded'), '嵌套章节默认折叠');
+  assert(!entryByPathMaybe(['张三', '装备', '佩剑']), '嵌套章节折叠时其条目不渲染');
+  click(gear.querySelector('.kaleido-game__chapter-head'));
+  const gearExpanded = chapters().find((c) => c.querySelector('.kaleido-game__chapter-seal')?.textContent === '装备');
+  assert(gearExpanded.classList.contains('is-expanded'), '点嵌套章节头应展开');
+  assert(entryByPath(['张三', '装备', '佩剑']).querySelector('.kaleido-game__entry-value').textContent === '精钢长剑', '嵌套值应显示');
+  // 收起外层：内层随之隐藏，但内层展开状态保留（再次展开外层仍在）
+  const zhangChapter = chapters().find((c) => c.querySelector('.kaleido-game__chapter-seal')?.textContent === '张三');
+  click(zhangChapter.querySelector('.kaleido-game__chapter-head'));
+  click(chapters().find((c) => c.querySelector('.kaleido-game__chapter-seal')?.textContent === '张三').querySelector('.kaleido-game__chapter-head'));
+  const gearAgain = chapters().find((c) => c.querySelector('.kaleido-game__chapter-seal')?.textContent === '装备');
+  assert(gearAgain.classList.contains('is-expanded'), '外层重新展开后内层应保持展开');
+  // 还原数据，避免影响后续用例
+  const restored = { 好感: 55, 金币: 80, 张三: { 好感: 20, 状态: '疲惫' } };
+  ui.saveValuesChatState(hostCtx, restored, { immediate: true });
+  ui.renderGameView();
+});
+
+runner.test('游戏模式：空章节只是题签，无箭头不响应点击', () => {
+  ui.saveValuesChatState(hostCtx, { 好感: 55, 空门派: {} }, { immediate: true });
+  ui.renderGameView();
+  const empty = chapters().find((c) => c.querySelector('.kaleido-game__chapter-seal')?.textContent === '空门派');
+  assert(empty, '空容器应渲染为章节题签');
+  assert(empty.classList.contains('is-empty'), '空容器应带 is-empty 标记');
+  const head = empty.querySelector('.kaleido-game__chapter-head');
+  assert(head && head.tagName !== 'BUTTON', '空章节头不应是可点击按钮');
+  assert(!head.hasAttribute('aria-expanded'), '空章节头不应有 aria-expanded');
+  assert(head.querySelector('.kaleido-game__chapter-chevron'), '空章节仍保留箭头占位（CSS 隐藏）以对齐文字');
+  click(head);
+  const after = chapters().find((c) => c.querySelector('.kaleido-game__chapter-seal')?.textContent === '空门派');
+  assert(!after.classList.contains('is-expanded'), '点击空章节不应展开');
+  // 还原数据，避免影响后续用例
+  ui.saveValuesChatState(hostCtx, { 好感: 55, 金币: 80, 张三: { 好感: 20, 状态: '疲惫' } }, { immediate: true });
+  ui.renderGameView();
 });
 
 // ---------- 游戏值（聊天绑定）与更新时间 ----------

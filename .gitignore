@@ -35,3 +35,7 @@ tests/_map_tall_*.png
 
 # 调试产物（变量系统手机端视窗复现）
 tests/_values_pane_*.js
+
+# 调试产物（游戏数据章节折叠复现）
+tests/_repro_collapse_*
+tests/_zoom_collapse_*

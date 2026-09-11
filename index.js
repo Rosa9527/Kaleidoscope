@@ -1,11 +1,11 @@
 // ===== 万华镜（Kaleidoscope）index.js — 构建产物，勿手改 =====
-// 构建时间: 2026-09-11 20:45:54 · 文件数: 24 · 指纹: 3e423759
+// 构建时间: 2026-09-12 00:29:22 · 文件数: 24 · 指纹: 73bba733
 
 // ===== js/constants.js =====
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.4.7';
+const MODULE_VERSION = '1.4.9';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -475,6 +475,7 @@ const GAME_UPDATED_ID = 'kaleido-game-updated';
 const GAME_REFRESH_ID = 'kaleido-game-refresh';
 const GAME_GEAR_ID = 'kaleido-game-gear';
 const GAME_TREE_ID = 'kaleido-game-tree';
+const GAME_CHEVRON_ICON_CLASS = 'fa-solid fa-chevron-right';
 const GAME_REFRESH_ENDED_KEY = '__kaleido_game_refresh_ended__';
 // ---------- 地图系统（游戏地图：角色卡绑定）----------
 // 地图数据存角色卡 extensions['kaleidoscope_map']，随角色卡导入/导出自动携带；
@@ -680,6 +681,10 @@ const DEFAULT_SETTINGS = Object.freeze({
   promptPresets: [],
   promptPresetsActiveId: PROMPT_PRESET_DEFAULT_ID,
   valuesNavCollapsed: false,
+  // 游戏模式「游戏数据」已展开的章节路径（path.join('/') 字符串数组）：
+  // 记住玩家的展开操作，下次打开仍是上次的样子；路径在当前变量树里不存在时
+  // 自然不命中（等于默认折叠），无需清理。
+  gameExpandedChapters: [],
   theme: DEFAULT_THEME,
   mapData: null,
 });
@@ -14160,8 +14165,11 @@ function initMapSection(panel) {
 // 界面内点左上角返回键回到图标入口，点右上角 ✕ 关闭面板回悬浮球。
 // 两个区块均只读，无编辑入口；地图编辑在首页「游戏地图」独立入口里完成。
 // 视觉：档案体例——朱砂印章节 + 点线目次，只呈现数值本身，不做工作台式标注。
+// 章节默认折叠：人物 / 父类一多，平铺全展开要翻半天；点章节头展开，再点收起。
+// 展开状态随设置持久化：下次打开仍是上次的样子（见下方 read/persist）。
 
 let gameActivePane = null; // null（图标入口）| 'map'（游戏地图） | 'data'（游戏数据）
+let gameExpanded = new Set(); // 已展开的章节路径（path.join('/')）；进视图时从设置恢复
 
 function getGameView() {
   return document.getElementById(GAME_VIEW_ID);
@@ -14173,11 +14181,15 @@ function isGameViewActive() {
 }
 
 // 刷新入口：视图打开 / 手动刷新 / 每轮生成结束后（若视图正打开）调用。
-// resetToLauncher：进入视图时重置到入口（不点击不显示任何界面）。
+// resetToLauncher：进入视图时重置到入口（不点击不显示任何界面），
+// 并从设置恢复上次的章节展开状态；手动刷新沿用内存中的当前状态。
 function renderGameView(resetToLauncher = false) {
   const view = getGameView();
   if (!view) return;
-  if (resetToLauncher) gameActivePane = null;
+  if (resetToLauncher) {
+    gameActivePane = null;
+    gameExpanded = readGameExpandedFromSettings();
+  }
   const ctx = getContextSafe();
   renderGameMeta(ctx);
   renderGameTree(ctx);
@@ -14253,22 +14265,28 @@ function buildGameEntry(path, name, node, depth) {
   return entry;
 }
 
-// 章节头：节点名（比变量条目稍大）+ 渐变分隔线。
-function buildGameChapter(path, name, depth) {
+// 章节头：可点击折叠（默认折叠）——节点名 + 渐变分隔线 + 展开箭头。
+// 箭头放行尾：章节名与条目名左对齐（层级一眼可辨），折叠控制落在统一右边缘。
+// 没有内容的空容器只当普通题签：不是按钮、无箭头、不响应点击。
+function buildGameChapter(path, name, depth, hasContent) {
   const chapter = document.createElement('section');
-  chapter.className = 'kaleido-game__chapter';
+  chapter.className = 'kaleido-game__chapter' + (hasContent ? '' : ' is-empty');
   chapter.dataset.path = JSON.stringify(path);
   chapter.style.setProperty('--depth', String(depth));
-  chapter.innerHTML = `
-    <header class="kaleido-game__chapter-head">
+  const expanded = hasContent && gameExpanded.has(path.join('/'));
+  if (expanded) chapter.classList.add('is-expanded');
+  const inner = `
       <span class="kaleido-game__chapter-seal">${escapeHtml(name)}</span>
       <span class="kaleido-game__chapter-rule" aria-hidden="true"></span>
-    </header>
+      <span class="kaleido-game__chapter-chevron" aria-hidden="true"><span class="${GAME_CHEVRON_ICON_CLASS}"></span></span>
   `;
+  chapter.innerHTML = hasContent
+    ? `<button type="button" class="kaleido-game__chapter-head" aria-expanded="${expanded}" title="${expanded ? '收起' : '展开'}">${inner}</button>`
+    : `<div class="kaleido-game__chapter-head">${inner}</div>`;
   return chapter;
 }
 
-// 一层档案内容：先列条目（叶子），再排章节（容器）；全部平铺展示，不折叠。
+// 一层档案内容：先列条目（叶子），再排章节（容器）；章节默认折叠，点章节头展开。
 function renderGameLevel(parent, ctx, node, path, depth) {
   const order = ctx ? getValuesTreeOrder(ctx) : {};
   const names = valuesOrderedNames(order, path.join('/'), node);
@@ -14285,10 +14303,48 @@ function renderGameLevel(parent, ctx, node, path, depth) {
     const child = node[name];
     if (!valuesIsContainer(child)) continue;
     const childPath = path.concat(name);
-    const chapter = buildGameChapter(childPath, name, depth);
-    renderGameLevel(chapter, ctx, child, childPath, depth + 1);
+    const hasContent = Object.keys(child).length > 0;
+    const chapter = buildGameChapter(childPath, name, depth, hasContent);
+    if (hasContent && gameExpanded.has(childPath.join('/'))) {
+      renderGameLevel(chapter, ctx, child, childPath, depth + 1);
+    }
     parent.appendChild(chapter);
   }
+}
+
+// 展开状态持久化：读 / 写扩展设置（与变量工作台 valuesNavCollapsed 同款）。
+// 只存字符串路径数组——换角色卡后路径不命中即自然折叠，不需要清理陈旧项。
+function readGameExpandedFromSettings() {
+  try {
+    const ctx = getContextSafe();
+    const settings = ctx ? getSettings(ctx) : null;
+    const saved = settings?.gameExpandedChapters;
+    if (Array.isArray(saved)) return new Set(saved.filter((key) => typeof key === 'string'));
+  } catch {}
+  return new Set();
+}
+
+function persistGameExpanded() {
+  try {
+    const ctx = getContextSafe();
+    if (!ctx) return;
+    const settings = getSettings(ctx);
+    settings.gameExpandedChapters = Array.from(gameExpanded);
+    saveSettings(ctx);
+  } catch {}
+}
+
+// 章节折叠切换：改状态后写回设置（下次打开仍是这个展开状态），
+// 只重渲染档案树（封面与地图区不动），并保持滚动位置。
+function toggleGameChapter(path) {
+  const key = path.join('/');
+  if (gameExpanded.has(key)) gameExpanded.delete(key);
+  else gameExpanded.add(key);
+  persistGameExpanded();
+  const body = document.getElementById(GAME_TREE_ID);
+  const scrollTop = body ? body.scrollTop : 0;
+  renderGameTree(getContextSafe());
+  if (body) body.scrollTop = scrollTop;
 }
 
 function renderGameTree(ctx) {
@@ -14360,6 +14416,14 @@ function initGameSection(panel) {
   document.getElementById(GAME_DATA_TAB_ID)?.addEventListener('click', () => {
     gameActivePane = 'data';
     applyGamePane();
+  });
+  // 章节头点击折叠 / 展开（事件委托：章节树每次渲染都重建）。
+  document.getElementById(GAME_TREE_ID)?.addEventListener('click', (event) => {
+    const head = event.target instanceof Element ? event.target.closest('.kaleido-game__chapter-head') : null;
+    if (!head) return;
+    const chapter = head.closest('.kaleido-game__chapter');
+    if (!chapter || chapter.classList.contains('is-empty')) return;
+    toggleGameChapter(JSON.parse(String(chapter.dataset.path || '[]')));
   });
 }
 
