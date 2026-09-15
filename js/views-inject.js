@@ -109,22 +109,27 @@ function buildInjectEventCard(event) {
 }
 
 // 渲染注入实录视图：无记录时显示空态，有记录时按
-// 摘要 → 预筛原文 → 触发事件 → 注入提示词原文 四段展示。
+// 摘要 → 预筛原文 → 变量表 → 触发事件 → 注入提示词原文 五段展示。
 function renderInjectView() {
   const summary = document.getElementById(INJECT_SUMMARY_ID);
   const empty = document.getElementById(INJECT_EMPTY_ID);
   const gateHead = document.querySelector('.kaleido-inject__gate-head');
   const gateText = document.getElementById(INJECT_GATE_TEXT_ID);
+  const valuesHead = document.querySelector('.kaleido-inject__values-head');
+  const valuesText = document.getElementById(INJECT_VALUES_TEXT_ID);
   const eventsHead = document.querySelector('.kaleido-inject__events-head');
   const events = document.getElementById(INJECT_EVENTS_ID);
   const injectHead = document.querySelector('.kaleido-inject__inject-head');
   const injectText = document.getElementById(INJECT_TEXT_ID);
-  if (!summary || !empty || !gateHead || !gateText || !eventsHead || !events || !injectHead || !injectText) return;
+  if (!summary || !empty || !gateHead || !gateText || !valuesHead || !valuesText
+    || !eventsHead || !events || !injectHead || !injectText) return;
   const round = getStoryGateLastRound();
   if (!round) {
     summary.hidden = true;
     gateHead.hidden = true;
     gateText.hidden = true;
+    valuesHead.hidden = true;
+    valuesText.hidden = true;
     eventsHead.hidden = true;
     events.hidden = true;
     injectHead.hidden = true;
@@ -140,6 +145,11 @@ function renderInjectView() {
   gateHead.hidden = !hasGateRaw;
   gateText.hidden = !hasGateRaw;
   gateText.textContent = round.raw || '';
+  // 变量表段：只在预筛请求确实带了变量表时出现（未使用变量系统时整段隐藏）。
+  const hasValues = Boolean(String(round.valuesText || '').trim());
+  valuesHead.hidden = !hasValues;
+  valuesText.hidden = !hasValues;
+  valuesText.textContent = round.valuesText || '';
   const hasEvents = Array.isArray(round.selectedEvents) && round.selectedEvents.length > 0;
   eventsHead.hidden = !hasEvents;
   events.hidden = !hasEvents;

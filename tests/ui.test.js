@@ -760,6 +760,34 @@ runner.test('注入实录卡片打开视图并展示触发与注入内容', () =
   delete sandbox['__kaleido_story_gate_last_round__'];
 });
 
+runner.test('注入实录：变量表段随记录显示 / 缺失时隐藏', () => {
+  const valuesHead = dom.window.document.querySelector('.kaleido-inject__values-head');
+  const valuesText = $('kaleido-inject-values-text');
+  // 无变量表（未使用变量系统）：整段隐藏
+  sandbox['__kaleido_story_gate_last_round__'] = {
+    triggeredAt: new Date().toISOString(),
+    durationMs: 100,
+    totalEvents: 1,
+    selectedIds: ['001'],
+    selectedEvents: [{ id: '001', name: '雨夜', content: '雨声渐密。' }],
+    raw: '{"events":["001"]}',
+    valuesText: '',
+    injectionText: '<Story_Event>\n</Story_Event>',
+    injected: true,
+    skipped: false,
+    timedOut: false,
+  };
+  ui.showPanelView('kaleido-inject-view');
+  assert(valuesHead.hidden === true, '无变量表时应隐藏变量表段');
+  assert(valuesText.hidden === true, '无变量表时应隐藏变量表原文');
+  // 有变量表：显示 YAML 原文
+  sandbox['__kaleido_story_gate_last_round__'].valuesText = '张三:\n  好感: 30';
+  ui.showPanelView('kaleido-inject-view');
+  assert(valuesHead.hidden === false, '有变量表时应显示变量表段');
+  assert(valuesText.textContent.includes('好感: 30'), '应展示变量表 YAML 原文');
+  delete sandbox['__kaleido_story_gate_last_round__'];
+});
+
 runner.test('注入实录无记录时显示空态', () => {
   delete sandbox['__kaleido_story_gate_last_round__'];
   ui.showPanelView('kaleido-inject-view');

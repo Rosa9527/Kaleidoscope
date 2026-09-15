@@ -1,7 +1,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.4.9';
+const MODULE_VERSION = '1.5.0';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -75,6 +75,8 @@ const INJECT_VIEW_ID = 'kaleido-inject-view';
 const INJECT_SUMMARY_ID = 'kaleido-inject-summary';
 const INJECT_EMPTY_ID = 'kaleido-inject-empty';
 const INJECT_GATE_TEXT_ID = 'kaleido-inject-gate-text';
+// 预筛请求携带的变量表（<Current_Values> 原文）
+const INJECT_VALUES_TEXT_ID = 'kaleido-inject-values-text';
 const INJECT_EVENTS_ID = 'kaleido-inject-events';
 const INJECT_TEXT_ID = 'kaleido-inject-text';
 const INJECT_COPY_ID = 'kaleido-inject-copy';
@@ -690,7 +692,8 @@ const FALLBACK_SETTINGS_STORE = new WeakMap();
 
 // ---------- 剧情预筛默认提示词 ----------
 // 与「剧情预筛」的输入说明保持一致：事件目录（<Story_Events>）只含节点与事件的
-// 名字 / ID / 触发条件 / 描述，不含正文；recent_messages 严格取最近 4 条。
+// 名字 / ID / 触发条件 / 描述，不含正文；<Current_Values> 为当前聊天的游戏变量表
+// （YAML，未使用变量系统时该块不提供）；recent_messages 严格取最近 4 条。
 const DEFAULT_STORY_GATE_PROMPT = [
   '【任务】',
   '你是「剧情预筛」子 agent。',
@@ -699,15 +702,16 @@ const DEFAULT_STORY_GATE_PROMPT = [
   '你的唯一产出是一个 JSON 名单（结构见【输出】）。',
   '',
   '【输入】',
-  '本轮输入包含两份材料：',
+  '本轮输入包含三份材料（未使用变量系统时不提供 <Current_Values>）：',
   '- <Story_Events>：当前全部剧情节点与事件目录，是唯一的候选集。只从这份目录中挑选，目录之外的事件（即使剧情里自然发生）一律不列入。',
   '  · 每个事件只展示：所属节点、事件 ID、名称、触发条件、描述。事件正文不展示，你只负责挑选，不负责内容。',
+  '- <Current_Values>：当前聊天的游戏变量（YAML 格式，含父变量与系统派生的子变量），反映剧情推进至今积累的数值与状态。只读参考：用于核对触发条件中涉及数值 / 状态的表述（如「好感达到 60 以上」「金钱耗尽」「已被通缉」），不要复述、不要改动，也不要据它推断未发生的剧情；该块缺失时，仅凭 <Story_Events> 与 <Recent_Messages> 判断。',
   '- <Recent_Messages>：当前场景的最新几条消息，是判断依据。只用于判断目录中的事件，不要从对话中寻找目录之外的事件。',
   '  · 最后一条用户消息是下一轮剧情的直接触发点：优先判断它点名、涉及或会波及目录中的哪些事件；其余消息用于确认当前剧情进展到哪一步、哪些前置条件已满足。',
   '',
   '【推演】',
   '对目录中的每个事件，在心里按以下顺序过一遍，不要写出来：',
-  '1. 条件判定：触发条件是否已满足？明确未满足（前置剧情未发生、地点/时间/人物不符）的直接排除。',
+  '1. 条件判定：触发条件是否已满足？明确未满足（前置剧情未发生、地点/时间/人物不符）的直接排除；条件中涉及数值或状态时，以 <Current_Values> 为准确认是否达标。',
   '2. 时机判定：本轮是否适合触发？事件是否与当前剧情直接相关，还是属于更晚阶段的内容。',
   '3. 归类：按【判定标准】归入「必须触发 / 应触发 / 不触发」。',
   '',
@@ -726,6 +730,7 @@ const DEFAULT_STORY_GATE_PROMPT = [
   '【质量红线】',
   '- 触发判定从严：条件未满足或时机未到的事件不触发——错误触发会注入无关内容干扰主模型，宁可漏选也不可错选。',
   '- 关联判定从宽：拿不准是否与本轮相关时，若触发条件已满足且剧情已推进到附近，倾向列入。',
+  '- 变量表只作核对：<Current_Values> 是参考材料而非判定依据，不要因为它出现就额外触发事件，也不要因为数值未达标就放宽条件已满足的事件。',
 ].join('\n');
 
 // ---------- 变量自动维护默认提示词 ----------

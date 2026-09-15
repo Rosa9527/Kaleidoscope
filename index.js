@@ -1,11 +1,11 @@
 // ===== 万华镜（Kaleidoscope）index.js — 构建产物，勿手改 =====
-// 构建时间: 2026-09-12 00:29:22 · 文件数: 24 · 指纹: 73bba733
+// 构建时间: 2026-09-16 00:29:24 · 文件数: 24 · 指纹: 844ac727
 
 // ===== js/constants.js =====
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.4.9';
+const MODULE_VERSION = '1.5.0';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -79,6 +79,8 @@ const INJECT_VIEW_ID = 'kaleido-inject-view';
 const INJECT_SUMMARY_ID = 'kaleido-inject-summary';
 const INJECT_EMPTY_ID = 'kaleido-inject-empty';
 const INJECT_GATE_TEXT_ID = 'kaleido-inject-gate-text';
+// 预筛请求携带的变量表（<Current_Values> 原文）
+const INJECT_VALUES_TEXT_ID = 'kaleido-inject-values-text';
 const INJECT_EVENTS_ID = 'kaleido-inject-events';
 const INJECT_TEXT_ID = 'kaleido-inject-text';
 const INJECT_COPY_ID = 'kaleido-inject-copy';
@@ -694,7 +696,8 @@ const FALLBACK_SETTINGS_STORE = new WeakMap();
 
 // ---------- 剧情预筛默认提示词 ----------
 // 与「剧情预筛」的输入说明保持一致：事件目录（<Story_Events>）只含节点与事件的
-// 名字 / ID / 触发条件 / 描述，不含正文；recent_messages 严格取最近 4 条。
+// 名字 / ID / 触发条件 / 描述，不含正文；<Current_Values> 为当前聊天的游戏变量表
+// （YAML，未使用变量系统时该块不提供）；recent_messages 严格取最近 4 条。
 const DEFAULT_STORY_GATE_PROMPT = [
   '【任务】',
   '你是「剧情预筛」子 agent。',
@@ -703,15 +706,16 @@ const DEFAULT_STORY_GATE_PROMPT = [
   '你的唯一产出是一个 JSON 名单（结构见【输出】）。',
   '',
   '【输入】',
-  '本轮输入包含两份材料：',
+  '本轮输入包含三份材料（未使用变量系统时不提供 <Current_Values>）：',
   '- <Story_Events>：当前全部剧情节点与事件目录，是唯一的候选集。只从这份目录中挑选，目录之外的事件（即使剧情里自然发生）一律不列入。',
   '  · 每个事件只展示：所属节点、事件 ID、名称、触发条件、描述。事件正文不展示，你只负责挑选，不负责内容。',
+  '- <Current_Values>：当前聊天的游戏变量（YAML 格式，含父变量与系统派生的子变量），反映剧情推进至今积累的数值与状态。只读参考：用于核对触发条件中涉及数值 / 状态的表述（如「好感达到 60 以上」「金钱耗尽」「已被通缉」），不要复述、不要改动，也不要据它推断未发生的剧情；该块缺失时，仅凭 <Story_Events> 与 <Recent_Messages> 判断。',
   '- <Recent_Messages>：当前场景的最新几条消息，是判断依据。只用于判断目录中的事件，不要从对话中寻找目录之外的事件。',
   '  · 最后一条用户消息是下一轮剧情的直接触发点：优先判断它点名、涉及或会波及目录中的哪些事件；其余消息用于确认当前剧情进展到哪一步、哪些前置条件已满足。',
   '',
   '【推演】',
   '对目录中的每个事件，在心里按以下顺序过一遍，不要写出来：',
-  '1. 条件判定：触发条件是否已满足？明确未满足（前置剧情未发生、地点/时间/人物不符）的直接排除。',
+  '1. 条件判定：触发条件是否已满足？明确未满足（前置剧情未发生、地点/时间/人物不符）的直接排除；条件中涉及数值或状态时，以 <Current_Values> 为准确认是否达标。',
   '2. 时机判定：本轮是否适合触发？事件是否与当前剧情直接相关，还是属于更晚阶段的内容。',
   '3. 归类：按【判定标准】归入「必须触发 / 应触发 / 不触发」。',
   '',
@@ -730,6 +734,7 @@ const DEFAULT_STORY_GATE_PROMPT = [
   '【质量红线】',
   '- 触发判定从严：条件未满足或时机未到的事件不触发——错误触发会注入无关内容干扰主模型，宁可漏选也不可错选。',
   '- 关联判定从宽：拿不准是否与本轮相关时，若触发条件已满足且剧情已推进到附近，倾向列入。',
+  '- 变量表只作核对：<Current_Values> 是参考材料而非判定依据，不要因为它出现就额外触发事件，也不要因为数值未达标就放宽条件已满足的事件。',
 ].join('\n');
 
 // ---------- 变量自动维护默认提示词 ----------
@@ -2264,6 +2269,10 @@ function createPanel() {
               <span class="kaleido-panel__section-title">预筛原文（Gate 返回）</span>
             </div>
             <pre id="${INJECT_GATE_TEXT_ID}" class="kaleido-inject__gate-text" hidden></pre>
+            <div class="kaleido-inject__values-head" hidden>
+              <span class="kaleido-panel__section-title">变量表（随预筛请求发送）</span>
+            </div>
+            <pre id="${INJECT_VALUES_TEXT_ID}" class="kaleido-inject__gate-text" hidden></pre>
             <div class="kaleido-inject__events-head" hidden>
               <span class="kaleido-panel__section-title">本轮触发的事件</span>
             </div>
@@ -4504,22 +4513,27 @@ function buildInjectEventCard(event) {
 }
 
 // 渲染注入实录视图：无记录时显示空态，有记录时按
-// 摘要 → 预筛原文 → 触发事件 → 注入提示词原文 四段展示。
+// 摘要 → 预筛原文 → 变量表 → 触发事件 → 注入提示词原文 五段展示。
 function renderInjectView() {
   const summary = document.getElementById(INJECT_SUMMARY_ID);
   const empty = document.getElementById(INJECT_EMPTY_ID);
   const gateHead = document.querySelector('.kaleido-inject__gate-head');
   const gateText = document.getElementById(INJECT_GATE_TEXT_ID);
+  const valuesHead = document.querySelector('.kaleido-inject__values-head');
+  const valuesText = document.getElementById(INJECT_VALUES_TEXT_ID);
   const eventsHead = document.querySelector('.kaleido-inject__events-head');
   const events = document.getElementById(INJECT_EVENTS_ID);
   const injectHead = document.querySelector('.kaleido-inject__inject-head');
   const injectText = document.getElementById(INJECT_TEXT_ID);
-  if (!summary || !empty || !gateHead || !gateText || !eventsHead || !events || !injectHead || !injectText) return;
+  if (!summary || !empty || !gateHead || !gateText || !valuesHead || !valuesText
+    || !eventsHead || !events || !injectHead || !injectText) return;
   const round = getStoryGateLastRound();
   if (!round) {
     summary.hidden = true;
     gateHead.hidden = true;
     gateText.hidden = true;
+    valuesHead.hidden = true;
+    valuesText.hidden = true;
     eventsHead.hidden = true;
     events.hidden = true;
     injectHead.hidden = true;
@@ -4535,6 +4549,11 @@ function renderInjectView() {
   gateHead.hidden = !hasGateRaw;
   gateText.hidden = !hasGateRaw;
   gateText.textContent = round.raw || '';
+  // 变量表段：只在预筛请求确实带了变量表时出现（未使用变量系统时整段隐藏）。
+  const hasValues = Boolean(String(round.valuesText || '').trim());
+  valuesHead.hidden = !hasValues;
+  valuesText.hidden = !hasValues;
+  valuesText.textContent = round.valuesText || '';
   const hasEvents = Array.isArray(round.selectedEvents) && round.selectedEvents.length > 0;
   eventsHead.hidden = !hasEvents;
   events.hidden = !hasEvents;
@@ -5914,7 +5933,7 @@ function importPromptPreset(ctx, parsed) {
 // 并发协调：预筛管线注册进跨扩展发送屏障（js/send-barrier.js，与 SoulLink 共用），
 // 与其他扩展的发送前任务并发执行——发送前耗时 = max(各 Gate)，而非串行之和；
 // 屏障不可用时回退为「自己直接阻塞」的原有行为。
-// 流程：Gate（剧情预筛提示词 + 事件目录 + 最近 4 条消息）→ 解析事件 ID →
+// 流程：Gate（剧情预筛提示词 + 事件目录 + 变量表 + 最近 4 条消息）→ 解析事件 ID →
 // 拼接 <Story_Event> 块 → setExtensionPrompt(IN_CHAT, depth 0, SYSTEM) 注入到
 // 最后一条用户消息正下方 → 恢复发送；generationEnded / generationStopped 后清空注入。
 // 重新生成（retry）：宿主 Generate('regenerate') 全程不发 messageSent，只在开头发
@@ -6008,17 +6027,42 @@ function getStoryGatePrompt(ctx) {
   return getEffectivePromptText(ctx, 'storyGate');
 }
 
-// Gate 请求体按「提示词 → 事件目录块 → 剧情块 → 输出契约」四段式组织：
+// 变量表：当前聊天的游戏变量（YAML 树，父变量 + 按父变量派生的子变量），供 Gate
+// 核对触发条件里涉及数值 / 状态的表述（好感高低、资源多少、身份变化等）。
+// 刻意只发值、不发变量规则块（<Key_Rules>）：Gate 只需要「现在是什么状态」，
+// 规则是变量维护的职责，多一份规则块只会稀释预筛输入。
+// 空变量树（未使用变量系统的卡 / 聊天）返回空串，该块整体不进入请求；
+// 读取失败一律降级为「不带变量表」，绝不阻塞发送。
+function buildStoryGateValuesText(ctx) {
+  try {
+    const text = serializeValuesGameTree(ctx);
+    if (!text) {
+      logApp('debug', '剧情预筛：当前没有变量，本轮不携带变量表');
+      return '';
+    }
+    logApp('debug', '剧情预筛：已携带变量表', text.length + ' 字符');
+    return text;
+  } catch (error) {
+    logApp('warn', '剧情预筛：读取变量表失败，本轮不携带变量', String(error?.message || error));
+    return '';
+  }
+}
+
+// Gate 请求体按「提示词 → 事件目录块 → 变量表块（可选）→ 剧情块 → 输出契约」
+// 五段式组织；变量表为空（未使用变量系统）时该段整体省略，回到原来的四段式：
 // 1. system 剧情预筛提示词；
 // 2. user 目录段：引导 + <Story_Events> 块（节点 + 事件目录，XML 包裹）；
-// 3. user 剧情段：引导 + <Recent_Messages> 块（最近 4 条消息，XML 包裹）；
-// 4. user 输出契约段：约定 JSON 模板。
+// 3. user 变量段：引导 + <Current_Values> 块（当前游戏变量 YAML，XML 包裹）；
+// 4. user 剧情段：引导 + <Recent_Messages> 块（最近 4 条消息，XML 包裹）；
+// 5. user 输出契约段：约定 JSON 模板。
 // 与「剧情预筛」默认提示词的输入说明保持一致；JSON 紧凑序列化（省缩进 token），
 // 减少消息轮次与输入体积，加快 Gate 返回。
-function buildStoryGateMessages(ctx, prompt) {
+// valuesText 由调用方传入（管线要同步存快照，避免重复派生整棵树）；缺省时才现算。
+function buildStoryGateMessages(ctx, prompt, valuesText) {
   const catalog = buildStoryEventCatalog(ctx);
+  const values = typeof valuesText === 'string' ? valuesText : buildStoryGateValuesText(ctx);
   const recentMessages = getStoryGateRecentMessages(STORY_GATE_RECENT_COUNT, ctx);
-  return [
+  const messages = [
     { role: 'system', content: prompt },
     {
       role: 'user',
@@ -6029,6 +6073,18 @@ function buildStoryGateMessages(ctx, prompt) {
         '<Story_Events>\n' + JSON.stringify(catalog) + '\n</Story_Events>',
       ].join('\n'),
     },
+  ];
+  if (values) {
+    messages.push({
+      role: 'user',
+      content: [
+        '以下被 <Current_Values>...</Current_Values> 包裹的是当前聊天的游戏变量（YAML 格式，完整变量树，含父变量与系统派生的子变量）。',
+        '它反映剧情推进的当前状态，用于核对触发条件中涉及数值 / 状态的表述；只读参考，不要复述，也不要改动。',
+        '<Current_Values>\n' + values + '\n</Current_Values>',
+      ].join('\n'),
+    });
+  }
+  messages.push(
     {
       role: 'user',
       content: [
@@ -6042,7 +6098,8 @@ function buildStoryGateMessages(ctx, prompt) {
       role: 'user',
       content: '请按约定输出 JSON，只从目录中列出本轮应该触发的事件 ID：\n\n' + JSON.stringify({ events: [] }),
     },
-  ];
+  );
+  return messages;
 }
 
 // 解析 Gate 返回的事件 ID，并与现有事件求交集：模型可能返回乱格式、含未知 ID 或
@@ -6223,6 +6280,7 @@ async function runStoryGatePipeline(ctx, settings, signature = '') {
     selectedIds: [],
     selectedEvents: [],
     raw: '',
+    valuesText: '',
     injectionText: '',
     injected: false,
     skipped: false,
@@ -6246,8 +6304,10 @@ async function runStoryGatePipeline(ctx, settings, signature = '') {
     }
     globalThis.toastr?.info?.('剧情预筛中…', '[' + MODULE_DISPLAY_NAME + ']');
     const prompt = getStoryGatePrompt(ctx);
-    const messages = buildStoryGateMessages(ctx, prompt);
-    logApp('info', '剧情预筛：Gate 开始', scripts.length + ' 个事件');
+    // 变量表随请求一起发出，同步记进本轮快照供「注入实录」核对（未使用变量系统时为空串）。
+    record.valuesText = buildStoryGateValuesText(ctx);
+    const messages = buildStoryGateMessages(ctx, prompt, record.valuesText);
+    logApp('info', '剧情预筛：Gate 开始', scripts.length + ' 个事件' + (record.valuesText ? ' · 含变量表' : ' · 无变量表'));
     // Gate 只产出事件 ID 名单，输出量小：限制 maxTokens 并降低 temperature，
     // 避免模型长篇输出拖慢发送前阻塞链路，同时保持判定确定性（与 SoulLink 一致）。
     const content = await chatCompletion(settings, messages, { signal: controller.signal, maxTokens: 1024, temperature: 0.1 });

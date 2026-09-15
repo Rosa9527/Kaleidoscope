@@ -144,6 +144,94 @@ runner.test('buildStoryGateMessages 四段式：提示词 → 目录 → 剧情 
   assert(messages[3].content.includes('"events":[]'), '第四条应为输出契约');
 });
 
+// ---------- 变量表 ----------
+runner.test('buildStoryGateValuesText：有变量时输出 YAML 树，空变量树返回空串', () => {
+  const c = fresh();
+  assert(ctx.buildStoryGateValuesText(c) === '', '没有变量时应返回空串');
+  ctx.upsertValuesKey(c, '好感', '友好互动 +5');
+  ctx.saveValuesChatState(c, { 张三: { 好感: 30 } }, {});
+  const text = ctx.buildStoryGateValuesText(c);
+  assert(text.includes('张三:') && text.includes('好感: 30'), '应输出变量 YAML 树');
+});
+
+runner.test('buildStoryGateValuesText：含子变量的完整树（子变量只读派生）', () => {
+  const c = fresh();
+  ctx.upsertValuesKey(c, '好感度', '友好互动 +5');
+  ctx.upsertValuesKey(c, '态度', '', { type: 'child', parent: '好感度', rules: [
+    { min: 0, max: 30, value: '冷淡' },
+    { min: 31, max: 100, value: '颇具好感' },
+  ] });
+  // 子变量叶子须先在树里存在（与 UI 新建变量的行为一致），派生才会落到它上面。
+  ctx.saveValuesChatState(c, { 张三: { 好感度: 40, 态度: '未知' } }, {});
+  const text = ctx.buildStoryGateValuesText(c);
+  assert(text.includes('好感度: 40'), '应含父变量当前值');
+  assert(text.includes('态度: 颇具好感'), '应含按父变量派生的子变量');
+});
+
+runner.test('buildStoryGateMessages：有变量表时插入 <Current_Values> 段（五段式）', () => {
+  const c = fresh();
+  makeStory(c);
+  ctx.upsertValuesKey(c, '好感', '规则');
+  ctx.saveValuesChatState(c, { 张三: { 好感: 30 } }, {});
+  c.chat = [{ is_user: true, mes: '我推开门' }];
+  const messages = ctx.buildStoryGateMessages(c, '预筛提示词');
+  assert(messages.length === 5, '带变量表时应有 5 条消息');
+  const valuesMessage = messages[2];
+  assert(valuesMessage.content.includes('<Current_Values>'), '第三条应含变量表块');
+  assert(valuesMessage.content.includes('好感: 30'), '变量表块应含当前变量值');
+  assert(valuesMessage.content.includes('只读参考'), '变量表块应声明只读');
+  assert(messages[3].content.includes('<Recent_Messages>'), '剧情块应顺延到第四条');
+  assert(messages[4].content.includes('"events":[]'), '输出契约应顺延到第五条');
+});
+
+runner.test('runStoryGatePipeline：变量表随请求发出并记入快照', async () => {
+  const c = fresh();
+  makeStory(c);
+  ctx.upsertValuesKey(c, '好感', '规则');
+  ctx.saveValuesChatState(c, { 张三: { 好感: 30 } }, {});
+  c.chat = [{ is_user: true, mes: '我推开门' }];
+  setupApi(c);
+  c.setExtensionPrompt = () => {};
+  let captured = null;
+  sandbox.chatCompletion = async (settings, messages) => {
+    captured = messages;
+    return '{"events":["001"]}';
+  };
+  await ctx.runStoryGatePipeline(c, ctx.getSettings(c));
+  assert(captured && captured.length === 5, '请求体应含变量表段');
+  assert(captured[2].content.includes('好感: 30'), '请求变量表段应含当前变量值');
+  const round = sandbox[LAST_ROUND_KEY];
+  assert(round.valuesText.includes('好感: 30'), '快照应记录变量表原文');
+});
+
+runner.test('runStoryGatePipeline：变量读取异常时降级为不带变量表，不阻塞发送', async () => {
+  const c = fresh();
+  makeStory(c);
+  ctx.upsertValuesKey(c, '好感', '规则');
+  ctx.saveValuesChatState(c, { 张三: { 好感: 30 } }, {});
+  c.chat = [{ is_user: true, mes: '我推开门' }];
+  setupApi(c);
+  const calls = [];
+  c.setExtensionPrompt = (key, text) => calls.push({ key, text });
+  // 读取变量表抛错（如宿主 chatMetadata 不可读）：Gate 照常发出，只是不带变量表。
+  // 沙箱是全体用例共享的，覆写后必须在 finally 里还原，避免污染后续用例。
+  const originalTree = ctx.getValuesGameTree;
+  ctx.getValuesGameTree = () => { throw new Error('chatMetadata 不可读'); };
+  let captured = null;
+  sandbox.chatCompletion = async (settings, messages) => {
+    captured = messages;
+    return '{"events":["001"]}';
+  };
+  try {
+    await ctx.runStoryGatePipeline(c, ctx.getSettings(c));
+  } finally {
+    ctx.getValuesGameTree = originalTree;
+  }
+  assert(captured && captured.length === 4, '变量表不可读时应回到四段式');
+  assert(calls.some((call) => call.key === INJECT_KEY), '预筛仍应正常注入事件');
+  assert(sandbox[LAST_ROUND_KEY].valuesText === '', '快照变量表应为空串');
+});
+
 // ---------- 解析 ----------
 runner.test('parseStoryGateEventIds 精确匹配、去重、丢弃未知、限 5 个', () => {
   const allowed = ['001', '002', '003', '004', '005', '006'];

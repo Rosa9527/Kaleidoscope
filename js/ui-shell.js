@@ -616,6 +616,10 @@ function createPanel() {
               <span class="kaleido-panel__section-title">预筛原文（Gate 返回）</span>
             </div>
             <pre id="${INJECT_GATE_TEXT_ID}" class="kaleido-inject__gate-text" hidden></pre>
+            <div class="kaleido-inject__values-head" hidden>
+              <span class="kaleido-panel__section-title">变量表（随预筛请求发送）</span>
+            </div>
+            <pre id="${INJECT_VALUES_TEXT_ID}" class="kaleido-inject__gate-text" hidden></pre>
             <div class="kaleido-inject__events-head" hidden>
               <span class="kaleido-panel__section-title">本轮触发的事件</span>
             </div>
