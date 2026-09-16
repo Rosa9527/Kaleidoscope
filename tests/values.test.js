@@ -828,6 +828,35 @@ runner.test('触发列表重排：按 id 调整顺序并保存', () => {
   assert(ids.join(',') === '003,001,002', '应按给定顺序重排');
 });
 
+runner.test('事件分类重排：同级内调整顺序，其他层级不受影响', () => {
+  const c = makeChatCtx();
+  const topA = ctx.createValuesTriggerCategory(c, { name: '甲类' });
+  const topB = ctx.createValuesTriggerCategory(c, { name: '乙类' });
+  const topC = ctx.createValuesTriggerCategory(c, { name: '丙类' });
+  const childA = ctx.createValuesTriggerCategory(c, { name: '子一', parentId: topA.id });
+  const childB = ctx.createValuesTriggerCategory(c, { name: '子二', parentId: topA.id });
+  // 顶层重排：丙提到最前；子分类顺序不受影响
+  ctx.reorderValuesTriggerCategories(c, '', [topC.id, topA.id, topB.id]);
+  const roots = ctx.getValuesTriggerRootCategories(c).map((category) => category.name);
+  assert(roots.join(',') === '丙类,甲类,乙类', `顶层应按给定顺序，实际「${roots}」`);
+  const children = ctx.getValuesTriggerCategoryChildren(c, topA.id).map((category) => category.name);
+  assert(children.join(',') === '子一,子二', '子分类顺序不应被顶层重排波及');
+  // 子级重排：独立于顶层
+  ctx.reorderValuesTriggerCategories(c, topA.id, [childB.id, childA.id]);
+  const children2 = ctx.getValuesTriggerCategoryChildren(c, topA.id).map((category) => category.name);
+  assert(children2.join(',') === '子二,子一', '子分类应按给定顺序重排');
+  const roots2 = ctx.getValuesTriggerRootCategories(c).map((category) => category.name);
+  assert(roots2.join(',') === '丙类,甲类,乙类', '顶层顺序不应被子级重排波及');
+  // 跨层 id 混入时只认本层成员：乙类属于顶层，不该被塞进甲类的子级
+  ctx.reorderValuesTriggerCategories(c, topA.id, [topB.id, childA.id, childB.id]);
+  const children3 = ctx.getValuesTriggerCategoryChildren(c, topA.id).map((category) => category.name);
+  assert(children3.join(',') === '子一,子二', `非本层 id 应被忽略，实际「${children3}」`);
+  // 未列出的同级项按原相对顺序追加在末尾
+  ctx.reorderValuesTriggerCategories(c, '', [topB.id]);
+  const roots3 = ctx.getValuesTriggerRootCategories(c).map((category) => category.name);
+  assert(roots3.join(',') === '乙类,丙类,甲类', `未列出的顶层项应追加在末尾，实际「${roots3}」`);
+});
+
 runner.test('变量树顺序表：记录顺序 + 未记录条目按名称排序追加', () => {
   const c = makeChatCtx();
   ctx.valuesSetAtPath(ctx.getValuesDefaults(c), ['张三', '好感'], 30);
@@ -887,6 +916,51 @@ runner.test('整包 YAML 往返：order 顺序表', () => {
   const c2 = fresh();
   ctx.applyValuesBundle(c2, parsed, 'merge');
   assert(ctx.getValuesTreeOrder(c2)[''].join(',') === '李四,张三', '合并导入应保留顺序');
+});
+
+// ---------- 顺序表清理（已删除条目的幽灵项）----------
+runner.test('导出顺序表：已删除的条目不再写进 YAML', () => {
+  const character = makeCharacter('测试角色', 'avatar-1');
+  const c = makeContext({ characters: [character], characterId: 0, writeExtensionField: () => Promise.resolve() });
+  ctx.upsertValuesKey(c, '好感', '规则');
+  const defaults = ctx.getValuesDefaults(c);
+  ctx.valuesSetAtPath(defaults, ['张三', '好感'], 30);
+  ctx.valuesSetAtPath(defaults, ['李四'], 1);
+  ctx.valuesSetAtPath(defaults, ['八奈见杏菜', '友谊'], 10);
+  // 顺序表记下三个顶层条目 + 已删节点下的子条目
+  ctx.reorderValuesTreeAt(c, '', ['李四', '八奈见杏菜', '张三']);
+  ctx.reorderValuesTreeAt(c, '八奈见杏菜', ['友谊', '情欲']);
+  // 玩家删掉「八奈见杏菜」——顺序表此前不会跟着收缩
+  ctx.valuesDeleteAtPath(defaults, ['八奈见杏菜']);
+  assert(ctx.getValuesTreeOrder(c)[''].includes('八奈见杏菜'), '前置条件：顺序表里确实残留着已删除的名字');
+  const yaml = ctx.serializeValuesBundle(c);
+  assert(!yaml.includes('八奈见杏菜'), '已删除的节点不应出现在导出文件里');
+  assert(!yaml.includes('情欲'), '已删除节点下的条目名不应残留');
+  assert(yaml.includes('李四') && yaml.includes('张三'), '仍存在的条目应保留');
+  const parsed = ctx.parseValuesBundle(yaml);
+  assert(parsed.order[''].join(',') === '李四,张三', `顶层顺序应只留现存条目，实际「${parsed.order[''].join(',')}」`);
+  assert(parsed.order['八奈见杏菜'] === undefined, '整条失效路径不应写进导出');
+});
+
+runner.test('顺序表清理：pruneValuesTreeOrder 保留另一层仍在的顺序', () => {
+  const character = makeCharacter('测试角色', 'avatar-1');
+  const c = makeContext({ characters: [character], characterId: 0, writeExtensionField: () => Promise.resolve() });
+  const defaults = ctx.getValuesDefaults(c);
+  ctx.valuesSetAtPath(defaults, ['张三', '好感'], 30);
+  ctx.reorderValuesTreeAt(c, '', ['张三', '李四']);
+  // 默认值层没有「李四」，但游戏值层有——顺序表两层共用，不能按单棵树裁掉它
+  ctx.pruneValuesTreeOrder(c, [defaults, { 李四: { 金钱: 1 } }]);
+  const order = ctx.getValuesTreeOrder(c);
+  assert(order[''].join(',') === '张三,李四', `两棵树任一存在的条目都应保留，实际「${order[''].join(',')}」`);
+  // 两棵树都不存在的名字才该丢
+  const c2 = makeContext({ characters: [makeCharacter('角色二', 'avatar-2')], characterId: 0, writeExtensionField: () => Promise.resolve() });
+  const defaults2 = ctx.getValuesDefaults(c2);
+  ctx.valuesSetAtPath(defaults2, ['王五'], 1);
+  ctx.reorderValuesTreeAt(c2, '', ['王五', '赵六']);
+  assert(ctx.pruneValuesTreeOrder(c2, [defaults2, { 李四: { 金钱: 1 } }]) === true, '「赵六」两棵树都没有，应清理');
+  assert(ctx.getValuesTreeOrder(c2)[''].join(',') === '王五', '只保留两棵树里存在的条目');
+  // 无改动时不误报，避免每次保存都触发多余落盘
+  assert(ctx.pruneValuesTreeOrder(c2, [defaults2, { 李四: { 金钱: 1 } }]) === false, '无陈旧项应返回 false');
 });
 
 // ---------- 公式派生 ----------

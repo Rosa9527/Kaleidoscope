@@ -1,7 +1,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.5.0';
+const MODULE_VERSION = '1.5.2';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -44,6 +44,11 @@ const VALUES_EDIT_ICON_CLASS = 'fa-solid fa-pen';
 const VALUES_DELETE_ICON_CLASS = 'fa-solid fa-trash-can';
 const VALUES_CHEVRON_ICON_CLASS = 'fa-solid fa-chevron-right';
 const VALUES_DRAG_ICON_CLASS = 'fa-solid fa-grip-vertical';
+// 长按整行进入拖动：与悬浮球长按同值（650ms）。触摸端没有悬停提示，
+// 长按是唯一能区分「点一下 = 操作行」与「按住 = 拖动行」的手势。
+const VALUES_LONG_PRESS_MS = 650;
+// 长按判定期间允许的手指抖动上限（px）：超过即认为是滚动 / 点选，放弃长按。
+const VALUES_LONG_PRESS_SLOP = 8;
 const VALUES_EXPORT_ICON_CLASS = 'fa-solid fa-download';
 const VALUES_IMPORT_ICON_CLASS = 'fa-solid fa-file-import';
 const VALUES_SPARK_ICON_CLASS = 'fa-solid fa-wand-magic-sparkles';

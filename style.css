@@ -3071,7 +3071,8 @@ textarea.kaleido-input {
   border-radius: 7px;
 }
 
-/* 分类行不参与拖动：分类顺序用不到，把手只出现在触发行上（同剧情脉络）。 */
+/* 分类行可拖动：按住把手直接拖，或长按整行 650ms 进入拖动（拖动时整棵子树随行）。
+   计数推到最右，与触发行「摘要贴右」的观感一致。 */
 .kaleido-values__row--trigger-category .kaleido-values__row-count {
   margin-left: auto;
 }
@@ -3106,6 +3107,9 @@ textarea.kaleido-input {
   border: none;
   border-radius: 6px;
   cursor: grab;
+  /* 触摸端：把手上一按下就是拖动，不允许浏览器把它当成滚动起手。
+     行其余部分不设 none——那里要留给长按判定，滚动照常。 */
+  touch-action: none;
   transition: color 0.13s ease, background 0.13s ease;
 }
 
@@ -3127,10 +3131,12 @@ textarea.kaleido-input {
   color: var(--k-accent);
 }
 
+/* 拖动中：列表整体不响应文本选择，避免整行拖拽顺带刷蓝文字。 */
 .kaleido-values__tree-body.is-reordering,
 .kaleido-values__keys-body.is-reordering,
 .kaleido-values__triggers-body.is-reordering {
   cursor: grabbing;
+  user-select: none;
 }
 /* 展开箭头 */
 .kaleido-values__chevron {

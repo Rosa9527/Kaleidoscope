@@ -1152,6 +1152,50 @@ function dragRowByHandle(handle, fromY, toY) {
   dom.window.document.dispatchEvent(pointerEvent('pointerup', toY));
 }
 
+// 长按整行（非把手）启动拖动：按下 → 越过 650ms 阈值 → 移动 → 松手。
+async function longPressDragRow(row, fromY, toY) {
+  const target = row.querySelector('.kaleido-values__row-name') || row;
+  target.dispatchEvent(pointerEvent('pointerdown', fromY));
+  await flush();
+  await new Promise((resolve) => setTimeout(resolve, 700));
+  dom.window.document.dispatchEvent(pointerEvent('pointermove', toY));
+  dom.window.document.dispatchEvent(pointerEvent('pointerup', toY));
+}
+
+function triggerRows() {
+  return Array.from($('kaleido-values-triggers-body').querySelectorAll('.kaleido-values__row--trigger'));
+}
+
+function triggerRowNames() {
+  return triggerRows().map((row) => row.querySelector('.kaleido-values__row-name').textContent).join(',');
+}
+
+// 触发页清场：删光事件与分类，并保证「张三/好感」路径存在（条件下拉要用）。
+function resetTriggers() {
+  for (const trigger of ui.getValuesTriggers(hostCtx).slice()) ui.deleteValuesTrigger(hostCtx, trigger.id);
+  for (const category of ui.getValuesTriggerCategories(hostCtx).slice()) ui.deleteValuesTriggerCategory(hostCtx, category.id);
+  const defaults = ui.getValuesDefaults(hostCtx);
+  defaults['张三'] = { '好感': 30 };
+  ui.saveValuesData(hostCtx);
+}
+
+// 新建一个带条件的事件（路径固定「张三/好感」，保证条件有效可保存）。
+function addTrigger(name) {
+  pickTriggerAddMenu('trigger');
+  setValue('kaleido-values-trigger-editor-name', name);
+  setValue('kaleido-values-trigger-editor-content', '触发内容');
+  click($('kaleido-values-trigger-editor-condition-add'));
+  const condRow = $('kaleido-values-trigger-editor-conditions').querySelector('.kaleido-values__trigger-condition');
+  condRow.querySelector('.kaleido-values__trigger-condition-path').value = '张三/好感';
+  click($('kaleido-values-trigger-editor-save'));
+}
+
+function addCategory(name) {
+  pickTriggerAddMenu('category');
+  setValue('kaleido-values-trigger-category-editor-name', name);
+  click($('kaleido-values-trigger-category-editor-save'));
+}
+
 runner.test('键列表：拖动把手改变注册顺序并持久化', () => {
   // 清掉旧键，注册 3 个新键
   for (const key of ui.getValuesKeys(hostCtx).slice()) ui.deleteValuesKey(hostCtx, key.name);
@@ -1204,6 +1248,46 @@ runner.test('变量树：同级条目拖动排序并保持', () => {
   assert(rowNames().join(',') === '李四,王五,张三', '重渲染后顺序应保持');
 });
 
+runner.test('变量树：删除条目后顺序表同步清理（导出无幽灵项）', async () => {
+  click($('kaleido-values-tab-tree'));
+  click($('kaleido-values-layer-default'));
+  const defaults = ui.getValuesDefaults(hostCtx);
+  for (const key of Object.keys(defaults)) delete defaults[key];
+  defaults['李四'] = 1;
+  defaults['王五'] = 1;
+  ui.saveValuesData(hostCtx);
+  ui.renderValuesTree();
+  // 先制造一条顺序记录（拖动排序即写入顺序表）
+  ui.reorderValuesTreeAt(hostCtx, '', ['李四', '王五']);
+  ui.renderValuesTree();
+  // 删除「李四」——顺序表此前不会跟着收缩
+  click(actionButton(rowByName('李四'), 'delete'));
+  assert(confirmMessage().includes('确定删除变量「李四」'), '删除变量应先弹确认');
+  clickConfirmOk();
+  await flush();
+  assert(ui.getValuesDefaults(hostCtx)['李四'] === undefined, '李四应从默认值层删除');
+  const order = ui.getValuesTreeOrder(hostCtx);
+  assert(!String(order[''] || '').includes('李四'), `顺序表应同步清掉已删除的名字，实际「${order['']}」`);
+  const yaml = ui.serializeValuesBundle(hostCtx);
+  assert(!yaml.includes('李四'), '导出文件里不应出现已删除的条目');
+  // 节点整棵删除：子树路径记录也一并清掉
+  const defaults2 = ui.getValuesDefaults(hostCtx);
+  defaults2['八奈见杏菜'] = { '友谊': 10 };
+  ui.saveValuesData(hostCtx);
+  ui.reorderValuesTreeAt(hostCtx, '八奈见杏菜', ['友谊']);
+  ui.renderValuesTree();
+  click(actionButton(rowByName('八奈见杏菜'), 'delete'));
+  clickConfirmOk();
+  await flush();
+  assert(ui.getValuesTreeOrder(hostCtx)['八奈见杏菜'] === undefined, '已删节点的子路径顺序记录应一并清掉');
+  assert(!ui.serializeValuesBundle(hostCtx).includes('八奈见杏菜'), '导出文件里不应出现已删除的节点');
+  // 复原后续用例依赖的树形（触发条件下拉需要「张三/好感」这条路径）
+  const restored = ui.getValuesDefaults(hostCtx);
+  restored['张三'] = { '好感': 30 };
+  ui.saveValuesData(hostCtx);
+  ui.renderValuesTree();
+});
+
 runner.test('剧情触发：拖动把手改变触发顺序', () => {
   click($('kaleido-values-tab-triggers'));
   for (const trigger of ui.getValuesTriggers(hostCtx).slice()) ui.deleteValuesTrigger(hostCtx, trigger.id);
@@ -1227,6 +1311,129 @@ runner.test('剧情触发：拖动把手改变触发顺序', () => {
   const dataIds = ui.getValuesTriggers(hostCtx).map((t) => t.id).join(',');
   assert(domIds === dataIds, '数据层顺序应与 DOM 一致');
   assert(rows()[2].querySelector('.kaleido-values__row-name').textContent === '事件A', '事件A 应拖到末尾');
+});
+
+// 回归：未分类事件被包在 .kaleido-values__trigger-group 里，而拖动插入曾按外层
+// body 计算落点——插入兄弟节点抛 NotFoundError（上拖无反应），落到末尾则直接
+// append 到 body（跳出分组、永远只能到最后一个）。
+runner.test('剧情触发：未分类事件可向上拖动（回归：只能拖到末尾）', () => {
+  openTriggersTab();
+  resetTriggers();
+  for (const name of ['事件A', '事件B', '事件C']) addTrigger(name);
+  const group = $('kaleido-values-triggers-body').querySelector('.kaleido-values__trigger-group');
+  assert(group, '未分类事件应被收进分组容器');
+  assert(triggerRows().every((row) => row.parentElement === group), '前置：三个事件都住在分组容器里');
+  // 重渲染后 DOM 整个重建，分组容器要重新取（不能用拖动前那个已脱离文档的节点）。
+  const inGroup = () => {
+    const current = $('kaleido-values-triggers-body').querySelector('.kaleido-values__trigger-group');
+    return current && triggerRows().every((row) => row.parentElement === current);
+  };
+  stubRowRects(triggerRows());
+  // 把最后一个（事件C）往上拖到第 1 位
+  dragRowByHandle(triggerRows()[2].querySelector('.kaleido-values__drag-handle'), 2 * 30 + 15, 5);
+  assert(triggerRowNames() === '事件C,事件A,事件B', `上拖应生效，实际「${triggerRowNames()}」`);
+  assert(ui.getValuesTriggers(hostCtx).map((t) => t.name).join(',') === '事件C,事件A,事件B', '数据层顺序应同步');
+  // 仍在分组容器里：拖动不应把行甩出未分类分组
+  assert(inGroup(), '拖动后仍应留在分组容器内');
+  // 反向：拖回末尾
+  stubRowRects(triggerRows());
+  dragRowByHandle(triggerRows()[0].querySelector('.kaleido-values__drag-handle'), 15, 999);
+  assert(triggerRowNames() === '事件A,事件B,事件C', `下拖到末尾应生效，实际「${triggerRowNames()}」`);
+  assert(inGroup(), '下拖后仍应留在分组容器内');
+});
+
+runner.test('剧情触发：长按整行进入拖动（把手仍是即拖，按钮长按不拖动）', async () => {
+  openTriggersTab();
+  resetTriggers();
+  for (const name of ['事件A', '事件B', '事件C']) addTrigger(name);
+  stubRowRects(triggerRows());
+  // 长按事件C 的行名区域（非把手）拖到顶部
+  const rowC = triggerRows()[2];
+  assert(rowC.querySelector('.kaleido-values__row-name'), '触发行应有名称区可用于长按');
+  await longPressDragRow(rowC, 2 * 30 + 15, 5);
+  assert(triggerRowNames() === '事件C,事件A,事件B', `长按拖动应生效，实际「${triggerRowNames()}」`);
+  // 长按行内按钮不启动拖动：按住开关 700ms 后移动，顺序不应变化
+  ui.renderValuesTriggers();
+  stubRowRects(triggerRows());
+  const before = triggerRowNames();
+  const toggle = triggerRows()[0].querySelector('[data-action="toggle-trigger"]');
+  toggle.dispatchEvent(pointerEvent('pointerdown', 15));
+  await new Promise((resolve) => setTimeout(resolve, 700));
+  dom.window.document.dispatchEvent(pointerEvent('pointermove', 999));
+  dom.window.document.dispatchEvent(pointerEvent('pointerup', 999));
+  assert(triggerRowNames() === before, `长按按钮不应触发拖动，实际「${triggerRowNames()}」`);
+  // 长按后未移动即松手：不排序、不残留拖动态
+  stubRowRects(triggerRows());
+  const rowA = triggerRows()[0];
+  await longPressDragRow(rowA, 15, 15);
+  assert(!rowA.classList.contains('is-dragging'), '松手后不应残留拖动态');
+  assert(!$('kaleido-values-triggers-body').classList.contains('is-reordering'), '松手后不应残留排序态');
+});
+
+runner.test('剧情触发：分类行可拖动，子树随行一起走', () => {
+  openTriggersTab();
+  resetTriggers();
+  for (const name of ['甲类', '乙类', '丙类']) addCategory(name);
+  assert(categoryRows().length === 3, '应有 3 个分类');
+  assert(categoryRows().every((row) => row.querySelector('.kaleido-values__drag-handle')), '分类行应有拖动把手');
+  assert(categoryRows().every((row) => row.dataset.parentId === ''), '顶层分类的 parentId 应为空串');
+  // 把甲类拖到底
+  stubRowRects(categoryRows());
+  dragRowByHandle(categoryRowByName('甲类').querySelector('.kaleido-values__drag-handle'), 15, 999);
+  assert(categoryRows().map((row) => row.querySelector('.kaleido-values__row-name').textContent).join(',') === '乙类,丙类,甲类', '分类顺序应变化');
+  assert(ui.getValuesTriggerRootCategories(hostCtx).map((c) => c.name).join(',') === '乙类,丙类,甲类', '数据层顺序应同步');
+  // 子树随行：父类带两个展开的子分类，把父类拖到底，子分类应跟着排在父类之后
+  resetTriggers(); 
+  addCategory('父类');
+  ui.renderValuesTriggers();
+  const parentRow = categoryRowByName('父类');
+  ui.createValuesTriggerCategory(hostCtx, { name: '子一', parentId: parentRow.dataset.id });
+  ui.createValuesTriggerCategory(hostCtx, { name: '子二', parentId: parentRow.dataset.id });
+  addCategory('独立类');
+  ui.renderValuesTriggers();
+  // 新建分类默认展开，子分类行应已渲染（父类之后、独立类之前）
+  const layout = () => Array.from($('kaleido-values-triggers-body').querySelectorAll('.kaleido-values__row'))
+    .map((row) => row.querySelector('.kaleido-values__row-name').textContent).join(',');
+  assert(layout() === '父类,子一,子二,独立类', `前置：展开后应为深度优先排列，实际「${layout()}」`);
+  const topRows = () => Array.from($('kaleido-values-triggers-body').querySelectorAll('.kaleido-values__row'));
+  stubRowRects(topRows());
+  dragRowByHandle(categoryRowByName('父类').querySelector('.kaleido-values__drag-handle'), 15, 999);
+  assert(layout() === '独立类,父类,子一,子二', `子树应随父类一起落位，实际「${layout()}」`);
+  assert(ui.getValuesTriggerRootCategories(hostCtx).map((c) => c.name).join(',') === '独立类,父类', '数据层顶层顺序应同步');
+  // 子分类仍挂在父类下（拖动没有改变归属）
+  const parentId = categoryRowByName('父类').dataset.id;
+  assert(ui.getValuesTriggerCategoryChildren(hostCtx, parentId).map((c) => c.name).join(',') === '子一,子二', '子分类归属不应被拖动改变');
+});
+
+runner.test('剧情触发：双击行进入编辑（分类行→分类编辑器，事件行→事件编辑器）', () => {
+  openTriggersTab();
+  resetTriggers();
+  addCategory('双击分类');
+  addTrigger('双击事件');
+  const dbl = (el) => el.dispatchEvent(new dom.window.MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+  // 分类行名称区双击 → 分类编辑器（回填名称）
+  dbl(categoryRowByName('双击分类').querySelector('.kaleido-values__row-name'));
+  assert(!$('kaleido-values-trigger-category-editor').hidden, '双击分类行应打开分类编辑器');
+  assert($('kaleido-values-trigger-category-editor-title').textContent === '编辑分类', '标题应为编辑分类');
+  assert($('kaleido-values-trigger-category-editor-name').value === '双击分类', '名称应回填');
+  click($('kaleido-values-trigger-category-editor-cancel'));
+  assert($('kaleido-values-trigger-category-editor').hidden, '取消后应关闭');
+  // 事件行名称区双击 → 事件编辑器（回填名称与内容）
+  const eventRow = triggerRows().find((row) => row.querySelector('.kaleido-values__row-name').textContent === '双击事件');
+  dbl(eventRow.querySelector('.kaleido-values__row-name'));
+  assert(!$('kaleido-values-trigger-editor').hidden, '双击事件行应打开事件编辑器');
+  assert($('kaleido-values-trigger-editor-title').textContent === '编辑触发', '标题应为编辑触发');
+  assert($('kaleido-values-trigger-editor-name').value === '双击事件', '名称应回填');
+  assert($('kaleido-values-trigger-editor-content').value === '触发内容', '内容应回填');
+  click($('kaleido-values-trigger-editor-cancel'));
+  // 行内按钮上的双击不打开编辑器（按钮自己管点击，避免与展开 / 开关冲突）
+  dbl(categoryRowByName('双击分类').querySelector('[data-action="edit-category"]'));
+  assert($('kaleido-values-trigger-category-editor').hidden, '双击行内按钮不应打开编辑器');
+  dbl(eventRow.querySelector('[data-action="edit-trigger"]'));
+  assert($('kaleido-values-trigger-editor').hidden, '双击事件行按钮不应打开编辑器');
+  // 展开箭头 / 开关上的双击同理
+  dbl(categoryRowByName('双击分类').querySelector('.kaleido-values__trigger-chevron'));
+  assert($('kaleido-values-trigger-category-editor').hidden, '双击展开箭头不应打开编辑器');
 });
 
 // ---------- 剧情触发：分类树（回归：分类行「＋」二选一菜单） ----------

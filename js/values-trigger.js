@@ -55,6 +55,43 @@ function getValuesTriggerRootCategories(ctx) {
   });
 }
 
+// 同级重排（拖动排序用）：只重排「同一父分类下（parentId 为空 = 顶层）」的分类，
+// 其余分类的相对顺序不变——整体插入到原组成员序列的起始位置。
+// 与事件的组内重排同构：分类在界面上是树，同级才有顺序可言。
+function reorderValuesTriggerCategories(ctx, parentId, ids) {
+  const categories = getValuesTriggerCategories(ctx);
+  const target = String(parentId || '').trim();
+  const members = categories.filter((category) => String(category.parentId || '').trim() === target);
+  if (members.length === 0) return categories;
+  const memberIds = new Set(members.map((category) => String(category?.id || '').trim()));
+  const byId = new Map(members.map((category) => [String(category?.id || '').trim(), category]));
+  const wanted = Array.isArray(ids) ? ids.map((id) => String(id || '').trim()).filter(Boolean) : [];
+  const group = [];
+  const seen = new Set();
+  for (const id of wanted) {
+    const category = byId.get(id);
+    if (category && !seen.has(id)) {
+      group.push(category);
+      seen.add(id);
+    }
+  }
+  for (const category of members) {
+    const id = String(category?.id || '').trim();
+    if (!seen.has(id)) group.push(category);
+  }
+  const rest = categories.filter((category) => !memberIds.has(String(category?.id || '').trim()));
+  const firstIndex = categories.findIndex((category) => memberIds.has(String(category?.id || '').trim()));
+  let insertAt = 0;
+  for (let i = 0; i < firstIndex; i += 1) {
+    if (!memberIds.has(String(categories[i]?.id || '').trim())) insertAt += 1;
+  }
+  rest.splice(Math.min(insertAt, rest.length), 0, ...group);
+  categories.length = 0;
+  for (const category of rest) categories.push(category);
+  saveValuesData(ctx);
+  return categories;
+}
+
 // parentId 是否为 categoryId 的祖先（沿父链向上查，防环）。categoryId 为空时恒为否。
 function isValuesTriggerCategoryAncestor(ctx, ancestorId, categoryId) {
   const ancestor = String(ancestorId || '').trim();

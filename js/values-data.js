@@ -1146,6 +1146,48 @@ function appendValuesTreeOrder(ctx, tree, parentPath, newName) {
   return reorderValuesTreeAt(ctx, key, names);
 }
 
+// 顺序表过滤：丢掉「节点已不存在」的路径整条记录与「条目已不存在」的名字，
+// 只留下仍能对应到实际内容的顺序。trees 可传多棵树，任一存在即保留——
+// 顺序表由默认值层与游戏值层共用，只按其中一棵裁剪会误删另一层的顺序。
+// 返回过滤后的新表（不改动入参），调用方按需自行决定是否覆盖回去。
+function filterValuesTreeOrder(order, trees) {
+  const sources = (Array.isArray(trees) ? trees : [trees]).filter(valuesIsContainer);
+  const filtered = {};
+  for (const path of Object.keys(order || {})) {
+    if (!Array.isArray(order[path])) continue;
+    // 根路径（''）解析为空路径，必然命中所有树；其余路径要能在某棵树里找到节点。
+    const segments = String(path).split('/').filter(Boolean);
+    const nodes = sources.map((tree) => valuesGetAtPath(tree, segments)).filter(valuesIsContainer);
+    if (nodes.length === 0) continue;
+    const present = new Set();
+    for (const node of nodes) for (const name of Object.keys(node)) present.add(name);
+    const names = [];
+    const seen = new Set();
+    for (const name of order[path]) {
+      const key = String(name || '').trim();
+      if (key && present.has(key) && !seen.has(key)) {
+        names.push(key);
+        seen.add(key);
+      }
+    }
+    // 名字全部失效时整条记录不再有意义，一并丢掉（导出不写空 names）。
+    if (names.length > 0) filtered[path] = names;
+  }
+  return filtered;
+}
+
+// 就地清理顺序表（删除 / 改名 / 移动节点后调用）：陈旧记录界面上看不见，
+// 却会被 YAML 原样导出成「幽灵条目」——已删除的名字重新出现在导出文件里。
+// 返回是否有改动，调用方据此决定是否落盘。
+function pruneValuesTreeOrder(ctx, trees) {
+  const order = getValuesTreeOrder(ctx);
+  const filtered = filterValuesTreeOrder(order, trees);
+  if (JSON.stringify(filtered) === JSON.stringify(order)) return false;
+  for (const key of Object.keys(order)) delete order[key];
+  Object.assign(order, filtered);
+  return true;
+}
+
 // ---------- 注入提示词配置（默认数值层勾选）----------
 // 配置存变量包 inject 字段：{ enabled, paths }。paths 是打开条目的路径数组
 // （path.join('/')），节点上下级联动：打开条目 = 自身 + 全部祖先 + 全部后代
@@ -1399,7 +1441,9 @@ function serializeValuesBundle(ctx) {
   if (defaultsText) lines.push(defaultsText);
   else lines.push('  {}');
   lines.push('order:');
-  const order = getValuesTreeOrder(ctx);
+  // 只导出「仍对得上实际内容」的顺序：顺序表由玩家拖动产生、不随删除清理，
+  // 旧卡里积下的陈旧名字（已删除的节点 / 变量）会在导出文件里变成幽灵条目。
+  const order = filterValuesTreeOrder(getValuesTreeOrder(ctx), [bundle.defaults]);
   const orderPaths = Object.keys(order).filter((path) => Array.isArray(order[path]) && order[path].length > 0);
   if (orderPaths.length === 0) {
     lines.push('  []');
