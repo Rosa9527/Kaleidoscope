@@ -266,7 +266,31 @@ function getValuesBundle(ctx) {
 
 // 保存：有角色且宿主支持写角色卡 → 确保角色卡容器存在后立即持久化；否则写全局设置。
 // 返回落盘 Promise（保存按钮 await 后从磁盘重读校验，避免校验与写入并行读到旧数据）。
+// 落盘后统一刷新提示词注入（常驻注入的唯一数据入口之一，见 values-inject.js）：
+// 默认值 / 勾选配置 / 事件效果等变更都经这里，注入随之保持最新。
 function saveValuesData(ctx) {
+  const result = writeValuesData(ctx);
+  notifyValuesDataChanged(ctx || getContextSafe());
+  return result;
+}
+
+// 数据变更后的常驻注入统一通知（变量表注入 + 剧情触发注入）：读取失败一律降级，
+// 绝不影响保存本身。两个刷新函数都不存在时（极简测试沙箱）静默跳过。
+function notifyValuesDataChanged(context) {
+  if (!context) return;
+  try {
+    if (typeof onValuesDataChangedForInject === 'function') onValuesDataChangedForInject(context);
+  } catch (error) {
+    logApp('warn', '变量注入刷新失败', String(error?.message || error));
+  }
+  try {
+    if (typeof onValuesDataChangedForTriggerInject === 'function') onValuesDataChangedForTriggerInject(context);
+  } catch (error) {
+    logApp('warn', '剧情触发注入刷新失败', String(error?.message || error));
+  }
+}
+
+function writeValuesData(ctx) {
   const character = getStoryCharacter(ctx);
   if (!character || typeof ctx?.writeExtensionField !== 'function') {
     const bundle = getValuesBundle(ctx);
@@ -998,7 +1022,8 @@ function scheduleValuesChatSave(ctx, immediate) {
 }
 
 // 写入游戏值：metadata[key] = 状态包，防抖保存聊天文件。meta 可携带 updatedAt /
-// lastSignature 等附加字段。
+// lastSignature 等附加字段。写入后刷新提示词注入（AI 维护 / 剧情触发效果 /
+// 预筛事件效果 / 手动改值 / 重置游戏值都汇聚到这里）。
 function saveValuesChatState(ctx, values, meta = {}) {
   const context = ctx || getContextSafe();
   if (!context) return false;
@@ -1019,6 +1044,7 @@ function saveValuesChatState(ctx, values, meta = {}) {
     lastSignature: String(meta.lastSignature || ''),
   };
   scheduleValuesChatSave(context, !!meta.immediate);
+  notifyValuesDataChanged(context);
   return true;
 }
 

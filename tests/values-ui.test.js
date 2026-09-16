@@ -1006,14 +1006,14 @@ runner.test('剧情触发：新建触发（名称 / 逻辑 / 条件 / 正文）'
   assert(listRows.length === 1, '列表应有 1 行');
   assert(listRows[0].querySelector('.kaleido-values__row-trigger').textContent.includes('张三/好感 ≥ 70'), '应显示条件摘要（符号展示）');
   assert(listRows[0].querySelector('.kaleido-values__row-trigger-type').textContent === '一次性', '应显示一次性徽标');
-  // 编辑为常驻事件
+  // 编辑为可重复事件（once: false；「常驻」一词专指注入方式，事件类型叫「可重复」）
   click(listRows[0].querySelector('[data-action="edit-trigger"]'));
   const onceSelect2 = $('kaleido-values-trigger-editor-once');
   assert(onceSelect2.value === 'once', '编辑时回显一次性');
   onceSelect2.value = 'persistent';
   click($('kaleido-values-trigger-editor-save'));
-  assert(ui.getValuesTriggers(hostCtx)[0].once === false, '常驻事件应保存 once=false');
-  assert(triggerRows()[0].querySelector('.kaleido-values__row-trigger-type').textContent === '常驻', '应显示常驻徽标');
+  assert(ui.getValuesTriggers(hostCtx)[0].once === false, '可重复事件应保存 once=false');
+  assert(triggerRows()[0].querySelector('.kaleido-values__row-trigger-type').textContent === '可重复', '应显示可重复徽标');
 });
 
 runner.test('剧情触发：启停滑块与删除', async () => {

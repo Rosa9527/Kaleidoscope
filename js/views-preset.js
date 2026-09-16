@@ -222,7 +222,9 @@ function renderPresetTriggerControl() {
   if (toggle) {
     toggle.textContent = enabled ? '⚡ 剧情触发：开' : '⚡ 剧情触发：关';
     toggle.classList.toggle('is-active', enabled);
-    toggle.title = enabled ? '点击关闭：发送前不再按变量条件触发剧情事件' : '点击开启：发送前按变量条件确定性触发剧情事件';
+    toggle.title = enabled
+      ? '点击关闭：不再按变量条件触发剧情事件，并清空已注入的事件块'
+      : '点击开启：按变量条件确定性触发剧情事件（条件满足即常驻注入，数据变化自动刷新）';
   }
   if (status) {
     status.textContent = enabled ? '已启用' : '未启用';
@@ -236,6 +238,16 @@ function toggleValuesTrigger() {
   const settings = getSettings(ctx);
   settings.valuesTriggerEnabled = !(settings.valuesTriggerEnabled !== false);
   saveSettings(ctx);
+  // 立即生效：开启 → 按当前变量值重新判定并注入；关闭 → 清空已注入的事件块并复位。
+  try {
+    if (settings.valuesTriggerEnabled) {
+      refreshValuesTriggerInjection(ctx);
+    } else {
+      resetValuesTriggerInjection(ctx);
+    }
+  } catch (error) {
+    logApp('warn', '剧情触发注入刷新失败', String(error?.message || error));
+  }
   renderPresetTriggerControl();
   refreshHomeValuesStatus();
   logApp('info', settings.valuesTriggerEnabled ? '剧情触发已开启' : '剧情触发已关闭');

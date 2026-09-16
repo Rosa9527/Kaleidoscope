@@ -1,9 +1,12 @@
 // ===== 万华镜（Kaleidoscope）剧情触发：变量条件确定性触发 =====
 // 与「剧情脉络」互补：剧情脉络由预筛 AI 依据对话判断触发；剧情触发不依赖 API，
 // 直接按「某节点下变量的当前值」是否满足预设条件，确定性判定剧情事件是否触发。
-// 触发时机：用户点击发送（messageSent，经跨扩展发送屏障），与剧情预筛并发执行；
-// 满足条件的事件以 <Story_Trigger> 块注入（IN_CHAT, SYSTEM），generationEnded /
-// generationStopped 后清空，下一轮发送前重新判定。
+// 注入方式（常驻，与变量注入 / 隔壁 BS BioTracker 同款模型）：条件满足的事件以
+// <Story_Trigger> 块（IN_CHAT, SYSTEM）常驻挂在提示词上——数据变更（AI 维护 /
+// 手动改值 / 触发效果 / 导入）立即重刷，不再等点击发送；生成结束只重刷不清空，
+// swipe / 重新生成照常携带本轮事件。
+// 副作用与注入分离：判定与注入**无副作用**（纯读）；事件效果（改值）与一次性事件
+// 关闭只在「用户点击发送」的发送前任务里各执行一次（见文件末尾 runValuesTriggerBarrierTask）。
 // 数据存储：随变量包（角色卡 kaleidoscope_values / 全局设置 valuesData）的
 // triggers 字段保存，随角色卡导入/导出自动携带；YAML 导入导出见 values-data.js。
 
@@ -616,62 +619,253 @@ function getValuesTriggerExtensionPromptApi(ctx) {
   return getExtensionPromptApi(ctx);
 }
 
-function clearValuesTriggerInjection(ctx) {
-  const api = getValuesTriggerExtensionPromptApi(ctx);
-  if (!api) return;
-  try {
-    api.setExtensionPrompt(VALUES_TRIGGER_INJECT_KEY, '', api.inChat, 0);
-  } catch (error) {
-    logApp('warn', '清理剧情触发注入失败', String(error?.message || error));
-  }
+// ---------- 常驻注入 ----------
+// 注入运行态（挂 globalThis：热重载后宿主里的注入是否已写过仍然可知）：
+// - written：宿主提示词里是否已有一份非空注入（空内容时只有写过才需要清理调用，
+//   与变量注入同款——没配剧情触发的聊天零调用）；
+// - locked：本轮是否已由「发送前判定」锁定——锁定后一律按本轮记录原样重写，不再
+//   重新判定（事件效果改值、一次性事件自动关闭都是本轮判定的后果，重新判定会把
+//   刚触发的事件从块里冲掉；swipe / 重新生成也据此拿到与本轮一致的事件）；
+// - busy：发送前任务正在判定 / 应用效果，期间的数据变更刷新直接跳过。
+function getValuesTriggerInjectState() {
+  const existing = globalThis[VALUES_TRIGGER_STATE_KEY];
+  if (existing && typeof existing === 'object') return existing;
+  const state = { written: false, locked: false, busy: false };
+  globalThis[VALUES_TRIGGER_STATE_KEY] = state;
+  return state;
 }
 
-// 发送前任务（注册进跨扩展发送屏障）：确定性求值 + 同步注入，失败静默降级，
-// 绝不阻塞发送。只处理「用户点击发送」产生的新消息；系统消息 / 非用户末条跳过。
-function runValuesTriggerBarrierTask(ctx, payload) {
-  const context = ctx || getContextSafe();
-  const settings = context ? getSettings(context) : null;
-  if (!settings || settings.valuesTriggerEnabled === false) return Promise.resolve();
-  const chat = Array.isArray(context?.chat) ? context.chat : [];
-  const lastMessage = chat[chat.length - 1];
-  if (!lastMessage || !lastMessage.is_user) return Promise.resolve();
-  const record = {
+// 解锁本轮：下一次刷新按实时数据重新判定（切聊天 / 启动 / 新一轮发送）。
+function unlockValuesTriggerRound() {
+  getValuesTriggerInjectState().locked = false;
+}
+
+// 判定记录：本次判定的完整快照（注入实录展示用）。source = 'send'（用户点击发送的
+// 发送前判定，含事件效果与一次性自动关闭）/ 'refresh'（常驻刷新：数据变更 / 启动 / 切聊天）。
+function buildValuesTriggerRecord(ctx, triggered, source) {
+  return {
     at: new Date().toISOString(),
-    totalTriggers: getValuesTriggers(context).length,
-    triggeredIds: [],
-    triggeredEvents: [],
-    injectionText: '',
-    injected: false,
-    skipped: false,
-  };
-  try {
-    const triggered = evaluateValuesTriggers(context);
-    record.triggeredIds = triggered.map((trigger) => trigger.id);
-    record.triggeredEvents = triggered.map((trigger) => ({
+    source,
+    totalTriggers: getValuesTriggers(ctx).length,
+    triggeredIds: triggered.map((trigger) => trigger.id),
+    triggeredEvents: triggered.map((trigger) => ({
       id: trigger.id,
       name: trigger.name,
       conditions: formatValuesTriggerConditions(trigger),
       description: trigger.description,
       content: trigger.content,
-    }));
+    })),
+    injectionText: '',
+    injected: false,
+    skipped: triggered.length === 0,
+  };
+}
+
+// 写入注入块：无条件重新断言（不做内容去重——宿主每轮可能重建 prompt 缓存，去重会
+// 让「状态以为写过、宿主其实已经清掉」的补写落空，与变量注入的取舍一致）。
+// 空内容且从未写过时零调用。
+function writeValuesTriggerInjection(ctx, text) {
+  const state = getValuesTriggerInjectState();
+  if (!text && !state.written) return false;
+  const api = getValuesTriggerExtensionPromptApi(ctx);
+  if (!api) return false;
+  try {
+    api.setExtensionPrompt(VALUES_TRIGGER_INJECT_KEY, text, api.inChat, 0, false, api.systemRole);
+    state.written = Boolean(text);
+    return Boolean(text);
+  } catch (error) {
+    logApp('warn', '剧情触发注入失败', String(error?.message || error));
+    return false;
+  }
+}
+
+// 只清注入块，不动本轮记录与运行态（发送前判定「本轮无事件」时用：块要清掉，记录留档）。
+function clearValuesTriggerInjection(ctx) {
+  const state = getValuesTriggerInjectState();
+  if (!state.written) return;
+  const api = getValuesTriggerExtensionPromptApi(ctx);
+  if (!api) return;
+  try {
+    api.setExtensionPrompt(VALUES_TRIGGER_INJECT_KEY, '', api.inChat, 0);
+    state.written = false;
+  } catch (error) {
+    logApp('warn', '清理剧情触发注入失败', String(error?.message || error));
+  }
+}
+
+// 复位：解锁本轮 + 清注入块 + 丢弃记录（总开关关闭 / 切换聊天）。
+// 已无注入时只做状态复位，不产生宿主调用。
+function resetValuesTriggerInjection(ctx) {
+  unlockValuesTriggerRound();
+  globalThis[VALUES_TRIGGER_LAST_ROUND_KEY] = null;
+  clearValuesTriggerInjection(ctx);
+}
+
+// 刷新注入（常驻模型的唯一写入入口）：总开关关闭 → 复位；本轮已锁定 → 按锁定的
+// 事件集合重写（内容取当前定义，事件被删除则从块里移除，集合为空则块清空但**保持
+// 锁定**——本轮该触发哪些事件在发送时就定了）；未锁定 → 按实时数据重新判定，写入 /
+// 清空并把判定记入「注入实录」。
+function refreshValuesTriggerInjection(ctx) {
+  const context = ctx || getContextSafe();
+  if (!context) return false;
+  let settings = null;
+  try {
+    settings = getSettings(context);
+  } catch (error) {
+    settings = null;
+  }
+  if (!settings || settings.valuesTriggerEnabled === false) {
+    resetValuesTriggerInjection(context);
+    return false;
+  }
+  const state = getValuesTriggerInjectState();
+  if (state.busy) return false;
+  if (state.locked) {
+    const round = globalThis[VALUES_TRIGGER_LAST_ROUND_KEY] || null;
+    const ids = round && Array.isArray(round.triggeredIds) ? round.triggeredIds : [];
+    // 只按「事件是否还存在」过滤：本轮自动关闭的一次性事件仍属于本轮，必须留在块里。
+    const kept = ids
+      .map((id) => getValuesTriggerById(context, id))
+      .filter(Boolean);
+    if (kept.length !== ids.length && round) {
+      // 有事件被删除：同步记录，保证实录与本轮块一致。
+      round.triggeredIds = kept.map((trigger) => trigger.id);
+      round.triggeredEvents = buildValuesTriggerRecord(context, kept, round.source || 'send').triggeredEvents;
+      round.injectionText = kept.length > 0 ? buildValuesTriggerInjectionText(context, kept) : '';
+      round.injected = kept.length > 0;
+      round.skipped = kept.length === 0;
+    }
+    const text = round ? String(round.injectionText || '') : '';
+    return writeValuesTriggerInjection(context, text);
+  }
+  const triggered = evaluateValuesTriggers(context);
+  const record = buildValuesTriggerRecord(context, triggered, 'refresh');
+  if (triggered.length > 0) {
+    record.injectionText = buildValuesTriggerInjectionText(context, triggered);
+    record.injected = true;
+  }
+  // 没配触发事件的聊天不写记录：实录的触发段保持隐藏（与旧行为一致）。
+  globalThis[VALUES_TRIGGER_LAST_ROUND_KEY] = record.totalTriggers > 0 ? record : null;
+  return writeValuesTriggerInjection(context, record.injectionText);
+}
+
+// 数据落盘后的刷新入口（saveValuesData / saveValuesChatState 统一调用）：读取失败
+// 一律降级，绝不影响保存本身。
+function onValuesDataChangedForTriggerInject(ctx) {
+  try {
+    refreshValuesTriggerInjection(ctx);
+  } catch (error) {
+    logApp('warn', '剧情触发注入刷新失败', String(error?.message || error));
+  }
+}
+
+// 切换聊天 / 启动后的延迟补刷：新聊天的 chatMetadata（游戏值所在处）可能晚于事件
+// 才就绪，早刷只能拿到默认值，按 delays 再刷几次收敛到实际值。
+function scheduleValuesTriggerInjectionRefresh(delays) {
+  scheduleDelayedRefreshes(
+    VALUES_TRIGGER_STARTUP_TIMER_KEY,
+    delays || VALUES_TRIGGER_STARTUP_REFRESH_DELAYS,
+    () => {
+      const freshCtx = getContextSafe();
+      if (!freshCtx) return;
+      try {
+        refreshValuesTriggerInjection(freshCtx);
+      } catch (error) {
+        logApp('warn', '剧情触发注入补刷失败', String(error?.message || error));
+      }
+    },
+  );
+}
+
+// 切换聊天：新聊天没有「本轮」，解锁后按新聊天的数据重新判定。运行态 written
+// **不**重置：新聊天若没有可注入内容，「曾经写过」正是清掉上个聊天残留块的依据。
+function onValuesTriggerChatChanged() {
+  unlockValuesTriggerRound();
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  try {
+    refreshValuesTriggerInjection(ctx);
+  } catch (error) {
+    logApp('warn', '剧情触发注入刷新失败', String(error?.message || error));
+  }
+  scheduleValuesTriggerInjectionRefresh();
+}
+
+// 启动首次注入 + 补刷：插件载入后不等点击发送，满足条件的事件就该在提示词里。
+function startValuesTriggerInjection() {
+  unlockValuesTriggerRound();
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  try {
+    refreshValuesTriggerInjection(ctx);
+  } catch (error) {
+    logApp('warn', '剧情触发注入启动刷新失败', String(error?.message || error));
+  }
+  scheduleValuesTriggerInjectionRefresh();
+}
+
+// 生成结束 / 停止：只重刷不清空（与变量注入同款）——宿主清掉提示词缓存时把常驻块
+// 补回来；本轮锁定者原样重写，保证 swipe / 重新生成拿到与本轮一致的事件。
+function onValuesTriggerGenerationRefresh() {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  try {
+    refreshValuesTriggerInjection(ctx);
+  } catch (error) {
+    logApp('warn', '剧情触发注入刷新失败', String(error?.message || error));
+  }
+}
+
+// 发送前任务（注册进跨扩展发送屏障）：本轮的**权威判定**——求值、应用事件效果、
+// 一次性事件自动关闭、写入注入并在本轮内锁定。只处理「用户点击发送」产生的新消息；
+// 系统消息 / 非用户末条跳过；失败静默降级，绝不阻塞发送。
+function runValuesTriggerBarrierTask(ctx, payload) {
+  const context = ctx || getContextSafe();
+  if (!context) return Promise.resolve();
+  let settings = null;
+  try {
+    settings = getSettings(context);
+  } catch (error) {
+    settings = null;
+  }
+  // 总开关关闭：常驻模型下要顺手清掉已注入的块（旧模型靠生成结束清理兜底）。
+  if (!settings || settings.valuesTriggerEnabled === false) {
+    resetValuesTriggerInjection(context);
+    return Promise.resolve();
+  }
+  const chat = Array.isArray(context?.chat) ? context.chat : [];
+  const lastMessage = chat[chat.length - 1];
+  if (!lastMessage || !lastMessage.is_user) return Promise.resolve();
+  const state = getValuesTriggerInjectState();
+  unlockValuesTriggerRound();
+  let record = null;
+  state.busy = true;
+  try {
+    const triggered = evaluateValuesTriggers(context);
+    record = buildValuesTriggerRecord(context, triggered, 'send');
+    // 先发布本轮记录再产生任何副作用：效果应用 / 一次性关闭都会经保存入口回调刷新，
+    // 锁定分支要读到的就是这份记录（迟一步读到的是上一轮，会把刚写的块清掉）。
+    if (record.totalTriggers > 0) globalThis[VALUES_TRIGGER_LAST_ROUND_KEY] = record;
     if (triggered.length === 0) {
-      record.skipped = true;
-      globalThis[VALUES_TRIGGER_LAST_ROUND_KEY] = record;
+      // 本轮无事件：清掉上一轮留下的常驻块，记录留档供实录核对。
+      clearValuesTriggerInjection(context);
+      logApp('debug', '剧情触发：本轮无事件满足条件');
       return Promise.resolve();
     }
+    // 先算好本轮块并锁定，再产生副作用：效果改值 / 一次性关闭都会经保存入口回调
+    // 刷新，锁定后这些刷新一律按本块原样重写，不会把刚触发的事件冲掉。
+    record.injectionText = buildValuesTriggerInjectionText(context, triggered);
+    state.locked = true;
     // 事件效果：确定性修改游戏值，不依赖注入能力，先于注入执行。
     record.effectsApplied = applyValuesTriggerEffects(context, triggered);
-    const api = getValuesTriggerExtensionPromptApi(context);
-    if (!api) {
+    const written = writeValuesTriggerInjection(context, record.injectionText);
+    record.injected = written;
+    if (!written) {
+      // 宿主不支持提示词注入（或写入抛错）：没有块可守，解锁即可。
+      state.locked = false;
       logApp('warn', '剧情触发：宿主不支持提示词注入，跳过注入');
-      globalThis[VALUES_TRIGGER_LAST_ROUND_KEY] = record;
       return Promise.resolve();
     }
-    const injectionText = buildValuesTriggerInjectionText(context, triggered);
-    record.injectionText = injectionText;
-    clearValuesTriggerInjection(context);
-    api.setExtensionPrompt(VALUES_TRIGGER_INJECT_KEY, injectionText, api.inChat, 0, false, api.systemRole);
-    record.injected = true;
     record.autoDisabledIds = autoDisableFiredValuesTriggers(context, triggered);
     logApp('info', '剧情触发：已注入事件', '满足条件 ' + triggered.length + ' 个事件', record.triggeredIds);
     const onceNote = record.autoDisabledIds.length > 0
@@ -680,17 +874,10 @@ function runValuesTriggerBarrierTask(ctx, payload) {
     globalThis.toastr?.success?.('剧情触发：已注入 ' + triggered.length + ' 个事件' + onceNote + '！', '[' + MODULE_DISPLAY_NAME + ']');
   } catch (error) {
     logApp('warn', '剧情触发失败，静默降级', String(error?.message || error));
+  } finally {
+    state.busy = false;
   }
-  globalThis[VALUES_TRIGGER_LAST_ROUND_KEY] = record;
   return Promise.resolve();
-}
-
-// 生成结束 / 停止后清空注入：swipes / 重生成 / 后续轮次不会复用本轮的旧块，
-// 下一轮发送前会按最新变量值重新判定。
-function onValuesTriggerGenerationCleanup() {
-  const ctx = getContextSafe();
-  if (!ctx) return;
-  clearValuesTriggerInjection(ctx);
 }
 
 // 注册进跨扩展发送屏障：与剧情预筛 / 变量注入并发执行，保证注入在主请求发出前完成。

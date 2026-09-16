@@ -1,4 +1,4 @@
-// 万华镜剧情触发测试：数据读写 / 条件求值 / 注入 / YAML 导入导出。
+// 万华镜剧情触发测试：数据读写 / 条件求值 / 常驻注入 / YAML 导入导出。
 'use strict';
 const { readSources, loadInContext, createRunner, makeContext } = require('./harness');
 
@@ -9,6 +9,9 @@ const quietConsole = {
   error(...args) { console.error(...args); },
 };
 
+// 可控定时器：切聊天 / 启动的补刷有延迟，测试里手动 flush（断言不依赖真实等待，
+// 也避免残留定时器污染后续用例）。
+const timerQueue = [];
 const hostCtx = makeContext();
 const sandbox = {
   console: quietConsole,
@@ -19,7 +22,15 @@ const sandbox = {
     error: (msg) => toasts.push(['error', msg]),
   },
   Luker: { getContext: () => hostCtx },
-  setTimeout, clearTimeout,
+  setTimeout: (fn, ms) => {
+    const job = { fn, ms: Number(ms) || 0 };
+    timerQueue.push(job);
+    return job;
+  },
+  clearTimeout: (job) => {
+    const index = timerQueue.indexOf(job);
+    if (index >= 0) timerQueue.splice(index, 1);
+  },
 };
 const ctx = loadInContext(sandbox, readSources());
 const runner = createRunner();
@@ -27,14 +38,45 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
 
 const INJECT_KEY = 'Kaleidoscope_Trigger_Event';
 const LAST_ROUND_KEY = '__kaleido_values_trigger_last_round__';
+const STATE_KEY = '__kaleido_values_trigger_state__';
 
+// 跑一轮待触发定时器（回调里可能再排下一个，需要就多调几次）。
+function flushTimers(rounds = 1) {
+  for (let i = 0; i < rounds; i += 1) {
+    const jobs = timerQueue.splice(0).sort((a, b) => a.ms - b.ms);
+    for (const job of jobs) job.fn();
+  }
+}
+
+// 每个用例都从「未写过注入、未锁定」的干净运行态开始（运行态挂 globalThis，跨用例污染）。
 function fresh() {
+  sandbox[STATE_KEY] = { written: false, locked: false, busy: false };
+  sandbox[LAST_ROUND_KEY] = null;
+  timerQueue.length = 0;
   const c = makeContext();
   c.chat = [];
   c.chatMetadata = {};
   c.saveChat = () => {};
   c.setExtensionPrompt = () => {};
   return c;
+}
+
+// 把宿主上下文临时指向 c（部分入口经 getContextSafe() 取宿主 ctx，不接收参数）。
+function withHostCtx(c, fn) {
+  const original = sandbox.Luker.getContext;
+  sandbox.Luker.getContext = () => c;
+  try {
+    return fn();
+  } finally {
+    sandbox.Luker.getContext = original;
+  }
+}
+
+// 记录 setExtensionPrompt 调用；返回 calls 数组。
+function track(c) {
+  const calls = [];
+  c.setExtensionPrompt = (key, text, position, depth, additive, role) => calls.push({ key, text, position, depth, additive, role });
+  return calls;
 }
 
 function makeValues(c) {
@@ -243,6 +285,7 @@ runner.test('发送前任务：触发时应用效果并落盘，record 记录 ap
   assert(ctx.getValuesChatState(c).values.张三.好感 === 110, '效果应把 80 加到 110');
   const round = sandbox[LAST_ROUND_KEY];
   assert(round && round.effectsApplied && round.effectsApplied.changed.includes('张三/好感'), '应记录已应用的效果');
+  assert(round.source === 'send', '发送前判定的来源应为 send');
 });
 
 // ---------- 注入 ----------
@@ -265,79 +308,196 @@ runner.test('条件摘要：且 / 或 连接词与 exists 无值', () => {
   assert(ctx.formatValuesTriggerConditions(t2) === '张三/好感 ≥ 70 或 张三/是否已知真相 存在', '或连接与 exists');
 });
 
-// ---------- 发送前任务 ----------
-runner.test('发送前任务：条件满足时注入 IN_CHAT 位置', async () => {
+// ---------- 常驻注入（核心：条件满足即注入，不依赖点击发送） ----------
+runner.test('常驻刷新：条件满足即写入 IN_CHAT 位置', () => {
   const c = fresh();
   makeValues(c);
   makeTrigger(c);
+  const calls = track(c);
   ctx.saveValuesChatState(c, { 张三: { 好感: 80, 是否已知真相: true }, 世界: { 战争状态: false } }, {});
-  c.chat = [{ is_user: true, mes: '你好', id: 1 }];
-  const calls = [];
-  c.setExtensionPrompt = (key, text, position, depth, additive, role) => calls.push({ key, text, position, depth, additive, role });
-  await ctx.runValuesTriggerBarrierTask(c);
   const inject = calls.find((call) => call.key === INJECT_KEY && call.text.includes('告白事件'));
-  assert(Boolean(inject), '应注入触发事件');
+  assert(Boolean(inject), '条件满足应写入事件块（无需点击发送）');
   assert(inject.position === 1, '应使用 IN_CHAT 位置');
   assert(inject.depth === 0, '深度应为 0');
   assert(inject.role === 0, '角色应为 SYSTEM');
   const round = sandbox[LAST_ROUND_KEY];
-  assert(round && round.injected === true && round.triggeredIds.includes('001'), '应记录本轮注入');
+  assert(round && round.injected === true && round.triggeredIds.includes('001'), '应记录本次判定');
+  assert(round.source === 'refresh', '常驻刷新的来源应为 refresh');
 });
 
-runner.test('一次性事件触发后自动关闭，常驻事件保留', async () => {
+runner.test('常驻刷新：无触发配置时零调用且不留记录', () => {
+  const c = fresh();
+  makeValues(c);
+  const calls = track(c);
+  ctx.saveValuesChatState(c, { 张三: { 好感: 80, 是否已知真相: true }, 世界: { 战争状态: false } }, {});
+  assert(calls.length === 0, '没有触发事件时不应调用 setExtensionPrompt');
+  assert(sandbox[LAST_ROUND_KEY] === null, '没有触发事件时不应留下判定记录');
+});
+
+runner.test('常驻刷新：条件不再满足时清空注入', () => {
   const c = fresh();
   makeValues(c);
   makeTrigger(c);
-  makeTrigger(c, { name: '常驻事件', once: false, conditions: [{ path: '世界/战争状态', op: '==', value: true }], content: '常驻正文' });
+  const calls = track(c);
+  ctx.saveValuesChatState(c, { 张三: { 好感: 80, 是否已知真相: true }, 世界: { 战争状态: false } }, {});
+  assert(calls.some((call) => call.text.includes('告白事件')), '前置：条件满足应注入');
+  calls.length = 0;
+  ctx.saveValuesChatState(c, { 张三: { 好感: 10, 是否已知真相: false }, 世界: { 战争状态: false } }, {});
+  assert(calls.some((call) => call.key === INJECT_KEY && call.text === ''), '条件不满足应清空注入');
+});
+
+runner.test('常驻刷新：总开关关闭即清空并复位', () => {
+  const c = fresh();
+  makeValues(c);
+  makeTrigger(c);
+  const calls = track(c);
+  ctx.saveValuesChatState(c, { 张三: { 好感: 80, 是否已知真相: true }, 世界: { 战争状态: false } }, {});
+  calls.length = 0;
+  ctx.getSettings(c).valuesTriggerEnabled = false;
+  ctx.refreshValuesTriggerInjection(c);
+  assert(calls.some((call) => call.key === INJECT_KEY && call.text === ''), '关闭总开关应清空注入');
+  assert(sandbox[LAST_ROUND_KEY] === null, '关闭总开关应复位记录');
+  // 关闭状态下数据变更不再写入。
+  calls.length = 0;
+  ctx.saveValuesChatState(c, { 张三: { 好感: 90, 是否已知真相: true }, 世界: { 战争状态: false } }, {});
+  assert(calls.length === 0, '关闭状态下数据变更不应再写入');
+});
+
+runner.test('常驻刷新：切换聊天后按新数据重建（不清空运行态）', () => {
+  const c = fresh();
+  makeValues(c);
+  makeTrigger(c);
+  const calls = track(c);
+  ctx.saveValuesChatState(c, { 张三: { 好感: 80, 是否已知真相: true }, 世界: { 战争状态: false } }, {});
+  calls.length = 0;
+  // 新聊天条件不满足 → 应清掉上个聊天残留的块。
+  c.chatMetadata = {};
+  withHostCtx(c, () => {
+    ctx.onValuesTriggerChatChanged();
+    flushTimers(3);
+  });
+  assert(calls.some((call) => call.key === INJECT_KEY && call.text === ''), '新聊天条件不满足应清掉残留块');
+});
+
+runner.test('常驻刷新：启动首次注入 + 延迟补刷', () => {
+  const c = fresh();
+  makeValues(c);
+  makeTrigger(c);
+  ctx.saveValuesChatState(c, { 张三: { 好感: 80, 是否已知真相: true }, 世界: { 战争状态: false } }, {});
+  const calls = track(c);
+  withHostCtx(c, () => {
+    ctx.startValuesTriggerInjection();
+    assert(calls.some((call) => call.key === INJECT_KEY && call.text.includes('告白事件')), '启动时应立即写入一次注入');
+    flushTimers(3);
+  });
+  assert(calls.filter((call) => call.key === INJECT_KEY).length >= 3, '补刷应按时再写入，实际 ' + calls.length + ' 次');
+});
+
+runner.test('常驻刷新：生成结束只重刷不清空（本轮事件保持一致）', async () => {
+  const c = fresh();
+  makeValues(c);
+  makeTrigger(c);
+  ctx.saveValuesChatState(c, { 张三: { 好感: 80, 是否已知真相: true }, 世界: { 战争状态: false } }, {});
+  c.chat = [{ is_user: true, mes: '你好', id: 1 }];
+  const calls = track(c);
+  await ctx.runValuesTriggerBarrierTask(c);
+  calls.length = 0;
+  // 生成结束后：一次性事件已被自动关闭、效果也改了值，但本轮块必须原样保留。
+  withHostCtx(c, () => ctx.onValuesTriggerGenerationRefresh());
+  const injected = calls.filter((call) => call.key === INJECT_KEY && call.text !== '');
+  assert(injected.length === 1, '生成结束应重写一次本轮块，实际 ' + injected.length + ' 次');
+  assert(injected[0].text.includes('告白事件'), '重写的仍应是本轮事件（不因一次性关闭而消失）');
+});
+
+runner.test('常驻刷新：宿主不支持注入时静默降级', () => {
+  const c = fresh();
+  makeValues(c);
+  makeTrigger(c);
+  c.setExtensionPrompt = undefined;
+  withHostCtx(c, () => {
+    ctx.refreshValuesTriggerInjection(c);
+    ctx.onValuesTriggerChatChanged();
+    flushTimers(3);
+  });
+  assert(true, '不支持注入时不应抛错');
+});
+
+// ---------- 发送前任务（本轮权威判定） ----------
+runner.test('发送前任务：本轮无事件时清空上一轮块但留档记录', async () => {
+  const c = fresh();
+  makeValues(c);
+  makeTrigger(c);
+  const calls = track(c);
+  ctx.saveValuesChatState(c, { 张三: { 好感: 80, 是否已知真相: true }, 世界: { 战争状态: false } }, {});
+  calls.length = 0;
+  c.chat = [{ is_user: true, mes: '你好', id: 1 }];
+  ctx.saveValuesChatState(c, { 张三: { 好感: 10, 是否已知真相: false }, 世界: { 战争状态: false } }, {});
+  await ctx.runValuesTriggerBarrierTask(c);
+  assert(calls.some((call) => call.key === INJECT_KEY && call.text === ''), '本轮无事件应清空注入');
+  const round = sandbox[LAST_ROUND_KEY];
+  assert(round && round.skipped === true && round.source === 'send', '应留档本轮判定（skipped）');
+});
+
+runner.test('发送前任务：关闭 / 非用户末条时不判定（关闭时清空注入）', async () => {
+  const c = fresh();
+  makeValues(c);
+  makeTrigger(c);
+  c.chat = [{ is_user: true, mes: '你好', id: 1 }];
+  const calls = track(c);
+  // 条件不满足（无触发）：非用户末条不判定，且这里没有已注入的块可清。
+  c.chat = [{ is_user: false, mes: '你好', id: 2 }];
+  await ctx.runValuesTriggerBarrierTask(c);
+  assert(calls.length === 0, '非用户末条不应写入');
+  // 总开关关闭：清掉已注入的块并复位。
+  c.chat = [{ is_user: true, mes: '你好', id: 3 }];
+  ctx.saveValuesChatState(c, { 张三: { 好感: 80, 是否已知真相: true }, 世界: { 战争状态: false } }, {});
+  calls.length = 0;
+  ctx.getSettings(c).valuesTriggerEnabled = false;
+  await ctx.runValuesTriggerBarrierTask(c);
+  assert(calls.some((call) => call.key === INJECT_KEY && call.text === ''), '总开关关闭应清空注入');
+});
+
+runner.test('一次性事件触发后自动关闭，可重复事件保留', async () => {
+  const c = fresh();
+  makeValues(c);
+  makeTrigger(c);
+  makeTrigger(c, { name: '可重复事件', once: false, conditions: [{ path: '世界/战争状态', op: '==', value: true }], content: '可重复正文' });
   ctx.saveValuesChatState(c, { 张三: { 好感: 80, 是否已知真相: true }, 世界: { 战争状态: true } }, {});
   c.chat = [{ is_user: true, mes: '你好', id: 1 }];
-  const calls = [];
-  c.setExtensionPrompt = (key, text) => calls.push({ key, text });
+  const calls = track(c);
   await ctx.runValuesTriggerBarrierTask(c);
   assert(calls.some((call) => call.key === INJECT_KEY && call.text.includes('告白事件')), '应注入一次性事件');
   const triggers = ctx.getValuesTriggers(c);
   const onceTrigger = triggers.find((t) => t.name === '告白事件');
-  const persistentTrigger = triggers.find((t) => t.name === '常驻事件');
+  const persistentTrigger = triggers.find((t) => t.name === '可重复事件');
   assert(onceTrigger.enabled === false, '一次性事件触发后应自动关闭');
-  assert(persistentTrigger.enabled === true, '常驻事件应保持启用');
+  assert(persistentTrigger.enabled === true, '可重复事件应保持启用');
   const round = sandbox[LAST_ROUND_KEY];
   assert(Array.isArray(round.autoDisabledIds) && round.autoDisabledIds.includes(onceTrigger.id), '记录应包含自动关闭的 id');
-  // 第二轮：一次性已关闭不再注入，常驻仍注入
+  // 第二轮：一次性已关闭不再注入，可重复仍注入。
   calls.length = 0;
   await ctx.runValuesTriggerBarrierTask(c);
   assert(!calls.some((call) => call.key === INJECT_KEY && call.text.includes('告白事件')), '一次性事件不应再次注入');
-  assert(calls.some((call) => call.key === INJECT_KEY && call.text.includes('常驻正文')), '常驻事件应再次注入');
+  assert(calls.some((call) => call.key === INJECT_KEY && call.text.includes('可重复正文')), '可重复事件应再次注入');
 });
 
-runner.test('发送前任务：条件不满足 / 关闭 / 非用户末条时不注入', async () => {
+runner.test('本轮锁定：效果改值与一次性关闭不冲掉本轮块，下一轮重新判定', async () => {
   const c = fresh();
   makeValues(c);
-  makeTrigger(c);
-  c.chat = [{ is_user: true, mes: '你好', id: 1 }];
-  const calls = [];
-  c.setExtensionPrompt = (key, text) => calls.push({ key, text });
-  // 条件不满足
-  await ctx.runValuesTriggerBarrierTask(c);
-  assert(calls.length === 0, '条件不满足不应注入');
-  // 总开关关闭
-  ctx.getSettings(c).valuesTriggerEnabled = false;
+  // 一次性事件 + 效果：发送后好感被改到 110，若重新判定仍满足（>= 70），
+  // 但一次性事件已被自动关闭——锁定期间块必须保留它。
+  makeTrigger(c, { effects: [{ path: '张三/好感', op: 'add', value: 30 }] });
   ctx.saveValuesChatState(c, { 张三: { 好感: 80, 是否已知真相: true }, 世界: { 战争状态: false } }, {});
+  c.chat = [{ is_user: true, mes: '你好', id: 1 }];
+  const calls = track(c);
   await ctx.runValuesTriggerBarrierTask(c);
-  assert(calls.length === 0, '总开关关闭不应注入');
-  // 非用户末条
-  ctx.getSettings(c).valuesTriggerEnabled = true;
-  c.chat = [{ is_user: false, mes: '你好', id: 2 }];
-  await ctx.runValuesTriggerBarrierTask(c);
-  assert(calls.length === 0, '非用户末条不应注入');
-});
-
-runner.test('生成结束清理：清空注入', () => {
-  const c = fresh();
-  const calls = [];
-  c.setExtensionPrompt = (key, text) => calls.push({ key, text });
-  hostCtx.setExtensionPrompt = c.setExtensionPrompt;
-  ctx.onValuesTriggerGenerationCleanup();
-  assert(calls.some((call) => call.key === INJECT_KEY && call.text === ''), '应清空剧情触发注入');
+  const last = calls[calls.length - 1];
+  assert(last.key === INJECT_KEY && last.text.includes('告白事件'), '本轮块应含触发的事件');
+  // 锁定：此刻即使再刷新（效果写入触发的回刷），块也不应被重新判定冲掉。
+  calls.length = 0;
+  ctx.refreshValuesTriggerInjection(c);
+  assert(calls.some((call) => call.key === INJECT_KEY && call.text.includes('告白事件')), '锁定期间块应原样重写（含已关闭的一次性事件）');
+  assert(sandbox[LAST_ROUND_KEY].triggeredIds.includes('001'), '记录仍应含本轮事件');
 });
 
 // ---------- YAML 导入导出 ----------

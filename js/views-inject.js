@@ -11,7 +11,10 @@ function getValuesTriggerLastRound() {
   return globalThis[VALUES_TRIGGER_LAST_ROUND_KEY] || null;
 }
 
-// 剧情触发摘要：本轮结果 + 统计 + 触发事件名单。
+// 剧情触发摘要：本次判定结果 + 统计 + 触发事件名单。
+// 常驻模型下记录会随数据变更不断重刷，source 区分本次是谁写的：
+// 'send' = 用户点击发送时的权威判定（含事件效果与一次性关闭）；
+// 'refresh' = 常驻刷新（数据变更 / 启动 / 切聊天）。
 function buildValuesTriggerSummary(round) {
   const wrap = document.createElement('div');
   wrap.className = 'kaleido-inject__summary';
@@ -23,7 +26,7 @@ function buildValuesTriggerSummary(round) {
       + (autoDisabled > 0 ? '，' + autoDisabled + ' 个一次性事件已自动关闭' : '');
     outcome.dataset.state = 'ok';
   } else if (round.skipped) {
-    outcome.textContent = '本轮无事件满足条件';
+    outcome.textContent = '本次无事件满足条件';
     outcome.dataset.state = 'idle';
   } else {
     outcome.textContent = '未注入';
@@ -31,7 +34,8 @@ function buildValuesTriggerSummary(round) {
   }
   const stats = document.createElement('span');
   stats.className = 'kaleido-inject__summary-stats';
-  stats.textContent = '候选 ' + round.totalTriggers + ' 个触发 · 满足 ' + round.triggeredIds.length + ' 个';
+  stats.textContent = '候选 ' + round.totalTriggers + ' 个触发 · 满足 ' + round.triggeredIds.length + ' 个'
+    + (round.source === 'send' ? ' · 发送时判定' : ' · 常驻刷新');
   wrap.append(outcome, stats);
   if (Array.isArray(round.triggeredEvents) && round.triggeredEvents.length > 0) {
     const names = document.createElement('span');

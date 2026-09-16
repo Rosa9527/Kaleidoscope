@@ -197,13 +197,13 @@ function refreshValuesInjectUI() {
       }
     }
     if (!config.enabled) {
-      status.textContent = '未开启 · 勾选条目后随提示词注入';
+      status.textContent = '未开启 · 勾选条目后常驻注入提示词';
       status.dataset.state = 'idle';
     } else if (count === 0) {
       status.textContent = '已开启 · 尚未勾选任何变量';
       status.dataset.state = 'warn';
     } else {
-      status.textContent = `已开启 · 注入 ${count} 个变量 · 位置：World Info after 之后`;
+      status.textContent = `已开启 · 常驻注入 ${count} 个变量 · 位置：World Info after 之后`;
       status.dataset.state = 'ok';
     }
   }
@@ -217,7 +217,7 @@ function renderValuesInjectPreview() {
   const ctx = getContextSafe();
   const config = ctx ? getValuesInjectConfig(ctx) : null;
   if (!config?.enabled) {
-    pre.textContent = '（变量注入未开启：在「变量系统 → 默认数值」层勾选变量并打开注入开关后，这里会显示实际注入提示词的 <Values> 内容。）';
+    pre.textContent = '（变量注入未开启：在「变量系统 → 默认数值」层勾选变量并打开注入开关后，这里会显示常驻注入提示词的 <Values> 内容。）';
     return;
   }
   const text = buildValuesInjectText(ctx);
@@ -291,7 +291,7 @@ function buildValuesRow(path, name, node, depth) {
   // 祖先，半选仅出现在导入等数据不一致场景，作为防御性提示）。
   const injectIndeterminate = injectConfig ? !injectChecked && injectConfig.paths.some((item) => item.startsWith(pathKey + '/')) : false;
   const injectCheckHTML = injectConfig
-    ? `<button type="button" class="kaleido-values__inject-switch${injectChecked ? '' : ' is-off'}${injectIndeterminate ? ' is-partial' : ''}" data-inject-toggle="1" role="switch" aria-checked="${injectChecked}" title="勾选后随提示词注入${isNode ? '（含全部子条目）' : ''}"><span class="kaleido-values__inject-switch-thumb"></span></button>`
+    ? `<button type="button" class="kaleido-values__inject-switch${injectChecked ? '' : ' is-off'}${injectIndeterminate ? ' is-partial' : ''}" data-inject-toggle="1" role="switch" aria-checked="${injectChecked}" title="勾选后常驻注入提示词（打开注入开关即生效，数据变化自动刷新）${isNode ? '，含全部子条目' : ''}"><span class="kaleido-values__inject-switch-thumb"></span></button>`
     : '';
 
   if (isNode) {
@@ -1511,7 +1511,9 @@ function refreshValuesTriggerStatus() {
   const enabled = settings ? settings.valuesTriggerEnabled !== false : true;
   toggle.classList.toggle('is-off', !enabled);
   toggle.setAttribute('aria-checked', String(Boolean(enabled)));
-  toggle.title = enabled ? '点击关闭：发送前不再按变量条件触发剧情事件' : '点击开启：发送前按变量条件确定性触发剧情事件';
+  toggle.title = enabled
+    ? '点击关闭：不再按变量条件触发剧情事件，并清空已注入的事件块'
+    : '点击开启：按变量条件确定性触发剧情事件（条件满足即常驻注入，数据变化自动刷新）';
 }
 
 function toggleValuesTriggerSystem() {
@@ -1520,6 +1522,16 @@ function toggleValuesTriggerSystem() {
   const settings = getSettings(ctx);
   settings.valuesTriggerEnabled = !(settings.valuesTriggerEnabled !== false);
   saveSettings(ctx);
+  // 立即生效：开启 → 按当前变量值重新判定并注入；关闭 → 清空已注入的事件块并复位。
+  try {
+    if (settings.valuesTriggerEnabled) {
+      refreshValuesTriggerInjection(ctx);
+    } else {
+      resetValuesTriggerInjection(ctx);
+    }
+  } catch (error) {
+    logApp('warn', '剧情触发注入刷新失败', String(error?.message || error));
+  }
   refreshValuesTriggerStatus();
   logApp('info', settings.valuesTriggerEnabled ? '剧情触发已开启' : '剧情触发已关闭');
   globalThis.toastr?.info?.('剧情触发已' + (settings.valuesTriggerEnabled ? '开启' : '关闭'), '[' + MODULE_DISPLAY_NAME + ']');
@@ -1536,7 +1548,7 @@ function buildValuesTriggerRow(trigger, depth) {
   const conditionsText = formatValuesTriggerConditions(trigger);
   const effectsText = formatValuesTriggerEffects(trigger);
   const onceBadge = trigger.once === false
-    ? '<span class="kaleido-values__row-trigger-type" title="常驻事件：条件满足时可重复触发">常驻</span>'
+    ? '<span class="kaleido-values__row-trigger-type" title="可重复事件：条件满足时可反复触发">可重复</span>'
     : '<span class="kaleido-values__row-trigger-type is-once" title="一次性事件：触发一次后自动关闭">一次性</span>';
   row.innerHTML = `
     <button type="button" class="kaleido-values__drag-handle" data-action="drag" title="拖动排序" aria-label="拖动排序"><span class="${VALUES_DRAG_ICON_CLASS}"></span></button>
@@ -1566,7 +1578,7 @@ function renderValuesTriggers() {
   refreshValuesTriggerStatus();
   body.innerHTML = '';
   if (triggers.length === 0 && categories.length === 0) {
-    body.appendChild(buildValuesEmpty('还没有剧情触发。点击上方「＋ 新建」创建分类或事件：\n设置变量条件（如 张三/好感 ≥ 70），条件满足时自动注入对应剧情事件。'));
+    body.appendChild(buildValuesEmpty('还没有剧情触发。点击上方「＋ 新建」创建分类或事件：\n设置变量条件（如 张三/好感 ≥ 70），条件满足时常驻注入对应剧情事件。'));
     return;
   }
   const roots = getValuesTriggerRootCategories(ctx);
@@ -2727,7 +2739,7 @@ function buildValuesContentHTML(editorClass) {
               <span class="kaleido-values__nav-icon"><span class="${VALUES_KEYS_ICON_CLASS}"></span></span>
               <span class="kaleido-values__nav-label">变量注册</span>
             </button>
-            <button type="button" id="${VALUES_TAB_TRIGGERS_ID}" class="kaleido-values__nav-item" role="tab" aria-selected="false" title="剧情触发：按变量当前值是否满足条件，确定性触发剧情事件（不依赖 AI 判断）">
+            <button type="button" id="${VALUES_TAB_TRIGGERS_ID}" class="kaleido-values__nav-item" role="tab" aria-selected="false" title="剧情触发：按变量当前值是否满足条件，确定性触发剧情事件（条件满足即常驻注入，不依赖 AI 判断）">
               <span class="kaleido-values__nav-icon"><span class="${VALUES_TRIGGER_ICON_CLASS}"></span></span>
               <span class="kaleido-values__nav-label">剧情触发</span>
             </button>
@@ -2762,11 +2774,11 @@ function buildValuesContentHTML(editorClass) {
                 <span id="${VALUES_DEFAULT_HINT_ID}" class="kaleido-values__default-hint" hidden>默认值仅手动修改</span>
               </div>
               <div id="${VALUES_INJECT_BAR_ID}" class="kaleido-values__inject-bar">
-                <div class="kaleido-values__inject-toggle" title="把勾选的节点与变量注入提示词（World Info after 之后）">
+                <div class="kaleido-values__inject-toggle" title="把勾选的节点与变量常驻注入提示词（World Info after 之后，数据变化即刷新）">
                   <button type="button" id="${VALUES_INJECT_TOGGLE_ID}" class="kaleido-values__inject-switch is-off" role="switch" aria-checked="false" aria-label="注入提示词开关"><span class="kaleido-values__inject-switch-thumb"></span></button>
                   <span class="kaleido-values__inject-toggle-label"><span class="${VALUES_INJECT_ICON_CLASS}"></span> 注入提示词</span>
                 </div>
-                <span id="${VALUES_INJECT_STATUS_ID}" class="kaleido-values__inject-status" data-state="idle">未开启 · 勾选条目后随提示词注入</span>
+                <span id="${VALUES_INJECT_STATUS_ID}" class="kaleido-values__inject-status" data-state="idle">未开启 · 勾选条目后常驻注入提示词</span>
               </div>
               <div id="${VALUES_TREE_ID}" class="kaleido-values__tree">
                 <div id="${VALUES_TREE_BODY_ID}" class="kaleido-values__tree-body"></div>
@@ -2780,7 +2792,7 @@ function buildValuesContentHTML(editorClass) {
             </div>
             <div id="${VALUES_TRIGGERS_PANE_ID}" class="kaleido-values__pane" hidden>
               <div class="kaleido-values__triggers-actions">
-                <div class="kaleido-values__inject-toggle" title="剧情触发总开关：开启后每次发送前按变量当前值判定并注入满足条件的事件">
+                <div class="kaleido-values__inject-toggle" title="剧情触发总开关：按变量当前值判定并常驻注入满足条件的事件（数据变化自动刷新；事件效果与一次性关闭在下次发送时生效）">
                   <button type="button" id="${VALUES_TRIGGERS_TOGGLE_ID}" class="kaleido-values__inject-switch is-off" role="switch" aria-checked="false" aria-label="剧情触发开关"><span class="kaleido-values__inject-switch-thumb"></span></button>
                   <span class="kaleido-values__inject-toggle-label"><span class="${VALUES_TRIGGER_ICON_CLASS}"></span> 剧情触发</span>
                 </div>
@@ -2936,7 +2948,7 @@ function buildValuesContentHTML(editorClass) {
               </label>
               <label class="kaleido-api__field" for="${VALUES_TRIGGER_EDITOR_ONCE_ID}">
                 <span class="kaleido-api__label">事件类型</span>
-                <select id="${VALUES_TRIGGER_EDITOR_ONCE_ID}" class="kaleido-input" title="一次性事件：触发一次后自动关闭；常驻事件：条件满足时可重复触发"></select>
+                <select id="${VALUES_TRIGGER_EDITOR_ONCE_ID}" class="kaleido-input" title="一次性事件：触发一次后自动关闭；可重复事件：条件满足时可反复触发"></select>
               </label>
               <div class="kaleido-api__field">
                 <span class="kaleido-api__label">变量条件 *</span>

@@ -1,7 +1,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.5.3';
+const MODULE_VERSION = '1.5.5';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -364,14 +364,21 @@ const VALUES_MAINTAIN_STOPPED_KEY = '__kaleido_values_maintain_stopped__';
 const VALUES_MAINTAIN_CHAT_CHANGED_KEY = '__kaleido_values_maintain_chat_changed__';
 const VALUES_MAINTAIN_STATE_KEY = '__kaleido_values_maintain_state__';
 const VALUES_LAST_ROUND_KEY = '__kaleido_values_last_round__';
-// 变量注入提示词（默认数值层勾选 → 发送前注入 World Info after 之后）
+// 变量注入提示词（默认数值层勾选 → 常驻注入 World Info after 之后）
 const VALUES_INJECT_KEY = 'Kaleidoscope_Values';
 const VALUES_INJECT_BAR_ID = 'kaleido-values-inject-bar';
 const VALUES_INJECT_TOGGLE_ID = 'kaleido-values-inject-toggle';
 const VALUES_INJECT_STATUS_ID = 'kaleido-values-inject-status';
 const VALUES_INJECT_ICON_CLASS = 'fa-solid fa-bullhorn';
-const VALUES_INJECT_CLEANUP_ENDED_KEY = '__kaleido_values_inject_cleanup_ended__';
-const VALUES_INJECT_CLEANUP_STOPPED_KEY = '__kaleido_values_inject_cleanup_stopped__';
+const VALUES_INJECT_CHAT_CHANGED_KEY = '__kaleido_values_inject_chat_changed__';
+const VALUES_INJECT_ENDED_KEY = '__kaleido_values_inject_ended__';
+const VALUES_INJECT_STOPPED_KEY = '__kaleido_values_inject_stopped__';
+const VALUES_INJECT_STARTUP_TIMER_KEY = '__kaleido_values_inject_startup_timer__';
+// 启动补刷延迟（ms）：宿主 chatMetadata 可能晚于 APP_READY 就绪，早刷只能拿到
+// 默认值；补刷保证最终展示的是聊天文件里的实际游戏值。
+const VALUES_INJECT_STARTUP_REFRESH_DELAYS = Object.freeze([1200, 3000]);
+// 注入运行态（挂 globalThis：热重载后宿主里的注入是否已写过仍可知）。
+const VALUES_INJECT_STATE_KEY = '__kaleido_values_inject_state__';
 // 注入预览：变量系统内查看实际注入提示词的 <Values> 内容（只读）。
 const VALUES_INJECT_PREVIEW_ICON_CLASS = 'fa-solid fa-scroll';
 const VALUES_TAB_INJECT_ID = 'kaleido-values-tab-inject';
@@ -435,11 +442,21 @@ const VALUES_TRIGGER_ADD_MENU_ID = 'kaleido-values-triggers-add-menu';
 const VALUES_TRIGGER_ADD_MENU_KEY = '__kaleido_values_trigger_add_menu_key__';
 const VALUES_TRIGGER_ADD_MENU_CATEGORY_ID = 'kaleido-values-triggers-add-menu-category';
 const VALUES_TRIGGER_ADD_MENU_TRIGGER_ID = 'kaleido-values-triggers-add-menu-trigger';
-// 剧情触发 · 注入与轮次记录
+// 剧情触发 · 常驻注入与轮次记录
 const VALUES_TRIGGER_INJECT_KEY = 'Kaleidoscope_Trigger_Event';
 const VALUES_TRIGGER_LAST_ROUND_KEY = '__kaleido_values_trigger_last_round__';
-const VALUES_TRIGGER_CLEANUP_ENDED_KEY = '__kaleido_values_trigger_cleanup_ended__';
-const VALUES_TRIGGER_CLEANUP_STOPPED_KEY = '__kaleido_values_trigger_cleanup_stopped__';
+const VALUES_TRIGGER_CHAT_CHANGED_KEY = '__kaleido_values_trigger_chat_changed__';
+const VALUES_TRIGGER_ENDED_KEY = '__kaleido_values_trigger_ended__';
+const VALUES_TRIGGER_STOPPED_KEY = '__kaleido_values_trigger_stopped__';
+const VALUES_TRIGGER_STARTUP_TIMER_KEY = '__kaleido_values_trigger_startup_timer__';
+// 启动补刷延迟（ms）：与变量注入同因——宿主 chatMetadata 可能晚于 APP_READY 就绪。
+const VALUES_TRIGGER_STARTUP_REFRESH_DELAYS = Object.freeze([1200, 3000]);
+// 注入运行态（挂 globalThis，热重载后仍然可知）：
+// - written：宿主提示词里是否已有一份剧情触发注入（空内容时只有写过才需要清理调用）；
+// - locked：本轮是否已由「发送前任务」锁定——锁定后按本轮记录原样重写，不再重新判定
+//   （效果改值、一次性事件自动关闭都会触发数据变更刷新，重判会把刚触发的事件删掉）；
+// - busy：发送前任务判定 / 应用效果期间，数据变更刷新直接跳过。
+const VALUES_TRIGGER_STATE_KEY = '__kaleido_values_trigger_state__';
 // 剧情触发 · 条件运算符与逻辑选项
 // 运算符展示：下拉与摘要一律用符号本身（≥ / ≤ / ＝ / ≠），label 只作悬停说明。
 const VALUES_TRIGGER_OPS = Object.freeze([
@@ -466,7 +483,7 @@ const VALUES_TRIGGER_LOGIC_OPTIONS = Object.freeze([
 // 事件类型：once = 一次性（触发后自动关闭，默认）；persistent = 常驻（可重复触发）。
 const VALUES_TRIGGER_ONCE_OPTIONS = Object.freeze([
   { value: 'once', label: '一次性事件（触发后自动关闭）' },
-  { value: 'persistent', label: '常驻事件（可重复触发）' },
+  { value: 'persistent', label: '可重复事件（条件满足时反复触发）' },
 ]);
 // ---------- 游戏模式（玩家数据展示面板）----------
 // 只读展示「变量系统」注入提示词的那些变量：当前游戏值总览，

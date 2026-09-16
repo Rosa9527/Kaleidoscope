@@ -1,11 +1,11 @@
 // ===== 万华镜（Kaleidoscope）index.js — 构建产物，勿手改 =====
-// 构建时间: 2026-09-16 11:56:46 · 文件数: 24 · 指纹: dc35b00b
+// 构建时间: 2026-09-16 18:45:11 · 文件数: 24 · 指纹: d04a39e0
 
 // ===== js/constants.js =====
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.5.3';
+const MODULE_VERSION = '1.5.5';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -368,14 +368,21 @@ const VALUES_MAINTAIN_STOPPED_KEY = '__kaleido_values_maintain_stopped__';
 const VALUES_MAINTAIN_CHAT_CHANGED_KEY = '__kaleido_values_maintain_chat_changed__';
 const VALUES_MAINTAIN_STATE_KEY = '__kaleido_values_maintain_state__';
 const VALUES_LAST_ROUND_KEY = '__kaleido_values_last_round__';
-// 变量注入提示词（默认数值层勾选 → 发送前注入 World Info after 之后）
+// 变量注入提示词（默认数值层勾选 → 常驻注入 World Info after 之后）
 const VALUES_INJECT_KEY = 'Kaleidoscope_Values';
 const VALUES_INJECT_BAR_ID = 'kaleido-values-inject-bar';
 const VALUES_INJECT_TOGGLE_ID = 'kaleido-values-inject-toggle';
 const VALUES_INJECT_STATUS_ID = 'kaleido-values-inject-status';
 const VALUES_INJECT_ICON_CLASS = 'fa-solid fa-bullhorn';
-const VALUES_INJECT_CLEANUP_ENDED_KEY = '__kaleido_values_inject_cleanup_ended__';
-const VALUES_INJECT_CLEANUP_STOPPED_KEY = '__kaleido_values_inject_cleanup_stopped__';
+const VALUES_INJECT_CHAT_CHANGED_KEY = '__kaleido_values_inject_chat_changed__';
+const VALUES_INJECT_ENDED_KEY = '__kaleido_values_inject_ended__';
+const VALUES_INJECT_STOPPED_KEY = '__kaleido_values_inject_stopped__';
+const VALUES_INJECT_STARTUP_TIMER_KEY = '__kaleido_values_inject_startup_timer__';
+// 启动补刷延迟（ms）：宿主 chatMetadata 可能晚于 APP_READY 就绪，早刷只能拿到
+// 默认值；补刷保证最终展示的是聊天文件里的实际游戏值。
+const VALUES_INJECT_STARTUP_REFRESH_DELAYS = Object.freeze([1200, 3000]);
+// 注入运行态（挂 globalThis：热重载后宿主里的注入是否已写过仍可知）。
+const VALUES_INJECT_STATE_KEY = '__kaleido_values_inject_state__';
 // 注入预览：变量系统内查看实际注入提示词的 <Values> 内容（只读）。
 const VALUES_INJECT_PREVIEW_ICON_CLASS = 'fa-solid fa-scroll';
 const VALUES_TAB_INJECT_ID = 'kaleido-values-tab-inject';
@@ -439,11 +446,21 @@ const VALUES_TRIGGER_ADD_MENU_ID = 'kaleido-values-triggers-add-menu';
 const VALUES_TRIGGER_ADD_MENU_KEY = '__kaleido_values_trigger_add_menu_key__';
 const VALUES_TRIGGER_ADD_MENU_CATEGORY_ID = 'kaleido-values-triggers-add-menu-category';
 const VALUES_TRIGGER_ADD_MENU_TRIGGER_ID = 'kaleido-values-triggers-add-menu-trigger';
-// 剧情触发 · 注入与轮次记录
+// 剧情触发 · 常驻注入与轮次记录
 const VALUES_TRIGGER_INJECT_KEY = 'Kaleidoscope_Trigger_Event';
 const VALUES_TRIGGER_LAST_ROUND_KEY = '__kaleido_values_trigger_last_round__';
-const VALUES_TRIGGER_CLEANUP_ENDED_KEY = '__kaleido_values_trigger_cleanup_ended__';
-const VALUES_TRIGGER_CLEANUP_STOPPED_KEY = '__kaleido_values_trigger_cleanup_stopped__';
+const VALUES_TRIGGER_CHAT_CHANGED_KEY = '__kaleido_values_trigger_chat_changed__';
+const VALUES_TRIGGER_ENDED_KEY = '__kaleido_values_trigger_ended__';
+const VALUES_TRIGGER_STOPPED_KEY = '__kaleido_values_trigger_stopped__';
+const VALUES_TRIGGER_STARTUP_TIMER_KEY = '__kaleido_values_trigger_startup_timer__';
+// 启动补刷延迟（ms）：与变量注入同因——宿主 chatMetadata 可能晚于 APP_READY 就绪。
+const VALUES_TRIGGER_STARTUP_REFRESH_DELAYS = Object.freeze([1200, 3000]);
+// 注入运行态（挂 globalThis，热重载后仍然可知）：
+// - written：宿主提示词里是否已有一份剧情触发注入（空内容时只有写过才需要清理调用）；
+// - locked：本轮是否已由「发送前任务」锁定——锁定后按本轮记录原样重写，不再重新判定
+//   （效果改值、一次性事件自动关闭都会触发数据变更刷新，重判会把刚触发的事件删掉）；
+// - busy：发送前任务判定 / 应用效果期间，数据变更刷新直接跳过。
+const VALUES_TRIGGER_STATE_KEY = '__kaleido_values_trigger_state__';
 // 剧情触发 · 条件运算符与逻辑选项
 // 运算符展示：下拉与摘要一律用符号本身（≥ / ≤ / ＝ / ≠），label 只作悬停说明。
 const VALUES_TRIGGER_OPS = Object.freeze([
@@ -470,7 +487,7 @@ const VALUES_TRIGGER_LOGIC_OPTIONS = Object.freeze([
 // 事件类型：once = 一次性（触发后自动关闭，默认）；persistent = 常驻（可重复触发）。
 const VALUES_TRIGGER_ONCE_OPTIONS = Object.freeze([
   { value: 'once', label: '一次性事件（触发后自动关闭）' },
-  { value: 'persistent', label: '常驻事件（可重复触发）' },
+  { value: 'persistent', label: '可重复事件（条件满足时反复触发）' },
 ]);
 // ---------- 游戏模式（玩家数据展示面板）----------
 // 只读展示「变量系统」注入提示词的那些变量：当前游戏值总览，
@@ -3972,7 +3989,9 @@ function renderPresetTriggerControl() {
   if (toggle) {
     toggle.textContent = enabled ? '⚡ 剧情触发：开' : '⚡ 剧情触发：关';
     toggle.classList.toggle('is-active', enabled);
-    toggle.title = enabled ? '点击关闭：发送前不再按变量条件触发剧情事件' : '点击开启：发送前按变量条件确定性触发剧情事件';
+    toggle.title = enabled
+      ? '点击关闭：不再按变量条件触发剧情事件，并清空已注入的事件块'
+      : '点击开启：按变量条件确定性触发剧情事件（条件满足即常驻注入，数据变化自动刷新）';
   }
   if (status) {
     status.textContent = enabled ? '已启用' : '未启用';
@@ -3986,6 +4005,16 @@ function toggleValuesTrigger() {
   const settings = getSettings(ctx);
   settings.valuesTriggerEnabled = !(settings.valuesTriggerEnabled !== false);
   saveSettings(ctx);
+  // 立即生效：开启 → 按当前变量值重新判定并注入；关闭 → 清空已注入的事件块并复位。
+  try {
+    if (settings.valuesTriggerEnabled) {
+      refreshValuesTriggerInjection(ctx);
+    } else {
+      resetValuesTriggerInjection(ctx);
+    }
+  } catch (error) {
+    logApp('warn', '剧情触发注入刷新失败', String(error?.message || error));
+  }
   renderPresetTriggerControl();
   refreshHomeValuesStatus();
   logApp('info', settings.valuesTriggerEnabled ? '剧情触发已开启' : '剧情触发已关闭');
@@ -4435,7 +4464,10 @@ function getValuesTriggerLastRound() {
   return globalThis[VALUES_TRIGGER_LAST_ROUND_KEY] || null;
 }
 
-// 剧情触发摘要：本轮结果 + 统计 + 触发事件名单。
+// 剧情触发摘要：本次判定结果 + 统计 + 触发事件名单。
+// 常驻模型下记录会随数据变更不断重刷，source 区分本次是谁写的：
+// 'send' = 用户点击发送时的权威判定（含事件效果与一次性关闭）；
+// 'refresh' = 常驻刷新（数据变更 / 启动 / 切聊天）。
 function buildValuesTriggerSummary(round) {
   const wrap = document.createElement('div');
   wrap.className = 'kaleido-inject__summary';
@@ -4447,7 +4479,7 @@ function buildValuesTriggerSummary(round) {
       + (autoDisabled > 0 ? '，' + autoDisabled + ' 个一次性事件已自动关闭' : '');
     outcome.dataset.state = 'ok';
   } else if (round.skipped) {
-    outcome.textContent = '本轮无事件满足条件';
+    outcome.textContent = '本次无事件满足条件';
     outcome.dataset.state = 'idle';
   } else {
     outcome.textContent = '未注入';
@@ -4455,7 +4487,8 @@ function buildValuesTriggerSummary(round) {
   }
   const stats = document.createElement('span');
   stats.className = 'kaleido-inject__summary-stats';
-  stats.textContent = '候选 ' + round.totalTriggers + ' 个触发 · 满足 ' + round.triggeredIds.length + ' 个';
+  stats.textContent = '候选 ' + round.totalTriggers + ' 个触发 · 满足 ' + round.triggeredIds.length + ' 个'
+    + (round.source === 'send' ? ' · 发送时判定' : ' · 常驻刷新');
   wrap.append(outcome, stats);
   if (Array.isArray(round.triggeredEvents) && round.triggeredEvents.length > 0) {
     const names = document.createElement('span');
@@ -7723,7 +7756,31 @@ function getValuesBundle(ctx) {
 
 // 保存：有角色且宿主支持写角色卡 → 确保角色卡容器存在后立即持久化；否则写全局设置。
 // 返回落盘 Promise（保存按钮 await 后从磁盘重读校验，避免校验与写入并行读到旧数据）。
+// 落盘后统一刷新提示词注入（常驻注入的唯一数据入口之一，见 values-inject.js）：
+// 默认值 / 勾选配置 / 事件效果等变更都经这里，注入随之保持最新。
 function saveValuesData(ctx) {
+  const result = writeValuesData(ctx);
+  notifyValuesDataChanged(ctx || getContextSafe());
+  return result;
+}
+
+// 数据变更后的常驻注入统一通知（变量表注入 + 剧情触发注入）：读取失败一律降级，
+// 绝不影响保存本身。两个刷新函数都不存在时（极简测试沙箱）静默跳过。
+function notifyValuesDataChanged(context) {
+  if (!context) return;
+  try {
+    if (typeof onValuesDataChangedForInject === 'function') onValuesDataChangedForInject(context);
+  } catch (error) {
+    logApp('warn', '变量注入刷新失败', String(error?.message || error));
+  }
+  try {
+    if (typeof onValuesDataChangedForTriggerInject === 'function') onValuesDataChangedForTriggerInject(context);
+  } catch (error) {
+    logApp('warn', '剧情触发注入刷新失败', String(error?.message || error));
+  }
+}
+
+function writeValuesData(ctx) {
   const character = getStoryCharacter(ctx);
   if (!character || typeof ctx?.writeExtensionField !== 'function') {
     const bundle = getValuesBundle(ctx);
@@ -8455,7 +8512,8 @@ function scheduleValuesChatSave(ctx, immediate) {
 }
 
 // 写入游戏值：metadata[key] = 状态包，防抖保存聊天文件。meta 可携带 updatedAt /
-// lastSignature 等附加字段。
+// lastSignature 等附加字段。写入后刷新提示词注入（AI 维护 / 剧情触发效果 /
+// 预筛事件效果 / 手动改值 / 重置游戏值都汇聚到这里）。
 function saveValuesChatState(ctx, values, meta = {}) {
   const context = ctx || getContextSafe();
   if (!context) return false;
@@ -8476,6 +8534,7 @@ function saveValuesChatState(ctx, values, meta = {}) {
     lastSignature: String(meta.lastSignature || ''),
   };
   scheduleValuesChatSave(context, !!meta.immediate);
+  notifyValuesDataChanged(context);
   return true;
 }
 
@@ -9544,12 +9603,24 @@ async function runValuesMaintainNow() {
 
 
 // ===== js/values-inject.js =====
-// ===== 万华镜（Kaleidoscope）变量注入：默认数值层勾选 → 发送前注入提示词 =====
-// 触发时机：用户点击发送（messageSent，经跨扩展发送屏障），把勾选的节点 / 变量
-// 以 YAML 形式注入到提示词中；注入位置 = IN_PROMPT（SillyTavern 的
-// 「World Info (after)」之后，见 host.js getExtensionPromptApi 注释）；
-// generationEnded / generationStopped 后清空注入，下一轮发送前重新注入最新值。
+// ===== 万华镜（Kaleidoscope）变量注入：默认数值层勾选 → 常驻注入提示词 =====
+// 注入方式（与隔壁 BS BioTracker 的 mainflow 提示词同款「常驻」模型）：
+// 不在点击发送时临时写入，而是**只要数据变了就把注入刷成最新**，注入结果一直
+// 挂在宿主提示词上，直到内容本身变化（开关关闭 / 取消勾选 / 变量被删）才清空。
+// 刷新时机：
+//   - 变量数据落盘（saveValuesData / saveValuesChatState 两个写入口统一挂钩），
+//     覆盖手动编辑、AI 维护完成、剧情触发/预筛事件效果、YAML 导入、重置游戏值；
+//   - 切换聊天（chatChanged，含启动补刷，等宿主把新聊天的 chatMetadata 读出来）；
+//   - 生成结束 / 停止（只重刷不清空：宿主清掉提示词缓存时把常驻块补回来）；
+//   - 点击发送（发送屏障兜底重断言：内容通常已是最新，此处只防御宿主漏刷）。
+// 注入位置 = IN_PROMPT（SillyTavern 的「World Info (after)」之后，见 host.js
+// getExtensionPromptApi 注释）。
 // 注入内容：当前游戏值（未初始化时回退默认值）按勾选路径裁剪后的 YAML 树。
+//
+// 为什么从「发送时注入」改成「常驻」：原实现把 setExtensionPrompt 放在 messageSent
+// 里、生成结束再清空，等于注入的存活期只有一轮，且**完全依赖宿主发 messageSent**——
+// swipe / 重新生成等不发 messageSent 的路径拿到的是空块，维护完成后也不能立刻反映到
+// 提示词上。常驻模型下这些场景天然正确：注入始终等于「最近一次数据变更后的变量状态」。
 
 // 注入文本：<Values> 块 + 说明 + YAML。只注入「自身打开」的变量（叶子）；
 // 容器节点本身不注入内容（打开节点 = 允许子树，具体注入哪些变量由各后代
@@ -9586,59 +9657,171 @@ function buildValuesInjectText(ctx) {
   ].join('\n');
 }
 
-// 注入：setExtensionPrompt(IN_PROMPT, depth 0) = World Info (after) 之后。
-// 未开启 / 未勾选 / 无内容时不做任何调用（清理统一由 generationEnded 负责）。
-function injectValuesIntoPrompt(ctx) {
-  const api = getExtensionPromptApi(ctx);
-  if (!api) return false;
-  const text = buildValuesInjectText(ctx);
-  if (!text) return false;
-  api.setExtensionPrompt(VALUES_INJECT_KEY, text, api.inPrompt, 0, false, api.systemRole);
-  return true;
+// 注入运行态：`written` 记住「当前提示词里是否已有一份注入」。空内容时只有写过
+// 才需要清理调用——从不写入的聊天（未开启 / 未勾选）零调用，与旧行为一致。
+function getValuesInjectState() {
+  const existing = globalThis[VALUES_INJECT_STATE_KEY];
+  if (existing && typeof existing === 'object') return existing;
+  const state = { written: false };
+  globalThis[VALUES_INJECT_STATE_KEY] = state;
+  return state;
 }
 
-function clearValuesInjection(ctx) {
+// 刷新注入：内容变了就写入最新，内容为空且曾写过就清空。返回是否写入了非空注入。
+// 宿主不支持注入（无 setExtensionPrompt）时静默返回，绝不抛错。
+function refreshValuesInjection(ctx) {
   const api = getExtensionPromptApi(ctx);
-  if (!api) return;
+  if (!api) return false;
+  const state = getValuesInjectState();
+  let text = '';
   try {
-    api.setExtensionPrompt(VALUES_INJECT_KEY, '', api.inPrompt, 0);
+    text = buildValuesInjectText(ctx);
   } catch (error) {
-    logApp('warn', '清理变量注入失败', String(error?.message || error));
+    logApp('warn', '变量注入失败', String(error?.message || error));
+    return false;
+  }
+  if (!text) {
+    if (!state.written) return false;
+    try {
+      api.setExtensionPrompt(VALUES_INJECT_KEY, '', api.inPrompt, 0);
+      state.written = false;
+    } catch (error) {
+      logApp('warn', '清理变量注入失败', String(error?.message || error));
+    }
+    return false;
+  }
+  try {
+    api.setExtensionPrompt(VALUES_INJECT_KEY, text, api.inPrompt, 0, false, api.systemRole);
+    state.written = true;
+    return true;
+  } catch (error) {
+    logApp('warn', '变量注入失败', String(error?.message || error));
+    return false;
   }
 }
 
-// 发送前任务（注册进跨扩展发送屏障）：同步注入，失败静默降级，绝不阻塞发送。
+// 数据落盘后的刷新入口（saveValuesData / saveValuesChatState 统一调用）：
+// 没有 ctx 可用时静默跳过，读取失败一律降级，绝不影响保存本身。
+function onValuesDataChangedForInject(ctx) {
+  try {
+    refreshValuesInjection(ctx);
+  } catch (error) {
+    logApp('warn', '变量注入刷新失败', String(error?.message || error));
+  }
+}
+
+// 链式延迟补刷（变量注入 / 剧情触发共用）：按 delays 依次 setTimeout 执行 job，
+// 同 key 只保留一条链（重排时先清旧定时器）。供「启动 / 切聊天」等宿主数据可能
+// 晚于事件就绪的场景收敛到实际值。
+function scheduleDelayedRefreshes(timerKey, delays, job) {
+  const pending = (Array.isArray(delays) ? delays : [])
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value >= 0);
+  if (globalThis[timerKey]) {
+    clearTimeout(globalThis[timerKey]);
+    globalThis[timerKey] = null;
+  }
+  const scheduleNext = () => {
+    const delay = pending.shift();
+    if (delay === undefined) {
+      globalThis[timerKey] = null;
+      return;
+    }
+    globalThis[timerKey] = setTimeout(() => {
+      try {
+        job();
+      } catch (error) {
+        logApp('warn', '延迟补刷失败', String(error?.message || error));
+      }
+      scheduleNext();
+    }, delay);
+  };
+  scheduleNext();
+}
+
+// 切换聊天 / 启动后的补刷：新聊天的 chatMetadata（游戏值所在处）可能晚于事件
+// 才就绪，早刷只能拿到默认值，因此按 delays 再刷几次收敛到实际值。
+function scheduleValuesInjectionRefresh(ctx, delays) {
+  scheduleDelayedRefreshes(
+    VALUES_INJECT_STARTUP_TIMER_KEY,
+    delays || VALUES_INJECT_STARTUP_REFRESH_DELAYS,
+    () => {
+      const freshCtx = getContextSafe();
+      if (!freshCtx) return;
+      try {
+        refreshValuesInjection(freshCtx);
+      } catch (error) {
+        logApp('warn', '变量注入补刷失败', String(error?.message || error));
+      }
+    },
+  );
+}
+
+// 切换聊天：按新聊天的数据重刷注入（游戏值随聊天文件走）。运行态**不能**在这里
+// 重置：新聊天若没有可注入内容，「曾经写过」这个事实正是清掉旧聊天残留块的依据。
+function onValuesInjectChatChanged() {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  try {
+    refreshValuesInjection(ctx);
+  } catch (error) {
+    logApp('warn', '变量注入刷新失败', String(error?.message || error));
+  }
+  scheduleValuesInjectionRefresh(ctx);
+}
+
+// 启动首次注入 + 补刷：与 biotracker 的 bootstrap 刷新同款，保证插件载入后
+// 不点发送也能在提示词里看到变量块。
+function startValuesInjection() {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  try {
+    refreshValuesInjection(ctx);
+  } catch (error) {
+    logApp('warn', '变量注入启动刷新失败', String(error?.message || error));
+  }
+  scheduleValuesInjectionRefresh(ctx);
+}
+
+// 发送前任务（注册进跨扩展发送屏障）：**兜底重断言**，不是唯一注入点。
+// 常驻刷新已覆盖全部数据变更路径，此处只防御「数据在宿主侧被改动而扩展未收到
+// 通知」之类的漏刷；同步执行、失败静默降级，绝不阻塞发送。
 // 只处理「用户点击发送」产生的新消息；系统消息 / 非用户末条一律跳过。
 function runValuesInjectBarrierTask(ctx) {
   const chat = Array.isArray(ctx?.chat) ? ctx.chat : [];
   const lastMessage = chat[chat.length - 1];
   if (!lastMessage || !lastMessage.is_user) return Promise.resolve();
-  try {
-    injectValuesIntoPrompt(ctx);
-  } catch (error) {
-    logApp('warn', '变量注入失败', String(error?.message || error));
-  }
+  onValuesDataChangedForInject(ctx);
   return Promise.resolve();
 }
 
-// 生成结束 / 停止后清空注入：swipes / 重生成 / 后续轮次不会复用本轮的旧值，
-// 下一轮发送前会重新注入最新值。
-function onValuesInjectGenerationCleanup() {
+// 生成结束 / 停止后的重断言：**只重刷、不清空**（与旧版「清空等下一轮」相反）。
+// 常驻注入要求提示词里始终有最新变量块；宿主重建 prompt 缓存或扩展提示词被
+// 其他环节清掉时，这一步把它补回来（内容相同则等价于无操作）。
+function onValuesInjectGenerationRefresh() {
   const ctx = getContextSafe();
   if (!ctx) return;
-  clearValuesInjection(ctx);
+  try {
+    refreshValuesInjection(ctx);
+  } catch (error) {
+    logApp('warn', '变量注入刷新失败', String(error?.message || error));
+  }
 }
 
-// 注册进跨扩展发送屏障：与剧情预筛并发执行，保证注入在主请求发出前完成。
+// 注册进跨扩展发送屏障：与剧情预筛并发执行，保证注入在主请求发出前是最新的。
 getPreSendBarrier()?.register('kaleidoscope-values-inject', runValuesInjectBarrierTask);
+
 
 // ===== js/values-trigger.js =====
 // ===== 万华镜（Kaleidoscope）剧情触发：变量条件确定性触发 =====
 // 与「剧情脉络」互补：剧情脉络由预筛 AI 依据对话判断触发；剧情触发不依赖 API，
 // 直接按「某节点下变量的当前值」是否满足预设条件，确定性判定剧情事件是否触发。
-// 触发时机：用户点击发送（messageSent，经跨扩展发送屏障），与剧情预筛并发执行；
-// 满足条件的事件以 <Story_Trigger> 块注入（IN_CHAT, SYSTEM），generationEnded /
-// generationStopped 后清空，下一轮发送前重新判定。
+// 注入方式（常驻，与变量注入 / 隔壁 BS BioTracker 同款模型）：条件满足的事件以
+// <Story_Trigger> 块（IN_CHAT, SYSTEM）常驻挂在提示词上——数据变更（AI 维护 /
+// 手动改值 / 触发效果 / 导入）立即重刷，不再等点击发送；生成结束只重刷不清空，
+// swipe / 重新生成照常携带本轮事件。
+// 副作用与注入分离：判定与注入**无副作用**（纯读）；事件效果（改值）与一次性事件
+// 关闭只在「用户点击发送」的发送前任务里各执行一次（见文件末尾 runValuesTriggerBarrierTask）。
 // 数据存储：随变量包（角色卡 kaleidoscope_values / 全局设置 valuesData）的
 // triggers 字段保存，随角色卡导入/导出自动携带；YAML 导入导出见 values-data.js。
 
@@ -10251,62 +10434,253 @@ function getValuesTriggerExtensionPromptApi(ctx) {
   return getExtensionPromptApi(ctx);
 }
 
-function clearValuesTriggerInjection(ctx) {
-  const api = getValuesTriggerExtensionPromptApi(ctx);
-  if (!api) return;
-  try {
-    api.setExtensionPrompt(VALUES_TRIGGER_INJECT_KEY, '', api.inChat, 0);
-  } catch (error) {
-    logApp('warn', '清理剧情触发注入失败', String(error?.message || error));
-  }
+// ---------- 常驻注入 ----------
+// 注入运行态（挂 globalThis：热重载后宿主里的注入是否已写过仍然可知）：
+// - written：宿主提示词里是否已有一份非空注入（空内容时只有写过才需要清理调用，
+//   与变量注入同款——没配剧情触发的聊天零调用）；
+// - locked：本轮是否已由「发送前判定」锁定——锁定后一律按本轮记录原样重写，不再
+//   重新判定（事件效果改值、一次性事件自动关闭都是本轮判定的后果，重新判定会把
+//   刚触发的事件从块里冲掉；swipe / 重新生成也据此拿到与本轮一致的事件）；
+// - busy：发送前任务正在判定 / 应用效果，期间的数据变更刷新直接跳过。
+function getValuesTriggerInjectState() {
+  const existing = globalThis[VALUES_TRIGGER_STATE_KEY];
+  if (existing && typeof existing === 'object') return existing;
+  const state = { written: false, locked: false, busy: false };
+  globalThis[VALUES_TRIGGER_STATE_KEY] = state;
+  return state;
 }
 
-// 发送前任务（注册进跨扩展发送屏障）：确定性求值 + 同步注入，失败静默降级，
-// 绝不阻塞发送。只处理「用户点击发送」产生的新消息；系统消息 / 非用户末条跳过。
-function runValuesTriggerBarrierTask(ctx, payload) {
-  const context = ctx || getContextSafe();
-  const settings = context ? getSettings(context) : null;
-  if (!settings || settings.valuesTriggerEnabled === false) return Promise.resolve();
-  const chat = Array.isArray(context?.chat) ? context.chat : [];
-  const lastMessage = chat[chat.length - 1];
-  if (!lastMessage || !lastMessage.is_user) return Promise.resolve();
-  const record = {
+// 解锁本轮：下一次刷新按实时数据重新判定（切聊天 / 启动 / 新一轮发送）。
+function unlockValuesTriggerRound() {
+  getValuesTriggerInjectState().locked = false;
+}
+
+// 判定记录：本次判定的完整快照（注入实录展示用）。source = 'send'（用户点击发送的
+// 发送前判定，含事件效果与一次性自动关闭）/ 'refresh'（常驻刷新：数据变更 / 启动 / 切聊天）。
+function buildValuesTriggerRecord(ctx, triggered, source) {
+  return {
     at: new Date().toISOString(),
-    totalTriggers: getValuesTriggers(context).length,
-    triggeredIds: [],
-    triggeredEvents: [],
-    injectionText: '',
-    injected: false,
-    skipped: false,
-  };
-  try {
-    const triggered = evaluateValuesTriggers(context);
-    record.triggeredIds = triggered.map((trigger) => trigger.id);
-    record.triggeredEvents = triggered.map((trigger) => ({
+    source,
+    totalTriggers: getValuesTriggers(ctx).length,
+    triggeredIds: triggered.map((trigger) => trigger.id),
+    triggeredEvents: triggered.map((trigger) => ({
       id: trigger.id,
       name: trigger.name,
       conditions: formatValuesTriggerConditions(trigger),
       description: trigger.description,
       content: trigger.content,
-    }));
+    })),
+    injectionText: '',
+    injected: false,
+    skipped: triggered.length === 0,
+  };
+}
+
+// 写入注入块：无条件重新断言（不做内容去重——宿主每轮可能重建 prompt 缓存，去重会
+// 让「状态以为写过、宿主其实已经清掉」的补写落空，与变量注入的取舍一致）。
+// 空内容且从未写过时零调用。
+function writeValuesTriggerInjection(ctx, text) {
+  const state = getValuesTriggerInjectState();
+  if (!text && !state.written) return false;
+  const api = getValuesTriggerExtensionPromptApi(ctx);
+  if (!api) return false;
+  try {
+    api.setExtensionPrompt(VALUES_TRIGGER_INJECT_KEY, text, api.inChat, 0, false, api.systemRole);
+    state.written = Boolean(text);
+    return Boolean(text);
+  } catch (error) {
+    logApp('warn', '剧情触发注入失败', String(error?.message || error));
+    return false;
+  }
+}
+
+// 只清注入块，不动本轮记录与运行态（发送前判定「本轮无事件」时用：块要清掉，记录留档）。
+function clearValuesTriggerInjection(ctx) {
+  const state = getValuesTriggerInjectState();
+  if (!state.written) return;
+  const api = getValuesTriggerExtensionPromptApi(ctx);
+  if (!api) return;
+  try {
+    api.setExtensionPrompt(VALUES_TRIGGER_INJECT_KEY, '', api.inChat, 0);
+    state.written = false;
+  } catch (error) {
+    logApp('warn', '清理剧情触发注入失败', String(error?.message || error));
+  }
+}
+
+// 复位：解锁本轮 + 清注入块 + 丢弃记录（总开关关闭 / 切换聊天）。
+// 已无注入时只做状态复位，不产生宿主调用。
+function resetValuesTriggerInjection(ctx) {
+  unlockValuesTriggerRound();
+  globalThis[VALUES_TRIGGER_LAST_ROUND_KEY] = null;
+  clearValuesTriggerInjection(ctx);
+}
+
+// 刷新注入（常驻模型的唯一写入入口）：总开关关闭 → 复位；本轮已锁定 → 按锁定的
+// 事件集合重写（内容取当前定义，事件被删除则从块里移除，集合为空则块清空但**保持
+// 锁定**——本轮该触发哪些事件在发送时就定了）；未锁定 → 按实时数据重新判定，写入 /
+// 清空并把判定记入「注入实录」。
+function refreshValuesTriggerInjection(ctx) {
+  const context = ctx || getContextSafe();
+  if (!context) return false;
+  let settings = null;
+  try {
+    settings = getSettings(context);
+  } catch (error) {
+    settings = null;
+  }
+  if (!settings || settings.valuesTriggerEnabled === false) {
+    resetValuesTriggerInjection(context);
+    return false;
+  }
+  const state = getValuesTriggerInjectState();
+  if (state.busy) return false;
+  if (state.locked) {
+    const round = globalThis[VALUES_TRIGGER_LAST_ROUND_KEY] || null;
+    const ids = round && Array.isArray(round.triggeredIds) ? round.triggeredIds : [];
+    // 只按「事件是否还存在」过滤：本轮自动关闭的一次性事件仍属于本轮，必须留在块里。
+    const kept = ids
+      .map((id) => getValuesTriggerById(context, id))
+      .filter(Boolean);
+    if (kept.length !== ids.length && round) {
+      // 有事件被删除：同步记录，保证实录与本轮块一致。
+      round.triggeredIds = kept.map((trigger) => trigger.id);
+      round.triggeredEvents = buildValuesTriggerRecord(context, kept, round.source || 'send').triggeredEvents;
+      round.injectionText = kept.length > 0 ? buildValuesTriggerInjectionText(context, kept) : '';
+      round.injected = kept.length > 0;
+      round.skipped = kept.length === 0;
+    }
+    const text = round ? String(round.injectionText || '') : '';
+    return writeValuesTriggerInjection(context, text);
+  }
+  const triggered = evaluateValuesTriggers(context);
+  const record = buildValuesTriggerRecord(context, triggered, 'refresh');
+  if (triggered.length > 0) {
+    record.injectionText = buildValuesTriggerInjectionText(context, triggered);
+    record.injected = true;
+  }
+  // 没配触发事件的聊天不写记录：实录的触发段保持隐藏（与旧行为一致）。
+  globalThis[VALUES_TRIGGER_LAST_ROUND_KEY] = record.totalTriggers > 0 ? record : null;
+  return writeValuesTriggerInjection(context, record.injectionText);
+}
+
+// 数据落盘后的刷新入口（saveValuesData / saveValuesChatState 统一调用）：读取失败
+// 一律降级，绝不影响保存本身。
+function onValuesDataChangedForTriggerInject(ctx) {
+  try {
+    refreshValuesTriggerInjection(ctx);
+  } catch (error) {
+    logApp('warn', '剧情触发注入刷新失败', String(error?.message || error));
+  }
+}
+
+// 切换聊天 / 启动后的延迟补刷：新聊天的 chatMetadata（游戏值所在处）可能晚于事件
+// 才就绪，早刷只能拿到默认值，按 delays 再刷几次收敛到实际值。
+function scheduleValuesTriggerInjectionRefresh(delays) {
+  scheduleDelayedRefreshes(
+    VALUES_TRIGGER_STARTUP_TIMER_KEY,
+    delays || VALUES_TRIGGER_STARTUP_REFRESH_DELAYS,
+    () => {
+      const freshCtx = getContextSafe();
+      if (!freshCtx) return;
+      try {
+        refreshValuesTriggerInjection(freshCtx);
+      } catch (error) {
+        logApp('warn', '剧情触发注入补刷失败', String(error?.message || error));
+      }
+    },
+  );
+}
+
+// 切换聊天：新聊天没有「本轮」，解锁后按新聊天的数据重新判定。运行态 written
+// **不**重置：新聊天若没有可注入内容，「曾经写过」正是清掉上个聊天残留块的依据。
+function onValuesTriggerChatChanged() {
+  unlockValuesTriggerRound();
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  try {
+    refreshValuesTriggerInjection(ctx);
+  } catch (error) {
+    logApp('warn', '剧情触发注入刷新失败', String(error?.message || error));
+  }
+  scheduleValuesTriggerInjectionRefresh();
+}
+
+// 启动首次注入 + 补刷：插件载入后不等点击发送，满足条件的事件就该在提示词里。
+function startValuesTriggerInjection() {
+  unlockValuesTriggerRound();
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  try {
+    refreshValuesTriggerInjection(ctx);
+  } catch (error) {
+    logApp('warn', '剧情触发注入启动刷新失败', String(error?.message || error));
+  }
+  scheduleValuesTriggerInjectionRefresh();
+}
+
+// 生成结束 / 停止：只重刷不清空（与变量注入同款）——宿主清掉提示词缓存时把常驻块
+// 补回来；本轮锁定者原样重写，保证 swipe / 重新生成拿到与本轮一致的事件。
+function onValuesTriggerGenerationRefresh() {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  try {
+    refreshValuesTriggerInjection(ctx);
+  } catch (error) {
+    logApp('warn', '剧情触发注入刷新失败', String(error?.message || error));
+  }
+}
+
+// 发送前任务（注册进跨扩展发送屏障）：本轮的**权威判定**——求值、应用事件效果、
+// 一次性事件自动关闭、写入注入并在本轮内锁定。只处理「用户点击发送」产生的新消息；
+// 系统消息 / 非用户末条跳过；失败静默降级，绝不阻塞发送。
+function runValuesTriggerBarrierTask(ctx, payload) {
+  const context = ctx || getContextSafe();
+  if (!context) return Promise.resolve();
+  let settings = null;
+  try {
+    settings = getSettings(context);
+  } catch (error) {
+    settings = null;
+  }
+  // 总开关关闭：常驻模型下要顺手清掉已注入的块（旧模型靠生成结束清理兜底）。
+  if (!settings || settings.valuesTriggerEnabled === false) {
+    resetValuesTriggerInjection(context);
+    return Promise.resolve();
+  }
+  const chat = Array.isArray(context?.chat) ? context.chat : [];
+  const lastMessage = chat[chat.length - 1];
+  if (!lastMessage || !lastMessage.is_user) return Promise.resolve();
+  const state = getValuesTriggerInjectState();
+  unlockValuesTriggerRound();
+  let record = null;
+  state.busy = true;
+  try {
+    const triggered = evaluateValuesTriggers(context);
+    record = buildValuesTriggerRecord(context, triggered, 'send');
+    // 先发布本轮记录再产生任何副作用：效果应用 / 一次性关闭都会经保存入口回调刷新，
+    // 锁定分支要读到的就是这份记录（迟一步读到的是上一轮，会把刚写的块清掉）。
+    if (record.totalTriggers > 0) globalThis[VALUES_TRIGGER_LAST_ROUND_KEY] = record;
     if (triggered.length === 0) {
-      record.skipped = true;
-      globalThis[VALUES_TRIGGER_LAST_ROUND_KEY] = record;
+      // 本轮无事件：清掉上一轮留下的常驻块，记录留档供实录核对。
+      clearValuesTriggerInjection(context);
+      logApp('debug', '剧情触发：本轮无事件满足条件');
       return Promise.resolve();
     }
+    // 先算好本轮块并锁定，再产生副作用：效果改值 / 一次性关闭都会经保存入口回调
+    // 刷新，锁定后这些刷新一律按本块原样重写，不会把刚触发的事件冲掉。
+    record.injectionText = buildValuesTriggerInjectionText(context, triggered);
+    state.locked = true;
     // 事件效果：确定性修改游戏值，不依赖注入能力，先于注入执行。
     record.effectsApplied = applyValuesTriggerEffects(context, triggered);
-    const api = getValuesTriggerExtensionPromptApi(context);
-    if (!api) {
+    const written = writeValuesTriggerInjection(context, record.injectionText);
+    record.injected = written;
+    if (!written) {
+      // 宿主不支持提示词注入（或写入抛错）：没有块可守，解锁即可。
+      state.locked = false;
       logApp('warn', '剧情触发：宿主不支持提示词注入，跳过注入');
-      globalThis[VALUES_TRIGGER_LAST_ROUND_KEY] = record;
       return Promise.resolve();
     }
-    const injectionText = buildValuesTriggerInjectionText(context, triggered);
-    record.injectionText = injectionText;
-    clearValuesTriggerInjection(context);
-    api.setExtensionPrompt(VALUES_TRIGGER_INJECT_KEY, injectionText, api.inChat, 0, false, api.systemRole);
-    record.injected = true;
     record.autoDisabledIds = autoDisableFiredValuesTriggers(context, triggered);
     logApp('info', '剧情触发：已注入事件', '满足条件 ' + triggered.length + ' 个事件', record.triggeredIds);
     const onceNote = record.autoDisabledIds.length > 0
@@ -10315,17 +10689,10 @@ function runValuesTriggerBarrierTask(ctx, payload) {
     globalThis.toastr?.success?.('剧情触发：已注入 ' + triggered.length + ' 个事件' + onceNote + '！', '[' + MODULE_DISPLAY_NAME + ']');
   } catch (error) {
     logApp('warn', '剧情触发失败，静默降级', String(error?.message || error));
+  } finally {
+    state.busy = false;
   }
-  globalThis[VALUES_TRIGGER_LAST_ROUND_KEY] = record;
   return Promise.resolve();
-}
-
-// 生成结束 / 停止后清空注入：swipes / 重生成 / 后续轮次不会复用本轮的旧块，
-// 下一轮发送前会按最新变量值重新判定。
-function onValuesTriggerGenerationCleanup() {
-  const ctx = getContextSafe();
-  if (!ctx) return;
-  clearValuesTriggerInjection(ctx);
 }
 
 // 注册进跨扩展发送屏障：与剧情预筛 / 变量注入并发执行，保证注入在主请求发出前完成。
@@ -10531,13 +10898,13 @@ function refreshValuesInjectUI() {
       }
     }
     if (!config.enabled) {
-      status.textContent = '未开启 · 勾选条目后随提示词注入';
+      status.textContent = '未开启 · 勾选条目后常驻注入提示词';
       status.dataset.state = 'idle';
     } else if (count === 0) {
       status.textContent = '已开启 · 尚未勾选任何变量';
       status.dataset.state = 'warn';
     } else {
-      status.textContent = `已开启 · 注入 ${count} 个变量 · 位置：World Info after 之后`;
+      status.textContent = `已开启 · 常驻注入 ${count} 个变量 · 位置：World Info after 之后`;
       status.dataset.state = 'ok';
     }
   }
@@ -10551,7 +10918,7 @@ function renderValuesInjectPreview() {
   const ctx = getContextSafe();
   const config = ctx ? getValuesInjectConfig(ctx) : null;
   if (!config?.enabled) {
-    pre.textContent = '（变量注入未开启：在「变量系统 → 默认数值」层勾选变量并打开注入开关后，这里会显示实际注入提示词的 <Values> 内容。）';
+    pre.textContent = '（变量注入未开启：在「变量系统 → 默认数值」层勾选变量并打开注入开关后，这里会显示常驻注入提示词的 <Values> 内容。）';
     return;
   }
   const text = buildValuesInjectText(ctx);
@@ -10625,7 +10992,7 @@ function buildValuesRow(path, name, node, depth) {
   // 祖先，半选仅出现在导入等数据不一致场景，作为防御性提示）。
   const injectIndeterminate = injectConfig ? !injectChecked && injectConfig.paths.some((item) => item.startsWith(pathKey + '/')) : false;
   const injectCheckHTML = injectConfig
-    ? `<button type="button" class="kaleido-values__inject-switch${injectChecked ? '' : ' is-off'}${injectIndeterminate ? ' is-partial' : ''}" data-inject-toggle="1" role="switch" aria-checked="${injectChecked}" title="勾选后随提示词注入${isNode ? '（含全部子条目）' : ''}"><span class="kaleido-values__inject-switch-thumb"></span></button>`
+    ? `<button type="button" class="kaleido-values__inject-switch${injectChecked ? '' : ' is-off'}${injectIndeterminate ? ' is-partial' : ''}" data-inject-toggle="1" role="switch" aria-checked="${injectChecked}" title="勾选后常驻注入提示词（打开注入开关即生效，数据变化自动刷新）${isNode ? '，含全部子条目' : ''}"><span class="kaleido-values__inject-switch-thumb"></span></button>`
     : '';
 
   if (isNode) {
@@ -11845,7 +12212,9 @@ function refreshValuesTriggerStatus() {
   const enabled = settings ? settings.valuesTriggerEnabled !== false : true;
   toggle.classList.toggle('is-off', !enabled);
   toggle.setAttribute('aria-checked', String(Boolean(enabled)));
-  toggle.title = enabled ? '点击关闭：发送前不再按变量条件触发剧情事件' : '点击开启：发送前按变量条件确定性触发剧情事件';
+  toggle.title = enabled
+    ? '点击关闭：不再按变量条件触发剧情事件，并清空已注入的事件块'
+    : '点击开启：按变量条件确定性触发剧情事件（条件满足即常驻注入，数据变化自动刷新）';
 }
 
 function toggleValuesTriggerSystem() {
@@ -11854,6 +12223,16 @@ function toggleValuesTriggerSystem() {
   const settings = getSettings(ctx);
   settings.valuesTriggerEnabled = !(settings.valuesTriggerEnabled !== false);
   saveSettings(ctx);
+  // 立即生效：开启 → 按当前变量值重新判定并注入；关闭 → 清空已注入的事件块并复位。
+  try {
+    if (settings.valuesTriggerEnabled) {
+      refreshValuesTriggerInjection(ctx);
+    } else {
+      resetValuesTriggerInjection(ctx);
+    }
+  } catch (error) {
+    logApp('warn', '剧情触发注入刷新失败', String(error?.message || error));
+  }
   refreshValuesTriggerStatus();
   logApp('info', settings.valuesTriggerEnabled ? '剧情触发已开启' : '剧情触发已关闭');
   globalThis.toastr?.info?.('剧情触发已' + (settings.valuesTriggerEnabled ? '开启' : '关闭'), '[' + MODULE_DISPLAY_NAME + ']');
@@ -11870,7 +12249,7 @@ function buildValuesTriggerRow(trigger, depth) {
   const conditionsText = formatValuesTriggerConditions(trigger);
   const effectsText = formatValuesTriggerEffects(trigger);
   const onceBadge = trigger.once === false
-    ? '<span class="kaleido-values__row-trigger-type" title="常驻事件：条件满足时可重复触发">常驻</span>'
+    ? '<span class="kaleido-values__row-trigger-type" title="可重复事件：条件满足时可反复触发">可重复</span>'
     : '<span class="kaleido-values__row-trigger-type is-once" title="一次性事件：触发一次后自动关闭">一次性</span>';
   row.innerHTML = `
     <button type="button" class="kaleido-values__drag-handle" data-action="drag" title="拖动排序" aria-label="拖动排序"><span class="${VALUES_DRAG_ICON_CLASS}"></span></button>
@@ -11900,7 +12279,7 @@ function renderValuesTriggers() {
   refreshValuesTriggerStatus();
   body.innerHTML = '';
   if (triggers.length === 0 && categories.length === 0) {
-    body.appendChild(buildValuesEmpty('还没有剧情触发。点击上方「＋ 新建」创建分类或事件：\n设置变量条件（如 张三/好感 ≥ 70），条件满足时自动注入对应剧情事件。'));
+    body.appendChild(buildValuesEmpty('还没有剧情触发。点击上方「＋ 新建」创建分类或事件：\n设置变量条件（如 张三/好感 ≥ 70），条件满足时常驻注入对应剧情事件。'));
     return;
   }
   const roots = getValuesTriggerRootCategories(ctx);
@@ -13061,7 +13440,7 @@ function buildValuesContentHTML(editorClass) {
               <span class="kaleido-values__nav-icon"><span class="${VALUES_KEYS_ICON_CLASS}"></span></span>
               <span class="kaleido-values__nav-label">变量注册</span>
             </button>
-            <button type="button" id="${VALUES_TAB_TRIGGERS_ID}" class="kaleido-values__nav-item" role="tab" aria-selected="false" title="剧情触发：按变量当前值是否满足条件，确定性触发剧情事件（不依赖 AI 判断）">
+            <button type="button" id="${VALUES_TAB_TRIGGERS_ID}" class="kaleido-values__nav-item" role="tab" aria-selected="false" title="剧情触发：按变量当前值是否满足条件，确定性触发剧情事件（条件满足即常驻注入，不依赖 AI 判断）">
               <span class="kaleido-values__nav-icon"><span class="${VALUES_TRIGGER_ICON_CLASS}"></span></span>
               <span class="kaleido-values__nav-label">剧情触发</span>
             </button>
@@ -13096,11 +13475,11 @@ function buildValuesContentHTML(editorClass) {
                 <span id="${VALUES_DEFAULT_HINT_ID}" class="kaleido-values__default-hint" hidden>默认值仅手动修改</span>
               </div>
               <div id="${VALUES_INJECT_BAR_ID}" class="kaleido-values__inject-bar">
-                <div class="kaleido-values__inject-toggle" title="把勾选的节点与变量注入提示词（World Info after 之后）">
+                <div class="kaleido-values__inject-toggle" title="把勾选的节点与变量常驻注入提示词（World Info after 之后，数据变化即刷新）">
                   <button type="button" id="${VALUES_INJECT_TOGGLE_ID}" class="kaleido-values__inject-switch is-off" role="switch" aria-checked="false" aria-label="注入提示词开关"><span class="kaleido-values__inject-switch-thumb"></span></button>
                   <span class="kaleido-values__inject-toggle-label"><span class="${VALUES_INJECT_ICON_CLASS}"></span> 注入提示词</span>
                 </div>
-                <span id="${VALUES_INJECT_STATUS_ID}" class="kaleido-values__inject-status" data-state="idle">未开启 · 勾选条目后随提示词注入</span>
+                <span id="${VALUES_INJECT_STATUS_ID}" class="kaleido-values__inject-status" data-state="idle">未开启 · 勾选条目后常驻注入提示词</span>
               </div>
               <div id="${VALUES_TREE_ID}" class="kaleido-values__tree">
                 <div id="${VALUES_TREE_BODY_ID}" class="kaleido-values__tree-body"></div>
@@ -13114,7 +13493,7 @@ function buildValuesContentHTML(editorClass) {
             </div>
             <div id="${VALUES_TRIGGERS_PANE_ID}" class="kaleido-values__pane" hidden>
               <div class="kaleido-values__triggers-actions">
-                <div class="kaleido-values__inject-toggle" title="剧情触发总开关：开启后每次发送前按变量当前值判定并注入满足条件的事件">
+                <div class="kaleido-values__inject-toggle" title="剧情触发总开关：按变量当前值判定并常驻注入满足条件的事件（数据变化自动刷新；事件效果与一次性关闭在下次发送时生效）">
                   <button type="button" id="${VALUES_TRIGGERS_TOGGLE_ID}" class="kaleido-values__inject-switch is-off" role="switch" aria-checked="false" aria-label="剧情触发开关"><span class="kaleido-values__inject-switch-thumb"></span></button>
                   <span class="kaleido-values__inject-toggle-label"><span class="${VALUES_TRIGGER_ICON_CLASS}"></span> 剧情触发</span>
                 </div>
@@ -13270,7 +13649,7 @@ function buildValuesContentHTML(editorClass) {
               </label>
               <label class="kaleido-api__field" for="${VALUES_TRIGGER_EDITOR_ONCE_ID}">
                 <span class="kaleido-api__label">事件类型</span>
-                <select id="${VALUES_TRIGGER_EDITOR_ONCE_ID}" class="kaleido-input" title="一次性事件：触发一次后自动关闭；常驻事件：条件满足时可重复触发"></select>
+                <select id="${VALUES_TRIGGER_EDITOR_ONCE_ID}" class="kaleido-input" title="一次性事件：触发一次后自动关闭；可重复事件：条件满足时可反复触发"></select>
               </label>
               <div class="kaleido-api__field">
                 <span class="kaleido-api__label">变量条件 *</span>
@@ -14929,14 +15308,22 @@ function installHostEventSubscriptions(ctx) {
   // 切换聊天 / 角色卡后刷新预设模版页：激活预设与预设列表随角色卡走（懒式
   // 读取，无事件也能取到最新数据，但面板若停在预设页需要重渲染）。
   onHostEvent(ctx, 'chatChanged', onPresetChatChanged, PROMPT_PRESET_CHAT_CHANGED_KEY);
-  // 变量注入：generationEnded / generationStopped 后清空注入，下一轮发送前
-  // 经发送屏障重新注入最新值（勾选条目见变量工作台「默认数值」层）。
-  onHostEvent(ctx, 'generationEnded', onValuesInjectGenerationCleanup, VALUES_INJECT_CLEANUP_ENDED_KEY);
-  onHostEvent(ctx, 'generationStopped', onValuesInjectGenerationCleanup, VALUES_INJECT_CLEANUP_STOPPED_KEY);
-  // 剧情触发：generationEnded / generationStopped 后清空注入，下一轮发送前
-  // 经发送屏障按最新变量值重新判定（条件与事件见变量工作台「剧情触发」页）。
-  onHostEvent(ctx, 'generationEnded', onValuesTriggerGenerationCleanup, VALUES_TRIGGER_CLEANUP_ENDED_KEY);
-  onHostEvent(ctx, 'generationStopped', onValuesTriggerGenerationCleanup, VALUES_TRIGGER_CLEANUP_STOPPED_KEY);
+  // 变量注入：常驻注入（与隔壁 BS BioTracker 的 mainflow 提示词同款）——
+  // 数据变更时经 saveValuesData / saveValuesChatState 立即重刷，不再等点击发送，
+  // 生成结束也不清空（swipe / 重新生成等不发 messageSent 的路径照常携带最新值）。
+  // 这里负责「切换聊天」「启动」与「每轮生成结束后补刷」三条主动刷新路径，
+  // 其中生成结束只重刷不清空（宿主清掉缓存时把常驻块补回来）。
+  onHostEvent(ctx, 'chatChanged', onValuesInjectChatChanged, VALUES_INJECT_CHAT_CHANGED_KEY);
+  onHostEvent(ctx, 'generationEnded', onValuesInjectGenerationRefresh, VALUES_INJECT_ENDED_KEY);
+  onHostEvent(ctx, 'generationStopped', onValuesInjectGenerationRefresh, VALUES_INJECT_STOPPED_KEY);
+  // 剧情触发：常驻注入（与变量注入同款）——条件满足的事件块一直挂在提示词上，
+  // 数据变更经 saveValuesData / saveValuesChatState 立即重刷；这里负责「切换聊天」
+  // 「启动」与「每轮生成结束后补刷」三条主动刷新路径，生成结束只重刷不清空
+  // （本轮锁定者原样重写，swipe / 重新生成拿到与本轮一致的事件）。
+  // 求值本身无副作用；事件效果与一次性关闭只在发送前任务里各执行一次。
+  onHostEvent(ctx, 'chatChanged', onValuesTriggerChatChanged, VALUES_TRIGGER_CHAT_CHANGED_KEY);
+  onHostEvent(ctx, 'generationEnded', onValuesTriggerGenerationRefresh, VALUES_TRIGGER_ENDED_KEY);
+  onHostEvent(ctx, 'generationStopped', onValuesTriggerGenerationRefresh, VALUES_TRIGGER_STOPPED_KEY);
   // 游戏模式：每轮生成结束后若展示面板正打开，刷新游戏数据（变量维护完成
   // 后也会经 refreshGameViewIfActive 再刷一次，保证展示最新值）。
   onHostEvent(ctx, 'generationEnded', onGameViewGenerationRefresh, GAME_REFRESH_ENDED_KEY);
@@ -14987,6 +15374,10 @@ async function bootstrap() {
     createSphere();
     showSphere();
     applyTheme(getCurrentTheme());
+    // 常驻注入的首次写入：插件载入后不等用户点发送，提示词里就该有变量块与
+    // 满足条件的剧情事件块（宿主 chatMetadata 可能稍后才就绪，内部自带补刷）。
+    startValuesInjection();
+    startValuesTriggerInjection();
     await registerMenuItem();
     logApp('info', `扩展就绪 v${MODULE_VERSION}`);
   } catch (error) {

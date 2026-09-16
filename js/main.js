@@ -121,14 +121,22 @@ function installHostEventSubscriptions(ctx) {
   // 切换聊天 / 角色卡后刷新预设模版页：激活预设与预设列表随角色卡走（懒式
   // 读取，无事件也能取到最新数据，但面板若停在预设页需要重渲染）。
   onHostEvent(ctx, 'chatChanged', onPresetChatChanged, PROMPT_PRESET_CHAT_CHANGED_KEY);
-  // 变量注入：generationEnded / generationStopped 后清空注入，下一轮发送前
-  // 经发送屏障重新注入最新值（勾选条目见变量工作台「默认数值」层）。
-  onHostEvent(ctx, 'generationEnded', onValuesInjectGenerationCleanup, VALUES_INJECT_CLEANUP_ENDED_KEY);
-  onHostEvent(ctx, 'generationStopped', onValuesInjectGenerationCleanup, VALUES_INJECT_CLEANUP_STOPPED_KEY);
-  // 剧情触发：generationEnded / generationStopped 后清空注入，下一轮发送前
-  // 经发送屏障按最新变量值重新判定（条件与事件见变量工作台「剧情触发」页）。
-  onHostEvent(ctx, 'generationEnded', onValuesTriggerGenerationCleanup, VALUES_TRIGGER_CLEANUP_ENDED_KEY);
-  onHostEvent(ctx, 'generationStopped', onValuesTriggerGenerationCleanup, VALUES_TRIGGER_CLEANUP_STOPPED_KEY);
+  // 变量注入：常驻注入（与隔壁 BS BioTracker 的 mainflow 提示词同款）——
+  // 数据变更时经 saveValuesData / saveValuesChatState 立即重刷，不再等点击发送，
+  // 生成结束也不清空（swipe / 重新生成等不发 messageSent 的路径照常携带最新值）。
+  // 这里负责「切换聊天」「启动」与「每轮生成结束后补刷」三条主动刷新路径，
+  // 其中生成结束只重刷不清空（宿主清掉缓存时把常驻块补回来）。
+  onHostEvent(ctx, 'chatChanged', onValuesInjectChatChanged, VALUES_INJECT_CHAT_CHANGED_KEY);
+  onHostEvent(ctx, 'generationEnded', onValuesInjectGenerationRefresh, VALUES_INJECT_ENDED_KEY);
+  onHostEvent(ctx, 'generationStopped', onValuesInjectGenerationRefresh, VALUES_INJECT_STOPPED_KEY);
+  // 剧情触发：常驻注入（与变量注入同款）——条件满足的事件块一直挂在提示词上，
+  // 数据变更经 saveValuesData / saveValuesChatState 立即重刷；这里负责「切换聊天」
+  // 「启动」与「每轮生成结束后补刷」三条主动刷新路径，生成结束只重刷不清空
+  // （本轮锁定者原样重写，swipe / 重新生成拿到与本轮一致的事件）。
+  // 求值本身无副作用；事件效果与一次性关闭只在发送前任务里各执行一次。
+  onHostEvent(ctx, 'chatChanged', onValuesTriggerChatChanged, VALUES_TRIGGER_CHAT_CHANGED_KEY);
+  onHostEvent(ctx, 'generationEnded', onValuesTriggerGenerationRefresh, VALUES_TRIGGER_ENDED_KEY);
+  onHostEvent(ctx, 'generationStopped', onValuesTriggerGenerationRefresh, VALUES_TRIGGER_STOPPED_KEY);
   // 游戏模式：每轮生成结束后若展示面板正打开，刷新游戏数据（变量维护完成
   // 后也会经 refreshGameViewIfActive 再刷一次，保证展示最新值）。
   onHostEvent(ctx, 'generationEnded', onGameViewGenerationRefresh, GAME_REFRESH_ENDED_KEY);
@@ -179,6 +187,10 @@ async function bootstrap() {
     createSphere();
     showSphere();
     applyTheme(getCurrentTheme());
+    // 常驻注入的首次写入：插件载入后不等用户点发送，提示词里就该有变量块与
+    // 满足条件的剧情事件块（宿主 chatMetadata 可能稍后才就绪，内部自带补刷）。
+    startValuesInjection();
+    startValuesTriggerInjection();
     await registerMenuItem();
     logApp('info', `扩展就绪 v${MODULE_VERSION}`);
   } catch (error) {
