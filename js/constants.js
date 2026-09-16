@@ -1,7 +1,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.5.2';
+const MODULE_VERSION = '1.5.3';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -547,6 +547,13 @@ const STORY_GATE_INJECT_KEY = 'Kaleidoscope_Story_Event';
 const STORY_GATE_RECENT_COUNT = 4;
 const STORY_GATE_TIMEOUT_MS = 45000;
 const STORY_GATE_MAX_SELECTED = 5;
+// Gate 输出预算：只产出事件 ID 名单，理论上几十 token 足够，但推理模型的
+// max_tokens 同时包含思维链与最终答案，思考阶段会把预算吃光，返回「200 +
+// content 空 + finish_reason=length」，每轮预筛都失败（重试无法自愈）。
+// 实测 1024 必炸、4096 在事件目录大时（如 28 个事件、含条件雷同的候选）仍不够，
+// 故提到 12000：正文输出量不变，多出的预算只用于让模型把思考写完。
+// temperature 仍压低保持判定确定性。
+const STORY_GATE_MAX_TOKENS = 12000;
 const STORY_GATE_HANDLER_KEY = '__kaleido_story_gate_handler__';
 const STORY_GATE_LAST_ROUND_KEY = '__kaleido_story_gate_last_round__';
 // 树形工作台图标（宿主为 Font Awesome 6）

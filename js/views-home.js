@@ -102,6 +102,9 @@ function refreshHomeInjectStatus() {
     } else if (round.skipped) {
       status.textContent = '本轮无事件';
       status.dataset.state = 'idle';
+    } else if (String(round.error || '').trim()) {
+      status.textContent = '预筛失败，已放行';
+      status.dataset.state = 'error';
     } else {
       status.textContent = '未注入';
       status.dataset.state = 'warn';

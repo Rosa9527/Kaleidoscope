@@ -515,21 +515,26 @@ async function requestChatCompletionOnce(apiBase, settings, body, signal) {
   }
   const choice = data?.choices?.[0];
   const content = choice?.message?.content ?? choice?.text;
+  const finishReason = String(choice?.finish_reason || '');
   if (typeof content !== 'string' || !content.trim()) {
     // 带思考能力的模型偶发把答案写进 reasoning_content、content 留空——兜底取用。
+    // 但 finish_reason=length 时 reasoning 是「被截断的思考过程」，不是答案：
+    // 推理模型的 max_tokens 预算同时包含思维链与最终答案，思考阶段耗尽预算就会
+    // 返回「200 + content 空 + 截断的 reasoning」——把它当答案返回，下游（剧情
+    // 预筛等）会拿半截思考去解析 JSON，报出误导性的解析错误。这种情况一律按
+    // 「没拿到内容」走可重试错误，让上层的重试 / 降级逻辑处理。
     const reasoning = typeof choice?.message?.reasoning_content === 'string'
       ? choice.message.reasoning_content
       : (typeof choice?.message?.reasoning === 'string' ? choice.message.reasoning : '');
-    if (reasoning.trim()) {
+    if (reasoning.trim() && finishReason !== 'length') {
       logApp('warn', 'AI 回复内容位于 reasoning_content 字段', `${transport} · ${reasoning.length} 字符`);
       return { content: reasoning, transport };
     }
     const errorMessage = data?.error?.message ? `: ${data.error.message}` : '';
-    const finishReason = choice?.finish_reason ? `finish_reason=${choice.finish_reason}` : '';
     const budgetHint = finishReason === 'length'
       ? '（疑似思考阶段耗尽输出预算：请调大 max_tokens 或改用非推理模型）'
       : '';
-    throw createChatError(`AI 未返回文本内容（${transport}）${errorMessage}${finishReason ? `（${finishReason}）` : ''}${budgetHint}`, true);
+    throw createChatError(`AI 未返回文本内容（${transport}）${errorMessage}${finishReason ? `（finish_reason=${finishReason}）` : ''}${budgetHint}`, true);
   }
   if (isHostErrorEnvelopeContent(content)) {
     const transient = /(?:网络|network|timeout|timed\s*out|failed|失败|超时)/i.test(content);

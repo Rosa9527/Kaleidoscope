@@ -344,6 +344,40 @@ runner.test('runStoryGatePipeline 失败时直接放行不注入', async () => {
   assert(calls.length === 0, '失败不应注入');
   const round = sandbox[LAST_ROUND_KEY];
   assert(round && round.injected === false && round.timedOut === false, '应记录失败轮');
+  assert(round.error === '上游超时', '失败原因应记入轮次快照供注入实录核对，实际: ' + round.error);
+});
+
+runner.test('runStoryGatePipeline 解析失败时原文与失败原因都进快照', async () => {
+  const c = fresh();
+  makeStory(c);
+  c.chat = [{ is_user: true, mes: '我推开门' }];
+  setupApi(c);
+  const calls = [];
+  c.setExtensionPrompt = (key, text) => calls.push({ key, text });
+  // 模拟响应被截断的思考过程落到这里：原文必须能被「注入实录」看到。
+  sandbox.chatCompletion = async () => '我们根据规则：最后一条用户消息是"上朝"，然后系统描述了早朝场景';
+  await ctx.runStoryGatePipeline(c, ctx.getSettings(c));
+  const round = sandbox[LAST_ROUND_KEY];
+  assert(calls.length === 0, '解析失败不应注入');
+  assert(String(round.raw).includes('我们根据规则'), '解析失败也应记录预筛原文');
+  assert(/无法解析为 JSON/.test(round.error || ''), '失败原因应记入快照，实际: ' + round.error);
+});
+
+runner.test('runStoryGatePipeline：Gate 输出预算给足思考阶段（回归：1024 被思考吃光）', async () => {
+  const c = fresh();
+  makeStory(c);
+  c.chat = [{ is_user: true, mes: '我推开门' }];
+  setupApi(c);
+  c.setExtensionPrompt = () => {};
+  let options = null;
+  sandbox.chatCompletion = async (settings, messages, opts) => {
+    options = opts;
+    return '{"events":[]}';
+  };
+  await ctx.runStoryGatePipeline(c, ctx.getSettings(c));
+  // 锁定当前档位：实测 1024 必炸、4096 仍不够，故为 12000。
+  assert(options && options.maxTokens === 12000, '预筛输出预算应为 12000，实际: ' + (options && options.maxTokens));
+  assert(options.temperature === 0.1, '判定确定性不应被改变');
 });
 
 // ---------- messageSent 监听 ----------

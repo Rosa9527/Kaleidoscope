@@ -356,6 +356,7 @@ async function runStoryGatePipeline(ctx, settings, signature = '') {
     injected: false,
     skipped: false,
     timedOut: false,
+    error: '',
     triggerSignature: String(signature || ''),
   };
   const finish = (overrides = {}) => {
@@ -381,11 +382,15 @@ async function runStoryGatePipeline(ctx, settings, signature = '') {
     logApp('info', '剧情预筛：Gate 开始', scripts.length + ' 个事件' + (record.valuesText ? ' · 含变量表' : ' · 无变量表'));
     // Gate 只产出事件 ID 名单，输出量小：限制 maxTokens 并降低 temperature，
     // 避免模型长篇输出拖慢发送前阻塞链路，同时保持判定确定性（与 SoulLink 一致）。
-    const content = await chatCompletion(settings, messages, { signal: controller.signal, maxTokens: 1024, temperature: 0.1 });
+    // 预算仍要给足思考阶段（见 STORY_GATE_MAX_TOKENS 注释：推理模型的 max_tokens
+    // 同时包含思维链与最终答案，给少了会整轮空回复）。
+    const content = await chatCompletion(settings, messages, { signal: controller.signal, maxTokens: STORY_GATE_MAX_TOKENS, temperature: 0.1 });
+    // 原文先记快照再解析：解析失败时「注入实录」也要能看到 AI 到底返回了什么，
+    // 否则失败轮只剩一句错误提示，无从判断是模型跑偏、还是响应被截断。
+    record.raw = String(content || '');
     const parsed = parseAgentJson(content);
     const selectedIds = parseStoryGateEventIds(parsed, scripts.map((script) => script.id));
     record.selectedIds = selectedIds;
-    record.raw = String(content || '');
     logApp('info', '剧情预筛：Gate 完成', '入选 ' + selectedIds.length + '/' + scripts.length + ' 个事件', selectedIds);
     if (selectedIds.length === 0) {
       logApp('debug', '剧情预筛：0 入选，原文', String(content || '').slice(0, 400));
@@ -428,8 +433,12 @@ async function runStoryGatePipeline(ctx, settings, signature = '') {
       globalThis.toastr?.warning?.('剧情预筛超时，已直接放行发送', '[' + MODULE_DISPLAY_NAME + ']');
     } else {
       const message = String(error?.message || error);
+      // 失败原因随轮次记录下来供「注入实录」核对（此前只进 toast 与日志，
+      // 面板上只剩「未注入」，排查时看不到到底为什么失败）。
       logApp('error', '剧情预筛失败，直接放行发送', message);
       globalThis.toastr?.error?.('剧情预筛失败，已直接放行：' + message.slice(0, 160), '[' + MODULE_DISPLAY_NAME + ']');
+      finish({ error: message });
+      return;
     }
     finish();
   }

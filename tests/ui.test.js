@@ -788,6 +788,29 @@ runner.test('注入实录：变量表段随记录显示 / 缺失时隐藏', () =
   delete sandbox['__kaleido_story_gate_last_round__'];
 });
 
+runner.test('注入实录：失败轮展示失败原因与预筛原文', () => {
+  sandbox['__kaleido_story_gate_last_round__'] = {
+    triggeredAt: new Date().toISOString(),
+    durationMs: 800,
+    totalEvents: 3,
+    selectedIds: [],
+    selectedEvents: [],
+    raw: '我们根据规则：最后一条用户消息是"上朝"……',
+    injectionText: '',
+    injected: false,
+    skipped: false,
+    timedOut: false,
+    error: 'AI 返回内容无法解析为 JSON：Unexpected token \'我\'',
+  };
+  ui.showPanelView('kaleido-inject-view');
+  const summary = $('kaleido-inject-summary');
+  assert(summary.textContent.includes('预筛失败，已放行'), '摘要应标明失败放行');
+  assert(summary.textContent.includes('无法解析为 JSON'), '摘要应展示失败原因');
+  assert($('kaleido-inject-gate-text').textContent.includes('我们根据规则'), '失败轮也应展示预筛原文');
+  assert($('kaleido-inject-text').hidden === true, '失败轮无注入原文可展示');
+  delete sandbox['__kaleido_story_gate_last_round__'];
+});
+
 runner.test('注入实录无记录时显示空态', () => {
   delete sandbox['__kaleido_story_gate_last_round__'];
   ui.showPanelView('kaleido-inject-view');

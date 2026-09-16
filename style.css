@@ -1819,6 +1819,10 @@ textarea.kaleido-input {
   color: var(--k-orange-text);
 }
 
+.kaleido-inject__summary-outcome[data-state="error"] {
+  color: var(--k-red-text);
+}
+
 .kaleido-inject__summary-stats {
   font-size: 12px;
   color: var(--k-text-2);
@@ -1830,6 +1834,14 @@ textarea.kaleido-input {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* 失败原因：不省略截断，换行完整显示（排查信息不该被 ellipsis 吃掉） */
+.kaleido-inject__summary-error {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--k-red-text);
+  word-break: break-word;
 }
 
 .kaleido-inject__empty {

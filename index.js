@@ -1,11 +1,11 @@
 // ===== 万华镜（Kaleidoscope）index.js — 构建产物，勿手改 =====
-// 构建时间: 2026-09-16 08:11:37 · 文件数: 24 · 指纹: 24dae1ab
+// 构建时间: 2026-09-16 11:56:46 · 文件数: 24 · 指纹: dc35b00b
 
 // ===== js/constants.js =====
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.5.2';
+const MODULE_VERSION = '1.5.3';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -551,6 +551,13 @@ const STORY_GATE_INJECT_KEY = 'Kaleidoscope_Story_Event';
 const STORY_GATE_RECENT_COUNT = 4;
 const STORY_GATE_TIMEOUT_MS = 45000;
 const STORY_GATE_MAX_SELECTED = 5;
+// Gate 输出预算：只产出事件 ID 名单，理论上几十 token 足够，但推理模型的
+// max_tokens 同时包含思维链与最终答案，思考阶段会把预算吃光，返回「200 +
+// content 空 + finish_reason=length」，每轮预筛都失败（重试无法自愈）。
+// 实测 1024 必炸、4096 在事件目录大时（如 28 个事件、含条件雷同的候选）仍不够，
+// 故提到 12000：正文输出量不变，多出的预算只用于让模型把思考写完。
+// temperature 仍压低保持判定确定性。
+const STORY_GATE_MAX_TOKENS = 12000;
 const STORY_GATE_HANDLER_KEY = '__kaleido_story_gate_handler__';
 const STORY_GATE_LAST_ROUND_KEY = '__kaleido_story_gate_last_round__';
 // 树形工作台图标（宿主为 Font Awesome 6）
@@ -1350,21 +1357,26 @@ async function requestChatCompletionOnce(apiBase, settings, body, signal) {
   }
   const choice = data?.choices?.[0];
   const content = choice?.message?.content ?? choice?.text;
+  const finishReason = String(choice?.finish_reason || '');
   if (typeof content !== 'string' || !content.trim()) {
     // 带思考能力的模型偶发把答案写进 reasoning_content、content 留空——兜底取用。
+    // 但 finish_reason=length 时 reasoning 是「被截断的思考过程」，不是答案：
+    // 推理模型的 max_tokens 预算同时包含思维链与最终答案，思考阶段耗尽预算就会
+    // 返回「200 + content 空 + 截断的 reasoning」——把它当答案返回，下游（剧情
+    // 预筛等）会拿半截思考去解析 JSON，报出误导性的解析错误。这种情况一律按
+    // 「没拿到内容」走可重试错误，让上层的重试 / 降级逻辑处理。
     const reasoning = typeof choice?.message?.reasoning_content === 'string'
       ? choice.message.reasoning_content
       : (typeof choice?.message?.reasoning === 'string' ? choice.message.reasoning : '');
-    if (reasoning.trim()) {
+    if (reasoning.trim() && finishReason !== 'length') {
       logApp('warn', 'AI 回复内容位于 reasoning_content 字段', `${transport} · ${reasoning.length} 字符`);
       return { content: reasoning, transport };
     }
     const errorMessage = data?.error?.message ? `: ${data.error.message}` : '';
-    const finishReason = choice?.finish_reason ? `finish_reason=${choice.finish_reason}` : '';
     const budgetHint = finishReason === 'length'
       ? '（疑似思考阶段耗尽输出预算：请调大 max_tokens 或改用非推理模型）'
       : '';
-    throw createChatError(`AI 未返回文本内容（${transport}）${errorMessage}${finishReason ? `（${finishReason}）` : ''}${budgetHint}`, true);
+    throw createChatError(`AI 未返回文本内容（${transport}）${errorMessage}${finishReason ? `（finish_reason=${finishReason}）` : ''}${budgetHint}`, true);
   }
   if (isHostErrorEnvelopeContent(content)) {
     const transient = /(?:网络|network|timeout|timed\s*out|failed|失败|超时)/i.test(content);
@@ -4314,6 +4326,9 @@ function refreshHomeInjectStatus() {
     } else if (round.skipped) {
       status.textContent = '本轮无事件';
       status.dataset.state = 'idle';
+    } else if (String(round.error || '').trim()) {
+      status.textContent = '预筛失败，已放行';
+      status.dataset.state = 'error';
     } else {
       status.textContent = '未注入';
       status.dataset.state = 'warn';
@@ -4466,6 +4481,9 @@ function buildInjectSummary(round) {
   } else if (round.skipped) {
     outcome.textContent = '本轮无事件触发';
     outcome.dataset.state = 'idle';
+  } else if (String(round.error || '').trim()) {
+    outcome.textContent = '预筛失败，已放行';
+    outcome.dataset.state = 'error';
   } else {
     outcome.textContent = '未注入';
     outcome.dataset.state = 'warn';
@@ -4474,6 +4492,13 @@ function buildInjectSummary(round) {
   stats.className = 'kaleido-inject__summary-stats';
   stats.textContent = '耗时 ' + Math.round(round.durationMs) + 'ms · 候选 ' + round.totalEvents + ' 个事件 · 入选 ' + round.selectedIds.length + ' 个';
   wrap.append(outcome, stats);
+  // 失败原因：toast 转瞬即逝，这里留一份可回看的原文（不省略截断）。
+  if (String(round.error || '').trim()) {
+    const error = document.createElement('span');
+    error.className = 'kaleido-inject__summary-error';
+    error.textContent = '失败原因：' + round.error;
+    wrap.appendChild(error);
+  }
   if (Array.isArray(round.selectedEvents) && round.selectedEvents.length > 0) {
     const names = document.createElement('span');
     names.className = 'kaleido-inject__summary-names';
@@ -6290,6 +6315,7 @@ async function runStoryGatePipeline(ctx, settings, signature = '') {
     injected: false,
     skipped: false,
     timedOut: false,
+    error: '',
     triggerSignature: String(signature || ''),
   };
   const finish = (overrides = {}) => {
@@ -6315,11 +6341,15 @@ async function runStoryGatePipeline(ctx, settings, signature = '') {
     logApp('info', '剧情预筛：Gate 开始', scripts.length + ' 个事件' + (record.valuesText ? ' · 含变量表' : ' · 无变量表'));
     // Gate 只产出事件 ID 名单，输出量小：限制 maxTokens 并降低 temperature，
     // 避免模型长篇输出拖慢发送前阻塞链路，同时保持判定确定性（与 SoulLink 一致）。
-    const content = await chatCompletion(settings, messages, { signal: controller.signal, maxTokens: 1024, temperature: 0.1 });
+    // 预算仍要给足思考阶段（见 STORY_GATE_MAX_TOKENS 注释：推理模型的 max_tokens
+    // 同时包含思维链与最终答案，给少了会整轮空回复）。
+    const content = await chatCompletion(settings, messages, { signal: controller.signal, maxTokens: STORY_GATE_MAX_TOKENS, temperature: 0.1 });
+    // 原文先记快照再解析：解析失败时「注入实录」也要能看到 AI 到底返回了什么，
+    // 否则失败轮只剩一句错误提示，无从判断是模型跑偏、还是响应被截断。
+    record.raw = String(content || '');
     const parsed = parseAgentJson(content);
     const selectedIds = parseStoryGateEventIds(parsed, scripts.map((script) => script.id));
     record.selectedIds = selectedIds;
-    record.raw = String(content || '');
     logApp('info', '剧情预筛：Gate 完成', '入选 ' + selectedIds.length + '/' + scripts.length + ' 个事件', selectedIds);
     if (selectedIds.length === 0) {
       logApp('debug', '剧情预筛：0 入选，原文', String(content || '').slice(0, 400));
@@ -6362,8 +6392,12 @@ async function runStoryGatePipeline(ctx, settings, signature = '') {
       globalThis.toastr?.warning?.('剧情预筛超时，已直接放行发送', '[' + MODULE_DISPLAY_NAME + ']');
     } else {
       const message = String(error?.message || error);
+      // 失败原因随轮次记录下来供「注入实录」核对（此前只进 toast 与日志，
+      // 面板上只剩「未注入」，排查时看不到到底为什么失败）。
       logApp('error', '剧情预筛失败，直接放行发送', message);
       globalThis.toastr?.error?.('剧情预筛失败，已直接放行：' + message.slice(0, 160), '[' + MODULE_DISPLAY_NAME + ']');
+      finish({ error: message });
+      return;
     }
     finish();
   }

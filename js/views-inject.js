@@ -57,6 +57,9 @@ function buildInjectSummary(round) {
   } else if (round.skipped) {
     outcome.textContent = '本轮无事件触发';
     outcome.dataset.state = 'idle';
+  } else if (String(round.error || '').trim()) {
+    outcome.textContent = '预筛失败，已放行';
+    outcome.dataset.state = 'error';
   } else {
     outcome.textContent = '未注入';
     outcome.dataset.state = 'warn';
@@ -65,6 +68,13 @@ function buildInjectSummary(round) {
   stats.className = 'kaleido-inject__summary-stats';
   stats.textContent = '耗时 ' + Math.round(round.durationMs) + 'ms · 候选 ' + round.totalEvents + ' 个事件 · 入选 ' + round.selectedIds.length + ' 个';
   wrap.append(outcome, stats);
+  // 失败原因：toast 转瞬即逝，这里留一份可回看的原文（不省略截断）。
+  if (String(round.error || '').trim()) {
+    const error = document.createElement('span');
+    error.className = 'kaleido-inject__summary-error';
+    error.textContent = '失败原因：' + round.error;
+    wrap.appendChild(error);
+  }
   if (Array.isArray(round.selectedEvents) && round.selectedEvents.length > 0) {
     const names = document.createElement('span');
     names.className = 'kaleido-inject__summary-names';

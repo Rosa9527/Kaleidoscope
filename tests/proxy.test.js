@@ -122,4 +122,51 @@ runner.test('requestChatCompletionOnce：代理返回模型列表时回退直连
   assert(calls.length === 2, '应先代理后直连，实际调用 ' + calls.length + ' 次');
 });
 
+// 空回复诊断回归：推理模型的 max_tokens 同时包含思维链与最终答案，思考阶段
+// 耗尽预算会返回「200 + content 空 + finish_reason=length + 截断的 reasoning」。
+// 这类截断思考不是答案——此前被当内容返回，下游解析 JSON 报出误导性错误。
+runner.test('requestChatCompletionOnce：finish_reason=length 的截断思考不当答案返回', async () => {
+  sandbox.fetch = async (url) => {
+    if (url === '/api/backends/chat-completions/generate') {
+      return jsonResponse({
+        choices: [{
+          finish_reason: 'length',
+          message: { content: '', reasoning: '我们根据规则：最后一条用户消息是"上朝"，然后系统描述了早朝场景……' },
+        }],
+      });
+    }
+    // 直连同样返回截断思考：避免用例退化成「回退直连拿到内容」的假阳性。
+    return jsonResponse({
+      choices: [{
+        finish_reason: 'length',
+        message: { content: '', reasoning: '我们根据规则：最后一条用户消息是"上朝"，然后系统描述了早朝场景……' },
+      }],
+    });
+  };
+  let thrown = null;
+  try {
+    await ctx.requestChatCompletionOnce('https://ollama.com/v1', { apiKey: 'sk-123' }, { model: 'm', messages: [], stream: false });
+  } catch (error) {
+    thrown = error;
+  }
+  assert(thrown, '截断思考不应作为内容返回');
+  assert(/AI 未返回文本内容/.test(thrown.message), '应报未返回文本内容，实际: ' + thrown.message);
+  assert(/finish_reason=length/.test(thrown.message), '应带出 finish_reason=length，实际: ' + thrown.message);
+  assert(/max_tokens/.test(thrown.message), '应提示调大 max_tokens，实际: ' + thrown.message);
+  assert(thrown.retryable === true, '空回复应可重试（配合调大预算后自愈）');
+});
+
+runner.test('requestChatCompletionOnce：思考写完（finish_reason=stop）时仍兜底取用 reasoning', async () => {
+  sandbox.fetch = async (url) => {
+    if (url === '/api/backends/chat-completions/generate') {
+      return jsonResponse({
+        choices: [{ finish_reason: 'stop', message: { content: '', reasoning_content: '{"events":["001"]}' } }],
+      });
+    }
+    throw new Error('不应回退直连');
+  };
+  const result = await ctx.requestChatCompletionOnce('https://ollama.com/v1', { apiKey: 'sk-123' }, { model: 'm', messages: [], stream: false });
+  assert(result.content === '{"events":["001"]}', '正常结束的 reasoning 仍应兜底取用');
+});
+
 runner.run();
