@@ -1,11 +1,11 @@
 // ===== 万华镜（Kaleidoscope）index.js — 构建产物，勿手改 =====
-// 构建时间: 2026-09-16 18:45:11 · 文件数: 24 · 指纹: d04a39e0
+// 构建时间: 2026-09-20 23:53:51 · 文件数: 25 · 指纹: 3bca9ec9
 
 // ===== js/constants.js =====
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.5.5';
+const MODULE_VERSION = '1.5.6';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -585,6 +585,7 @@ const STORY_SCRIPT_ICON_CLASS = 'fa-solid fa-scroll';
 const STORY_ADD_CHILD_ICON_CLASS = 'fa-solid fa-plus';
 const STORY_IMPORT_ICON_CLASS = 'fa-solid fa-file-import';
 const STORY_EDIT_ICON_CLASS = 'fa-solid fa-pen';
+const STORY_DRAG_ICON_CLASS = 'fa-solid fa-grip-vertical';
 const STORY_EXPORT_ICON_CLASS = 'fa-solid fa-download';
 const STORY_DELETE_ICON_CLASS = 'fa-solid fa-trash-can';
 // 思考强度选项：reasoning_effort 是 OpenAI 兼容标准参数（Ollama /v1/chat/completions
@@ -2693,6 +2694,219 @@ function kaleidoPrompt(message, defaultValue = '') {
   return new Promise((resolve) => {
     kaleidoPromptResolve = resolve;
   });
+}
+
+
+// ===== js/row-drag.js =====
+// ===== 万华镜（Kaleidoscope）通用行拖动排序引擎 =====
+// 变量系统的三处列表（变量树 / 变量注册 / 剧情触发）与剧情脉络树共用这套手势：
+// 两种启动方式——按住拖动把手立即可拖；长按整行（650ms）同样进入拖动——触摸端
+// 没有把手的精细落点，长按是唯一能把「点一下 = 操作行」与「按住 = 挪动行」分开的手势。
+//
+// 调用方（各列表）提供三件事：
+//   getSiblings(row) → 该行的同级行（数组，顺序即当前显示顺序）；
+//   onReorder(row, fromIndex, toIndex) → 松手后写回数据层（通常重渲染整表）；
+//   options.getBlock(row) → 该行在列表里占据的整块（分类 / 节点行连同渲染在其后的
+//     后代行，列表是深度优先扁平排列），拖动时整块一起走；不提供时块即单行。
+// 其余规则由本引擎保证：
+//   - 落点只在自己父节点内生效（两个列表的「未分类事件」各自住在一个分组容器里，
+//     跨容器插入会直接抛 NotFoundError，表现为「怎么拖都只能到末尾」）；
+//   - 只允许同级互排：分组由调用方的 getSiblings 决定（变量树按父路径、剧情脉络按
+//     parentId / nodeId）；
+//   - options.rowSelector 声明本列表的行元素（缺省 .kaleido-values__row）；
+//   - options.matches 声明本次注册管哪些行（同一容器注册多个拖动规则时用）。
+let rowDragState = null;
+let rowPressState = null;
+
+// 拖动期间阻止滚动与长按呼出菜单：触摸端浏览器只认 touch-action，而它在手指按下
+// 那一刻就定死了，长按之后才开始的拖动只能靠非 passive 的 touchmove 兜。
+function rowDragBlockScroll(event) {
+  event.preventDefault();
+}
+
+// 长按呼出菜单（Android 约 500ms 就弹）比拖动阈值来得早，必须在「按下待定」
+// 阶段就拦住——拖起来之后再拦已经晚了。
+function rowBlockContextMenu(event) {
+  if (!rowDragState && !rowPressState) return;
+  event.preventDefault();
+}
+
+// 长按按下但还没到时长：手指移动超过容差即视为滚动 / 点选，放弃这次长按。
+function handleRowPressMove(event) {
+  const state = rowPressState;
+  if (!state) return;
+  if (Math.hypot(event.clientX - state.startX, event.clientY - state.startY) > VALUES_LONG_PRESS_SLOP) {
+    endRowPress();
+  }
+}
+
+function endRowPress() {
+  const state = rowPressState;
+  if (!state) return;
+  rowPressState = null;
+  if (state.timer) clearTimeout(state.timer);
+  document.removeEventListener('pointermove', handleRowPressMove);
+  document.removeEventListener('pointerup', endRowPress);
+  document.removeEventListener('pointercancel', endRowPress);
+}
+
+// 长按转拖动后紧跟的那次 click 不是「点这一行」的意图，吞掉它；
+// 手势不产生 click 时超时自行摘除，避免误吞下一次真实点击。
+function rowSwallowNextClick() {
+  const handler = (event) => {
+    event.stopPropagation();
+    event.preventDefault();
+    document.removeEventListener('click', handler, true);
+  };
+  document.addEventListener('click', handler, true);
+  setTimeout(() => document.removeEventListener('click', handler, true), 350);
+}
+
+function rowDragBlockOf(row, getBlock) {
+  const block = typeof getBlock === 'function' ? getBlock(row) : null;
+  return Array.isArray(block) && block.length > 0 && block[0] === row ? block : [row];
+}
+
+// 深度优先扁平列表的整块收集：rootClass 命中的行连同渲染在它后面的后代行
+// （--depth 严格大于自己的连续行就是它的子树）；未命中的行没有后代，块即自身。
+// 变量触发的分类行与剧情脉络的节点行共用——拖动时子树跟着走，不分家。
+function collectRowDepthBlock(row, rootClass, rowClass) {
+  if (!row || !rootClass || !row.classList.contains(rootClass)) return [row];
+  const block = [row];
+  const depth = Number.parseInt(row.style.getPropertyValue('--depth') || '0', 10) || 0;
+  let sibling = row.nextElementSibling;
+  while (sibling && sibling.classList.contains(rowClass)) {
+    const siblingDepth = Number.parseInt(sibling.style.getPropertyValue('--depth') || '0', 10) || 0;
+    if (siblingDepth <= depth) break;
+    block.push(sibling);
+    sibling = sibling.nextElementSibling;
+  }
+  return block;
+}
+
+// 全局只挂一次：contextmenu 的拦截必须在「按下待定」阶段就生效（见上）。
+// 键名沿用旧版（热重载时旧监听仍在，换键会让两份监听叠加）。
+function initRowContextMenuBlock() {
+  if (globalThis[VALUES_DIALOG_KEY + '_ctxblock']) return;
+  globalThis[VALUES_DIALOG_KEY + '_ctxblock'] = rowBlockContextMenu;
+  document.addEventListener('contextmenu', rowBlockContextMenu, true);
+}
+
+function initRowDragReorder(container, handleSelector, getSiblings, onReorder, options = {}) {
+  if (!container) return;
+  initRowContextMenuBlock();
+  const getBlock = typeof options.getBlock === 'function' ? options.getBlock : null;
+  // 同一容器可能注册多次（触发行与分类行各有各的分组规则）：matches 声明本次
+  // 注册管哪些行，别的注册碰到的行直接放手，避免两边抢同一个长按计时器。
+  const matches = typeof options.matches === 'function' ? options.matches : () => true;
+  const rowSelector = typeof options.rowSelector === 'string' && options.rowSelector
+    ? options.rowSelector
+    : '.kaleido-values__row';
+
+  const beginDrag = (row, clientY, byLongPress) => {
+    const siblings = getSiblings(row);
+    const fromIndex = siblings.indexOf(row);
+    if (fromIndex < 0) return false;
+    rowDragState = {
+      container, row, siblings, getSiblings, getBlock, fromIndex, onReorder, byLongPress, startY: clientY, moved: false,
+    };
+    for (const node of rowDragBlockOf(row, getBlock)) node.classList.add('is-dragging');
+    container.classList.add('is-reordering');
+    document.addEventListener('pointermove', handleRowDragMove);
+    document.addEventListener('pointerup', handleRowDragEnd);
+    document.addEventListener('pointercancel', handleRowDragEnd);
+    document.addEventListener('touchmove', rowDragBlockScroll, { passive: false, capture: true });
+    return true;
+  };
+
+  container.addEventListener('pointerdown', (event) => {
+    if (rowDragState || rowPressState || event.button !== 0) return;
+    const target = event.target instanceof Element ? event.target : null;
+    const row = target ? target.closest(rowSelector) : null;
+    if (!row || !container.contains(row) || !matches(row)) return;
+    if (target.closest(handleSelector)) {
+      event.preventDefault();
+      beginDrag(row, event.clientY, false);
+      return;
+    }
+    // 按钮 / 输入框上的长按留给原生行为（开关、删除按钮不该变成拖动）；
+    // 没有把手的行（内置键、分类停用行）本来就不参与排序，长按也不该唤醒拖动。
+    if (target.closest('button, input, select, textarea, label')) return;
+    if (!row.querySelector(handleSelector)) return;
+    endRowPress();
+    const state = { startX: event.clientX, startY: event.clientY, timer: null };
+    rowPressState = state;
+    state.timer = setTimeout(() => {
+      if (rowPressState !== state) return;
+      endRowPress();
+      // 长按成立：此后手指移动就是拖动，不再是滚动。
+      beginDrag(row, state.startY, true);
+    }, VALUES_LONG_PRESS_MS);
+    document.addEventListener('pointermove', handleRowPressMove);
+    document.addEventListener('pointerup', endRowPress);
+    document.addEventListener('pointercancel', endRowPress);
+  });
+}
+
+function handleRowDragMove(event) {
+  const state = rowDragState;
+  if (!state) return;
+  if (!state.moved && Math.abs(event.clientY - state.startY) < 4) return;
+  state.moved = true;
+  const { row, siblings, getBlock } = state;
+  const parent = row.parentElement;
+  if (!parent) return;
+  let insertBefore = null;
+  let found = false;
+  for (const sibling of siblings) {
+    if (sibling === row) continue;
+    const block = rowDragBlockOf(sibling, getBlock);
+    const firstRect = block[0].getBoundingClientRect();
+    const last = block[block.length - 1];
+    const lastRect = last === block[0] ? firstRect : last.getBoundingClientRect();
+    if (event.clientY < firstRect.top) {
+      insertBefore = block[0];
+      found = true;
+      break;
+    }
+    if (event.clientY < lastRect.bottom) {
+      // 落在兄弟块的纵向范围里：按整块中线判前后，块整体让位。
+      insertBefore = event.clientY < (firstRect.top + lastRect.bottom) / 2 ? block[0] : last.nextElementSibling;
+      found = true;
+      break;
+    }
+  }
+  if (!found) {
+    // 指针落在所有同级之下：插到最后一个同级块之后。不能直接 append 到父节点末尾
+    // （insertBefore = null）——父节点里还排着别的组，那样会把行挪出自己的分组，
+    // 正是「怎么拖都只能到末尾」的成因。
+    const lastSibling = siblings[siblings.length - 1];
+    const lastBlock = rowDragBlockOf(lastSibling, getBlock);
+    insertBefore = lastBlock[lastBlock.length - 1].nextElementSibling;
+  }
+  const block = rowDragBlockOf(row, getBlock);
+  if (insertBefore === row || insertBefore === block[block.length - 1].nextElementSibling) return;
+  if (insertBefore && insertBefore.parentElement !== parent) return;
+  for (const node of block) parent.insertBefore(node, insertBefore);
+}
+
+function handleRowDragEnd() {
+  const state = rowDragState;
+  if (!state) return;
+  rowDragState = null;
+  endRowPress();
+  document.removeEventListener('pointermove', handleRowDragMove);
+  document.removeEventListener('pointerup', handleRowDragEnd);
+  document.removeEventListener('pointercancel', handleRowDragEnd);
+  document.removeEventListener('touchmove', rowDragBlockScroll, { capture: true });
+  for (const node of rowDragBlockOf(state.row, state.getBlock)) node.classList.remove('is-dragging');
+  state.container.classList.remove('is-reordering');
+  if (!state.moved) return;
+  if (state.byLongPress) rowSwallowNextClick();
+  const finalIndex = state.getSiblings(state.row).indexOf(state.row);
+  if (finalIndex >= 0 && finalIndex !== state.fromIndex) {
+    state.onReorder(state.row, state.fromIndex, finalIndex);
+  }
 }
 
 
@@ -4871,8 +5085,67 @@ function getStoryRootNodes(ctx) {
   return getStoryNodes(ctx).filter((node) => !String(node.parentId || ''));
 }
 
-function byStoryCreatedAt(a, b) {
-  return String(a?.createdAt || '').localeCompare(String(b?.createdAt || ''));
+// ---------- 同级重排（拖动排序用）----------
+// 数组顺序即显示顺序：渲染（views-story）与剧情预筛目录（story-gate）都按数组顺序
+// 取条目，玩家拖动就改这份顺序（不再按 createdAt 排序——拖动后的 createdAt 是旧的，
+// 再排一次会把顺序抹掉）。分组按数据归属算：节点看上级（parentId），事件看所属
+// 节点（未分类事件 / 孤儿事件为一组）。想改上级请用节点编辑器的「上级节点」，
+// 拖动只调同级顺序。
+function reorderStoryGroupInPlace(list, ids, isMember) {
+  const wanted = Array.isArray(ids) ? ids.map((id) => String(id || '').trim()).filter(Boolean) : [];
+  const wantedSet = new Set(wanted);
+  const member = typeof isMember === 'function'
+    ? isMember
+    : (item) => wantedSet.has(String(item?.id || '').trim());
+  const members = list.filter(member);
+  if (members.length === 0) return list;
+  const idOf = (item) => String(item?.id || '').trim();
+  const memberIds = new Set(members.map(idOf));
+  const byId = new Map(members.map((item) => [idOf(item), item]));
+  // 组内按界面给出的 id 顺序重排；未提到的成员按原相对顺序补在末尾。
+  const group = [];
+  const seen = new Set();
+  for (const id of wanted) {
+    const item = byId.get(id);
+    if (item && !seen.has(id)) {
+      group.push(item);
+      seen.add(id);
+    }
+  }
+  for (const item of members) {
+    if (!seen.has(idOf(item))) group.push(item);
+  }
+  // 组外条目原地不动：整组插回原组成员序列的起始位置（与变量触发的分类 / 事件重排同构）。
+  const rest = list.filter((item) => !memberIds.has(idOf(item)));
+  const firstIndex = list.findIndex((item) => memberIds.has(idOf(item)));
+  let insertAt = 0;
+  for (let i = 0; i < firstIndex; i += 1) {
+    if (!memberIds.has(idOf(list[i]))) insertAt += 1;
+  }
+  rest.splice(Math.min(insertAt, rest.length), 0, ...group);
+  list.length = 0;
+  for (const item of rest) list.push(item);
+  return list;
+}
+
+// 节点同级重排：parentId 相同的节点为一组（顶层为空串）。
+function reorderStoryNodesInGroup(ctx, parentId, ids) {
+  ensureStoryCardData(ctx);
+  const target = String(parentId || '').trim();
+  const nodes = getStoryNodes(ctx);
+  reorderStoryGroupInPlace(nodes, ids, (node) => String(node?.parentId || '').trim() === target);
+  saveStoryData(ctx);
+  return nodes;
+}
+
+// 事件组内重排：ids 由界面按渲染分组给出（同一所属节点；未分类组含所属节点已不
+// 存在的孤儿事件），因此只按 id 集合重排。
+function reorderStoryScriptsInGroup(ctx, ids) {
+  ensureStoryCardData(ctx);
+  const scripts = getStoryScripts(ctx);
+  reorderStoryGroupInPlace(scripts, ids);
+  saveStoryData(ctx);
+  return scripts;
 }
 
 // nodeId 是否为 ancestorId 的后代（沿 parentId 链向上查）。
@@ -6044,17 +6317,17 @@ function getStoryGateRecentMessages(count, ctx) {
 // 事件目录：节点（含层级与说明）+ 事件（只含名字 / ID / 触发条件 / 描述，不含正文）。
 // 这是 Gate 的唯一候选集，刻意不携带事件正文，避免预筛阶段泄露内容、放大输入体积。
 // 被关闭的节点（含其子树与事件）不进入目录，也不参与本轮预筛。
+// 顺序按数据层数组顺序（玩家在剧情脉络里拖动排序的结果）：目录里先出现的条目
+// 在提示词里也靠前，作者可以把最该先被看到的事件排在前面。
 function buildStoryEventCatalog(ctx) {
   const nodes = getStoryNodes(ctx);
   const scripts = getStoryScripts(ctx);
   const nodeMap = new Map(nodes.map((node) => [node.id, node]));
   const childrenOf = (parentId) => nodes
     .filter((node) => String(node.parentId || '') === String(parentId || ''))
-    .filter((node) => isStoryNodeActive(ctx, node))
-    .sort(byStoryCreatedAt);
+    .filter((node) => isStoryNodeActive(ctx, node));
   const scriptsOf = (nodeId) => scripts
     .filter((script) => script.nodeId === nodeId)
-    .sort(byStoryCreatedAt)
     .map((script) => ({
       id: script.id,
       name: script.name,
@@ -6070,11 +6343,9 @@ function buildStoryEventCatalog(ctx) {
   });
   const roots = nodes
     .filter((node) => !String(node.parentId || ''))
-    .filter((node) => isStoryNodeActive(ctx, node))
-    .sort(byStoryCreatedAt);
+    .filter((node) => isStoryNodeActive(ctx, node));
   const unassigned = scripts
     .filter((script) => !String(script.nodeId || '') || !nodeMap.has(script.nodeId))
-    .sort(byStoryCreatedAt)
     .map((script) => ({
       id: script.id,
       name: script.name,
@@ -6675,13 +6946,15 @@ function refreshStoryBindingStatus() {
 }
 
 // ---------- 树状渲染 ----------
+// 顺序按数据层数组顺序（玩家拖动排序的结果），不再按 createdAt 排：拖动只改数组，
+// 再排一次会把刚拖好的顺序抹掉。新建 / 导入都追加在末尾，未拖动过的卡观感与旧版一致。
 function renderStoryTree() {
   const body = document.getElementById(STORY_TREE_BODY_ID);
   if (!body) return;
   const ctx = getContextSafe();
   refreshStoryBindingStatus();
   body.innerHTML = '';
-  const roots = ctx ? getStoryRootNodes(ctx).sort(byStoryCreatedAt) : [];
+  const roots = ctx ? getStoryRootNodes(ctx) : [];
   if (roots.length === 0) {
     body.appendChild(buildStoryEmpty('还没有节点。点击「＋ 新建」开始。'));
     return;
@@ -6691,8 +6964,7 @@ function renderStoryTree() {
   // 未分类事件（无节点 / 节点已不存在）
   const scripts = ctx ? getStoryScripts(ctx) : [];
   const unassigned = scripts
-    .filter((script) => !String(script.nodeId || '') || !getStoryNodeById(ctx, script.nodeId))
-    .sort(byStoryCreatedAt);
+    .filter((script) => !String(script.nodeId || '') || !getStoryNodeById(ctx, script.nodeId));
   if (unassigned.length > 0) {
     const group = document.createElement('div');
     group.className = 'kaleido-story__group';
@@ -6707,10 +6979,9 @@ function renderStoryTree() {
 
 function renderStoryNodeRows(container, ctx, node, depth) {
   const expanded = storyExpanded.has(node.id);
-  const children = getStoryNodeChildren(ctx, node.id).sort(byStoryCreatedAt);
+  const children = getStoryNodeChildren(ctx, node.id);
   const scripts = getStoryScripts(ctx)
-    .filter((script) => script.nodeId === node.id)
-    .sort(byStoryCreatedAt);
+    .filter((script) => script.nodeId === node.id);
   container.appendChild(buildStoryNodeRow(node, depth, expanded, children.length + scripts.length));
   if (!expanded) return;
   for (const child of children) renderStoryNodeRows(container, ctx, child, depth + 1);
@@ -6721,9 +6992,12 @@ function buildStoryNodeRow(node, depth, expanded, childCount) {
   const row = document.createElement('div');
   row.className = 'kaleido-story__row kaleido-story__row--node';
   row.dataset.id = node.id;
+  // 同级分组按 parentId（顶层为空串）：拖动只在该组内换位。
+  row.dataset.parentId = String(node.parentId || '');
   row.style.setProperty('--depth', String(depth));
   const enabled = node.enabled !== false;
   row.innerHTML = `
+    <button type="button" class="kaleido-story__drag-handle" data-action="drag" title="拖动排序" aria-label="拖动排序"><span class="${STORY_DRAG_ICON_CLASS}"></span></button>
     <button type="button" class="kaleido-story__chevron${childCount > 0 ? '' : ' is-empty'}" data-action="toggle" data-id="${escapeHtml(node.id)}" title="展开 / 收起" aria-label="展开 / 收起">
       <span class="${STORY_CHEVRON_ICON_CLASS}"></span>
     </button>
@@ -6747,12 +7021,17 @@ function buildStoryScriptRow(script, depth) {
   const row = document.createElement('div');
   row.className = 'kaleido-story__row kaleido-story__row--script';
   row.dataset.id = script.id;
-  row.style.setProperty('--depth', String(depth));
+  // 同级分组按所属节点（未分类事件为空串）：拖动只在同一节点的事件间换位。
+  // 用「有效节点 id」而不是原始 nodeId——挂到已删除节点上的孤儿事件渲染在未分类组里，
+  // 必须与真正的未分类事件算同一组，否则拖不动（找不到同级）。
   const ctx = getContextSafe();
   const node = script.nodeId ? getStoryNodeById(ctx, script.nodeId) : null;
+  row.dataset.nodeId = node ? String(node.id) : '';
+  row.style.setProperty('--depth', String(depth));
   const badge = node ? escapeHtml(node.name) : '未分类';
   const effectsText = formatValuesTriggerEffects(script);
   row.innerHTML = `
+    <button type="button" class="kaleido-story__drag-handle" data-action="drag" title="拖动排序" aria-label="拖动排序"><span class="${STORY_DRAG_ICON_CLASS}"></span></button>
     <span class="kaleido-story__row-icon kaleido-story__row-icon--script"><span class="${STORY_SCRIPT_ICON_CLASS}"></span></span>
     <span class="kaleido-story__row-name" title="${escapeHtml(script.name)}">${escapeHtml(script.name)}</span>
     ${script.trigger ? `<span class="kaleido-story__row-trigger" title="${escapeHtml(script.trigger)}">${escapeHtml(script.trigger)}</span>` : ''}
@@ -6771,6 +7050,77 @@ function storyToggleNode(id) {
   if (storyExpanded.has(id)) storyExpanded.delete(id);
   else storyExpanded.add(id);
   renderStoryTree();
+}
+
+// ---------- 行拖动排序（手势与落点见 js/row-drag.js）----------
+// 剧情脉络树是深度优先扁平排列：节点行后面紧跟它的子节点与事件。分组按数据归属：
+// 节点看 parentId（顶层为空串），事件看所属节点（未分类组含挂到已删除节点上的
+// 孤儿事件）。节点行拖动时整棵子树随行（storyDragBlock），事件行只在同一节点内换位。
+// 只调同级顺序；改上级请用节点编辑器的「上级节点」下拉。
+function storyNodeSiblingsOf(row) {
+  const container = row?.parentElement;
+  if (!container) return [];
+  const parentKey = String(row.dataset.parentId || '');
+  return Array.from(container.querySelectorAll('.kaleido-story__row--node'))
+    .filter((item) => String(item.dataset.parentId || '') === parentKey);
+}
+
+function storyScriptSiblingsOf(row) {
+  const container = row?.parentElement;
+  if (!container) return [];
+  const nodeKey = String(row.dataset.nodeId || '');
+  return Array.from(container.querySelectorAll('.kaleido-story__row--script'))
+    .filter((item) => String(item.dataset.nodeId || '') === nodeKey);
+}
+
+function storyDragBlock(row) {
+  return collectRowDepthBlock(row, 'kaleido-story__row--node', 'kaleido-story__row');
+}
+
+function handleStoryNodesReorder(row) {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const parentId = String(row?.dataset.parentId || '');
+  const ids = storyNodeSiblingsOf(row).map((item) => String(item.dataset.id || ''));
+  reorderStoryNodesInGroup(ctx, parentId, ids);
+  renderStoryTree();
+  logApp('info', '剧情节点顺序已调整', parentId ? String(getStoryNodeById(ctx, parentId)?.name || '') : '顶层');
+}
+
+function handleStoryScriptsReorder(row) {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const ids = storyScriptSiblingsOf(row).map((item) => String(item.dataset.id || ''));
+  reorderStoryScriptsInGroup(ctx, ids);
+  renderStoryTree();
+  logApp('info', '剧情事件顺序已调整');
+}
+
+// 注册拖动排序：容器由调用方传入——对话框与手机端面板视图各有一份树容器，
+// 用 getElementById 会永远命中先创建的那一份（resize 后再创建的那份就拖不动）。
+function initStoryTreeDrag(container) {
+  if (!container) return;
+  initRowDragReorder(
+    container,
+    '.kaleido-story__drag-handle',
+    storyNodeSiblingsOf,
+    handleStoryNodesReorder,
+    {
+      rowSelector: '.kaleido-story__row',
+      matches: (row) => row.classList.contains('kaleido-story__row--node'),
+      getBlock: storyDragBlock,
+    }
+  );
+  initRowDragReorder(
+    container,
+    '.kaleido-story__drag-handle',
+    storyScriptSiblingsOf,
+    handleStoryScriptsReorder,
+    {
+      rowSelector: '.kaleido-story__row',
+      matches: (row) => row.classList.contains('kaleido-story__row--script'),
+    }
+  );
 }
 
 // ---------- 「＋」新建菜单 ----------
@@ -7447,6 +7797,7 @@ ${buildStoryContentHTML('kaleido-story-dialog__editor')}
   `;
   document.body.appendChild(dialog);
   bindStoryContentEvents();
+  initStoryTreeDrag(dialog.querySelector(`#${STORY_TREE_BODY_ID}`));
   document.getElementById(STORY_CLOSE_BTN_ID)?.addEventListener('click', closeStoryWorkbench);
   if (!globalThis[STORY_DIALOG_KEY]) {
     globalThis[STORY_DIALOG_KEY] = (event) => {
@@ -7476,6 +7827,7 @@ ${buildStoryContentHTML('kaleido-story__editor')}
   `;
   panel.querySelector('.kaleido-panel__body')?.appendChild(section);
   bindStoryContentEvents();
+  initStoryTreeDrag(section.querySelector(`#${STORY_TREE_BODY_ID}`));
 }
 
 function initStorySection(panel) {
@@ -11436,186 +11788,9 @@ async function handleValuesDelete(path) {
   renderValuesTree();
   refreshHomeValuesStatus();
 }
-// ---------- 行拖动排序 ----------
-// 两种启动方式：按住拖动把手立即可拖；长按整行（650ms）同样进入拖动——触摸端
-// 没有把手的精细落点，长按是唯一能把「点一下 = 操作行」与「按住 = 挪动行」分开的手势。
-// 落点只在自己父节点内生效（未分类事件有自己的分组容器，跨容器插入会直接抛
-// NotFoundError，表现为「怎么拖都只能到末尾」）。
-// 只允许在同级条目间排序：getSiblings 由调用方按行分组提供（树按父路径分组）。
-// options.getBlock 把一行展开成它在列表里占据的整块（分类 / 节点行连同渲染在其后的
-// 后代行，列表是深度优先扁平排列），拖动时整块一起走；不提供时块即单行。
-let valuesDragState = null;
-let valuesPressState = null;
-
-// 拖动期间阻止滚动与长按呼出菜单：触摸端浏览器只认 touch-action，而它在手指按下
-// 那一刻就定死了，长按之后才开始的拖动只能靠非 passive 的 touchmove 兜。
-function valuesDragBlockScroll(event) {
-  event.preventDefault();
-}
-
-// 长按呼出菜单（Android 约 500ms 就弹）比拖动阈值来得早，必须在「按下待定」
-// 阶段就拦住——拖起来之后再拦已经晚了。
-function valuesBlockContextMenu(event) {
-  if (!valuesDragState && !valuesPressState) return;
-  event.preventDefault();
-}
-
-// 长按按下但还没到时长：手指移动超过容差即视为滚动 / 点选，放弃这次长按。
-function handleValuesPressMove(event) {
-  const state = valuesPressState;
-  if (!state) return;
-  if (Math.hypot(event.clientX - state.startX, event.clientY - state.startY) > VALUES_LONG_PRESS_SLOP) {
-    endValuesPress();
-  }
-}
-
-function endValuesPress() {
-  const state = valuesPressState;
-  if (!state) return;
-  valuesPressState = null;
-  if (state.timer) clearTimeout(state.timer);
-  document.removeEventListener('pointermove', handleValuesPressMove);
-  document.removeEventListener('pointerup', endValuesPress);
-  document.removeEventListener('pointercancel', endValuesPress);
-}
-
-// 长按转拖动后紧跟的那次 click 不是「点这一行」的意图，吞掉它；
-// 手势不产生 click 时超时自行摘除，避免误吞下一次真实点击。
-function valuesSwallowNextClick() {
-  const handler = (event) => {
-    event.stopPropagation();
-    event.preventDefault();
-    document.removeEventListener('click', handler, true);
-  };
-  document.addEventListener('click', handler, true);
-  setTimeout(() => document.removeEventListener('click', handler, true), 350);
-}
-
-function valuesDragBlockOf(row, getBlock) {
-  const block = typeof getBlock === 'function' ? getBlock(row) : null;
-  return Array.isArray(block) && block.length > 0 && block[0] === row ? block : [row];
-}
-
-// 全局只挂一次：contextmenu 的拦截必须在「按下待定」阶段就生效（见上）。
-function initValuesContextMenuBlock() {
-  if (globalThis[VALUES_DIALOG_KEY + '_ctxblock']) return;
-  globalThis[VALUES_DIALOG_KEY + '_ctxblock'] = valuesBlockContextMenu;
-  document.addEventListener('contextmenu', valuesBlockContextMenu, true);
-}
-
-function initValuesDragReorder(container, handleSelector, getSiblings, onReorder, options = {}) {
-  if (!container) return;
-  const getBlock = typeof options.getBlock === 'function' ? options.getBlock : null;
-  // 同一容器可能注册多次（触发行与分类行各有各的分组规则）：matches 声明本次
-  // 注册管哪些行，别的注册碰到的行直接放手，避免两边抢同一个长按计时器。
-  const matches = typeof options.matches === 'function' ? options.matches : () => true;
-
-  const beginDrag = (row, clientY, byLongPress) => {
-    const siblings = getSiblings(row);
-    const fromIndex = siblings.indexOf(row);
-    if (fromIndex < 0) return false;
-    valuesDragState = {
-      container, row, siblings, getSiblings, getBlock, fromIndex, onReorder, byLongPress, startY: clientY, moved: false,
-    };
-    for (const node of valuesDragBlockOf(row, getBlock)) node.classList.add('is-dragging');
-    container.classList.add('is-reordering');
-    document.addEventListener('pointermove', handleValuesDragMove);
-    document.addEventListener('pointerup', handleValuesDragEnd);
-    document.addEventListener('pointercancel', handleValuesDragEnd);
-    document.addEventListener('touchmove', valuesDragBlockScroll, { passive: false, capture: true });
-    return true;
-  };
-
-  container.addEventListener('pointerdown', (event) => {
-    if (valuesDragState || valuesPressState || event.button !== 0) return;
-    const target = event.target instanceof Element ? event.target : null;
-    const row = target ? target.closest('.kaleido-values__row') : null;
-    if (!row || !container.contains(row) || !matches(row)) return;
-    if (target.closest(handleSelector)) {
-      event.preventDefault();
-      beginDrag(row, event.clientY, false);
-      return;
-    }
-    // 按钮 / 输入框上的长按留给原生行为（开关、删除按钮不该变成拖动）；
-    // 没有把手的行（内置键、分类停用行）本来就不参与排序，长按也不该唤醒拖动。
-    if (target.closest('button, input, select, textarea, label')) return;
-    if (!row.querySelector(handleSelector)) return;
-    endValuesPress();
-    const state = { startX: event.clientX, startY: event.clientY, timer: null };
-    valuesPressState = state;
-    state.timer = setTimeout(() => {
-      if (valuesPressState !== state) return;
-      endValuesPress();
-      // 长按成立：此后手指移动就是拖动，不再是滚动。
-      beginDrag(row, state.startY, true);
-    }, VALUES_LONG_PRESS_MS);
-    document.addEventListener('pointermove', handleValuesPressMove);
-    document.addEventListener('pointerup', endValuesPress);
-    document.addEventListener('pointercancel', endValuesPress);
-  });
-}
-
-function handleValuesDragMove(event) {
-  const state = valuesDragState;
-  if (!state) return;
-  if (!state.moved && Math.abs(event.clientY - state.startY) < 4) return;
-  state.moved = true;
-  const { row, siblings, getBlock } = state;
-  const parent = row.parentElement;
-  if (!parent) return;
-  let insertBefore = null;
-  let found = false;
-  for (const sibling of siblings) {
-    if (sibling === row) continue;
-    const block = valuesDragBlockOf(sibling, getBlock);
-    const firstRect = block[0].getBoundingClientRect();
-    const last = block[block.length - 1];
-    const lastRect = last === block[0] ? firstRect : last.getBoundingClientRect();
-    if (event.clientY < firstRect.top) {
-      insertBefore = block[0];
-      found = true;
-      break;
-    }
-    if (event.clientY < lastRect.bottom) {
-      // 落在兄弟块的纵向范围里：按整块中线判前后，块整体让位。
-      insertBefore = event.clientY < (firstRect.top + lastRect.bottom) / 2 ? block[0] : last.nextElementSibling;
-      found = true;
-      break;
-    }
-  }
-  if (!found) {
-    // 指针落在所有同级之下：插到最后一个同级块之后。不能直接 append 到父节点末尾
-    // （insertBefore = null）——父节点里还排着别的组，那样会把行挪出自己的分组，
-    // 正是「怎么拖都只能到末尾」的成因。
-    const lastSibling = siblings[siblings.length - 1];
-    const lastBlock = valuesDragBlockOf(lastSibling, getBlock);
-    insertBefore = lastBlock[lastBlock.length - 1].nextElementSibling;
-  }
-  const block = valuesDragBlockOf(row, getBlock);
-  if (insertBefore === row || insertBefore === block[block.length - 1].nextElementSibling) return;
-  if (insertBefore && insertBefore.parentElement !== parent) return;
-  for (const node of block) parent.insertBefore(node, insertBefore);
-}
-
-function handleValuesDragEnd() {
-  const state = valuesDragState;
-  if (!state) return;
-  valuesDragState = null;
-  endValuesPress();
-  document.removeEventListener('pointermove', handleValuesDragMove);
-  document.removeEventListener('pointerup', handleValuesDragEnd);
-  document.removeEventListener('pointercancel', handleValuesDragEnd);
-  document.removeEventListener('touchmove', valuesDragBlockScroll, { capture: true });
-  for (const node of valuesDragBlockOf(state.row, state.getBlock)) node.classList.remove('is-dragging');
-  state.container.classList.remove('is-reordering');
-  if (!state.moved) return;
-  if (state.byLongPress) valuesSwallowNextClick();
-  const finalIndex = state.getSiblings(state.row).indexOf(state.row);
-  if (finalIndex >= 0 && finalIndex !== state.fromIndex) {
-    state.onReorder(state.row, state.fromIndex, finalIndex);
-  }
-}
-
+// ---------- 行拖动排序：变量系统三处列表的分组规则 ----------
+// 手势与落点逻辑在 js/row-drag.js（与剧情脉络树共用）：这里只提供「哪些行算同级」
+// 与「松手后怎么写回数据层」。
 // 树行分组：同父路径的行视为同级（可互相排序）。
 function valuesRowParentKey(row) {
   try {
@@ -11695,20 +11870,9 @@ function handleValuesTriggerCategoriesReorder(row) {
   logApp('info', '事件分类顺序已调整', parentId || '顶层');
 }
 
-// 拖动块：分类 / 节点行连同渲染在它后面的后代行（列表是深度优先扁平排列，
-// 后代行的 --depth 大于自己的那一串就是子树内容）。触发行没有后代，块即自身。
+// 拖动块：分类行连同渲染在它后面的后代行（子分类与事件）；触发行没有后代，块即自身。
 function valuesTriggerDragBlock(row) {
-  if (!row || !row.classList.contains('kaleido-values__row--trigger-category')) return [row];
-  const block = [row];
-  let sibling = row.nextElementSibling;
-  const depth = Number.parseInt(row.style.getPropertyValue('--depth') || '0', 10) || 0;
-  while (sibling && sibling.classList.contains('kaleido-values__row')) {
-    const siblingDepth = Number.parseInt(sibling.style.getPropertyValue('--depth') || '0', 10) || 0;
-    if (siblingDepth <= depth) break;
-    block.push(sibling);
-    sibling = sibling.nextElementSibling;
-  }
-  return block;
+  return collectRowDepthBlock(row, 'kaleido-values__row--trigger-category', 'kaleido-values__row');
 }
 
 function handleValuesTreeReorder(row) {
@@ -13373,27 +13537,27 @@ function bindValuesContentEvents() {
   // 行拖动排序：变量树 / 变量注册 / 剧情触发（事件与分类）四处列表。
   // 触发页两个注册共用容器，各管各的行（matches）：事件按 categoryId 分组，
   // 分类按 parentId 分组；分类行拖动时整棵子树跟着走（getBlock）。
-  initValuesContextMenuBlock();
-  initValuesDragReorder(
+  // contextmenu 拦截由 initRowDragReorder 自己保证（见该函数）。
+  initRowDragReorder(
     document.getElementById(VALUES_TREE_BODY_ID),
     '.kaleido-values__drag-handle',
     valuesTreeSiblingsOf,
     handleValuesTreeReorder
   );
-  initValuesDragReorder(
+  initRowDragReorder(
     document.getElementById(VALUES_KEYS_BODY_ID),
     '.kaleido-values__drag-handle',
     valuesListSiblingsOf(document.getElementById(VALUES_KEYS_BODY_ID)),
     handleValuesKeysReorder
   );
-  initValuesDragReorder(
+  initRowDragReorder(
     document.getElementById(VALUES_TRIGGERS_BODY_ID),
     '.kaleido-values__drag-handle',
     valuesTriggerSiblingsOf,
     handleValuesTriggersReorder,
     { matches: (row) => row.classList.contains('kaleido-values__row--trigger') }
   );
-  initValuesDragReorder(
+  initRowDragReorder(
     document.getElementById(VALUES_TRIGGERS_BODY_ID),
     '.kaleido-values__drag-handle',
     valuesCategorySiblingsOf,

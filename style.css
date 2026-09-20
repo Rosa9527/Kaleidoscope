@@ -3104,8 +3104,9 @@ textarea.kaleido-input {
   color: var(--k-text-3);
 }
 
-/* 拖动把手 */
-.kaleido-values__drag-handle {
+/* 拖动把手（变量系统与剧情脉络共用：把手按下即拖，行其余部分长按整行） */
+.kaleido-values__drag-handle,
+.kaleido-story__drag-handle {
   flex: none;
   width: 22px;
   height: 24px;
@@ -3125,28 +3126,33 @@ textarea.kaleido-input {
   transition: color 0.13s ease, background 0.13s ease;
 }
 
-.kaleido-values__drag-handle:hover {
+.kaleido-values__drag-handle:hover,
+.kaleido-story__drag-handle:hover {
   color: var(--k-text);
   background: var(--k-hover);
 }
 
-.kaleido-values__drag-handle:active {
+.kaleido-values__drag-handle:active,
+.kaleido-story__drag-handle:active {
   cursor: grabbing;
 }
 
-.kaleido-values__row.is-dragging {
+.kaleido-values__row.is-dragging,
+.kaleido-story__row.is-dragging {
   opacity: 0.6;
   background: var(--k-hover);
 }
 
-.kaleido-values__row.is-dragging .kaleido-values__drag-handle {
+.kaleido-values__row.is-dragging .kaleido-values__drag-handle,
+.kaleido-story__row.is-dragging .kaleido-story__drag-handle {
   color: var(--k-accent);
 }
 
 /* 拖动中：列表整体不响应文本选择，避免整行拖拽顺带刷蓝文字。 */
 .kaleido-values__tree-body.is-reordering,
 .kaleido-values__keys-body.is-reordering,
-.kaleido-values__triggers-body.is-reordering {
+.kaleido-values__triggers-body.is-reordering,
+.kaleido-story__tree-body.is-reordering {
   cursor: grabbing;
   user-select: none;
 }

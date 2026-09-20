@@ -52,17 +52,17 @@ function getStoryGateRecentMessages(count, ctx) {
 // 事件目录：节点（含层级与说明）+ 事件（只含名字 / ID / 触发条件 / 描述，不含正文）。
 // 这是 Gate 的唯一候选集，刻意不携带事件正文，避免预筛阶段泄露内容、放大输入体积。
 // 被关闭的节点（含其子树与事件）不进入目录，也不参与本轮预筛。
+// 顺序按数据层数组顺序（玩家在剧情脉络里拖动排序的结果）：目录里先出现的条目
+// 在提示词里也靠前，作者可以把最该先被看到的事件排在前面。
 function buildStoryEventCatalog(ctx) {
   const nodes = getStoryNodes(ctx);
   const scripts = getStoryScripts(ctx);
   const nodeMap = new Map(nodes.map((node) => [node.id, node]));
   const childrenOf = (parentId) => nodes
     .filter((node) => String(node.parentId || '') === String(parentId || ''))
-    .filter((node) => isStoryNodeActive(ctx, node))
-    .sort(byStoryCreatedAt);
+    .filter((node) => isStoryNodeActive(ctx, node));
   const scriptsOf = (nodeId) => scripts
     .filter((script) => script.nodeId === nodeId)
-    .sort(byStoryCreatedAt)
     .map((script) => ({
       id: script.id,
       name: script.name,
@@ -78,11 +78,9 @@ function buildStoryEventCatalog(ctx) {
   });
   const roots = nodes
     .filter((node) => !String(node.parentId || ''))
-    .filter((node) => isStoryNodeActive(ctx, node))
-    .sort(byStoryCreatedAt);
+    .filter((node) => isStoryNodeActive(ctx, node));
   const unassigned = scripts
     .filter((script) => !String(script.nodeId || '') || !nodeMap.has(script.nodeId))
-    .sort(byStoryCreatedAt)
     .map((script) => ({
       id: script.id,
       name: script.name,

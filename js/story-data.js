@@ -179,8 +179,67 @@ function getStoryRootNodes(ctx) {
   return getStoryNodes(ctx).filter((node) => !String(node.parentId || ''));
 }
 
-function byStoryCreatedAt(a, b) {
-  return String(a?.createdAt || '').localeCompare(String(b?.createdAt || ''));
+// ---------- 同级重排（拖动排序用）----------
+// 数组顺序即显示顺序：渲染（views-story）与剧情预筛目录（story-gate）都按数组顺序
+// 取条目，玩家拖动就改这份顺序（不再按 createdAt 排序——拖动后的 createdAt 是旧的，
+// 再排一次会把顺序抹掉）。分组按数据归属算：节点看上级（parentId），事件看所属
+// 节点（未分类事件 / 孤儿事件为一组）。想改上级请用节点编辑器的「上级节点」，
+// 拖动只调同级顺序。
+function reorderStoryGroupInPlace(list, ids, isMember) {
+  const wanted = Array.isArray(ids) ? ids.map((id) => String(id || '').trim()).filter(Boolean) : [];
+  const wantedSet = new Set(wanted);
+  const member = typeof isMember === 'function'
+    ? isMember
+    : (item) => wantedSet.has(String(item?.id || '').trim());
+  const members = list.filter(member);
+  if (members.length === 0) return list;
+  const idOf = (item) => String(item?.id || '').trim();
+  const memberIds = new Set(members.map(idOf));
+  const byId = new Map(members.map((item) => [idOf(item), item]));
+  // 组内按界面给出的 id 顺序重排；未提到的成员按原相对顺序补在末尾。
+  const group = [];
+  const seen = new Set();
+  for (const id of wanted) {
+    const item = byId.get(id);
+    if (item && !seen.has(id)) {
+      group.push(item);
+      seen.add(id);
+    }
+  }
+  for (const item of members) {
+    if (!seen.has(idOf(item))) group.push(item);
+  }
+  // 组外条目原地不动：整组插回原组成员序列的起始位置（与变量触发的分类 / 事件重排同构）。
+  const rest = list.filter((item) => !memberIds.has(idOf(item)));
+  const firstIndex = list.findIndex((item) => memberIds.has(idOf(item)));
+  let insertAt = 0;
+  for (let i = 0; i < firstIndex; i += 1) {
+    if (!memberIds.has(idOf(list[i]))) insertAt += 1;
+  }
+  rest.splice(Math.min(insertAt, rest.length), 0, ...group);
+  list.length = 0;
+  for (const item of rest) list.push(item);
+  return list;
+}
+
+// 节点同级重排：parentId 相同的节点为一组（顶层为空串）。
+function reorderStoryNodesInGroup(ctx, parentId, ids) {
+  ensureStoryCardData(ctx);
+  const target = String(parentId || '').trim();
+  const nodes = getStoryNodes(ctx);
+  reorderStoryGroupInPlace(nodes, ids, (node) => String(node?.parentId || '').trim() === target);
+  saveStoryData(ctx);
+  return nodes;
+}
+
+// 事件组内重排：ids 由界面按渲染分组给出（同一所属节点；未分类组含所属节点已不
+// 存在的孤儿事件），因此只按 id 集合重排。
+function reorderStoryScriptsInGroup(ctx, ids) {
+  ensureStoryCardData(ctx);
+  const scripts = getStoryScripts(ctx);
+  reorderStoryGroupInPlace(scripts, ids);
+  saveStoryData(ctx);
+  return scripts;
 }
 
 // nodeId 是否为 ancestorId 的后代（沿 parentId 链向上查）。

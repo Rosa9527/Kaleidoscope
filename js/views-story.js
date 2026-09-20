@@ -88,13 +88,15 @@ function refreshStoryBindingStatus() {
 }
 
 // ---------- 树状渲染 ----------
+// 顺序按数据层数组顺序（玩家拖动排序的结果），不再按 createdAt 排：拖动只改数组，
+// 再排一次会把刚拖好的顺序抹掉。新建 / 导入都追加在末尾，未拖动过的卡观感与旧版一致。
 function renderStoryTree() {
   const body = document.getElementById(STORY_TREE_BODY_ID);
   if (!body) return;
   const ctx = getContextSafe();
   refreshStoryBindingStatus();
   body.innerHTML = '';
-  const roots = ctx ? getStoryRootNodes(ctx).sort(byStoryCreatedAt) : [];
+  const roots = ctx ? getStoryRootNodes(ctx) : [];
   if (roots.length === 0) {
     body.appendChild(buildStoryEmpty('还没有节点。点击「＋ 新建」开始。'));
     return;
@@ -104,8 +106,7 @@ function renderStoryTree() {
   // 未分类事件（无节点 / 节点已不存在）
   const scripts = ctx ? getStoryScripts(ctx) : [];
   const unassigned = scripts
-    .filter((script) => !String(script.nodeId || '') || !getStoryNodeById(ctx, script.nodeId))
-    .sort(byStoryCreatedAt);
+    .filter((script) => !String(script.nodeId || '') || !getStoryNodeById(ctx, script.nodeId));
   if (unassigned.length > 0) {
     const group = document.createElement('div');
     group.className = 'kaleido-story__group';
@@ -120,10 +121,9 @@ function renderStoryTree() {
 
 function renderStoryNodeRows(container, ctx, node, depth) {
   const expanded = storyExpanded.has(node.id);
-  const children = getStoryNodeChildren(ctx, node.id).sort(byStoryCreatedAt);
+  const children = getStoryNodeChildren(ctx, node.id);
   const scripts = getStoryScripts(ctx)
-    .filter((script) => script.nodeId === node.id)
-    .sort(byStoryCreatedAt);
+    .filter((script) => script.nodeId === node.id);
   container.appendChild(buildStoryNodeRow(node, depth, expanded, children.length + scripts.length));
   if (!expanded) return;
   for (const child of children) renderStoryNodeRows(container, ctx, child, depth + 1);
@@ -134,9 +134,12 @@ function buildStoryNodeRow(node, depth, expanded, childCount) {
   const row = document.createElement('div');
   row.className = 'kaleido-story__row kaleido-story__row--node';
   row.dataset.id = node.id;
+  // 同级分组按 parentId（顶层为空串）：拖动只在该组内换位。
+  row.dataset.parentId = String(node.parentId || '');
   row.style.setProperty('--depth', String(depth));
   const enabled = node.enabled !== false;
   row.innerHTML = `
+    <button type="button" class="kaleido-story__drag-handle" data-action="drag" title="拖动排序" aria-label="拖动排序"><span class="${STORY_DRAG_ICON_CLASS}"></span></button>
     <button type="button" class="kaleido-story__chevron${childCount > 0 ? '' : ' is-empty'}" data-action="toggle" data-id="${escapeHtml(node.id)}" title="展开 / 收起" aria-label="展开 / 收起">
       <span class="${STORY_CHEVRON_ICON_CLASS}"></span>
     </button>
@@ -160,12 +163,17 @@ function buildStoryScriptRow(script, depth) {
   const row = document.createElement('div');
   row.className = 'kaleido-story__row kaleido-story__row--script';
   row.dataset.id = script.id;
-  row.style.setProperty('--depth', String(depth));
+  // 同级分组按所属节点（未分类事件为空串）：拖动只在同一节点的事件间换位。
+  // 用「有效节点 id」而不是原始 nodeId——挂到已删除节点上的孤儿事件渲染在未分类组里，
+  // 必须与真正的未分类事件算同一组，否则拖不动（找不到同级）。
   const ctx = getContextSafe();
   const node = script.nodeId ? getStoryNodeById(ctx, script.nodeId) : null;
+  row.dataset.nodeId = node ? String(node.id) : '';
+  row.style.setProperty('--depth', String(depth));
   const badge = node ? escapeHtml(node.name) : '未分类';
   const effectsText = formatValuesTriggerEffects(script);
   row.innerHTML = `
+    <button type="button" class="kaleido-story__drag-handle" data-action="drag" title="拖动排序" aria-label="拖动排序"><span class="${STORY_DRAG_ICON_CLASS}"></span></button>
     <span class="kaleido-story__row-icon kaleido-story__row-icon--script"><span class="${STORY_SCRIPT_ICON_CLASS}"></span></span>
     <span class="kaleido-story__row-name" title="${escapeHtml(script.name)}">${escapeHtml(script.name)}</span>
     ${script.trigger ? `<span class="kaleido-story__row-trigger" title="${escapeHtml(script.trigger)}">${escapeHtml(script.trigger)}</span>` : ''}
@@ -184,6 +192,77 @@ function storyToggleNode(id) {
   if (storyExpanded.has(id)) storyExpanded.delete(id);
   else storyExpanded.add(id);
   renderStoryTree();
+}
+
+// ---------- 行拖动排序（手势与落点见 js/row-drag.js）----------
+// 剧情脉络树是深度优先扁平排列：节点行后面紧跟它的子节点与事件。分组按数据归属：
+// 节点看 parentId（顶层为空串），事件看所属节点（未分类组含挂到已删除节点上的
+// 孤儿事件）。节点行拖动时整棵子树随行（storyDragBlock），事件行只在同一节点内换位。
+// 只调同级顺序；改上级请用节点编辑器的「上级节点」下拉。
+function storyNodeSiblingsOf(row) {
+  const container = row?.parentElement;
+  if (!container) return [];
+  const parentKey = String(row.dataset.parentId || '');
+  return Array.from(container.querySelectorAll('.kaleido-story__row--node'))
+    .filter((item) => String(item.dataset.parentId || '') === parentKey);
+}
+
+function storyScriptSiblingsOf(row) {
+  const container = row?.parentElement;
+  if (!container) return [];
+  const nodeKey = String(row.dataset.nodeId || '');
+  return Array.from(container.querySelectorAll('.kaleido-story__row--script'))
+    .filter((item) => String(item.dataset.nodeId || '') === nodeKey);
+}
+
+function storyDragBlock(row) {
+  return collectRowDepthBlock(row, 'kaleido-story__row--node', 'kaleido-story__row');
+}
+
+function handleStoryNodesReorder(row) {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const parentId = String(row?.dataset.parentId || '');
+  const ids = storyNodeSiblingsOf(row).map((item) => String(item.dataset.id || ''));
+  reorderStoryNodesInGroup(ctx, parentId, ids);
+  renderStoryTree();
+  logApp('info', '剧情节点顺序已调整', parentId ? String(getStoryNodeById(ctx, parentId)?.name || '') : '顶层');
+}
+
+function handleStoryScriptsReorder(row) {
+  const ctx = getContextSafe();
+  if (!ctx) return;
+  const ids = storyScriptSiblingsOf(row).map((item) => String(item.dataset.id || ''));
+  reorderStoryScriptsInGroup(ctx, ids);
+  renderStoryTree();
+  logApp('info', '剧情事件顺序已调整');
+}
+
+// 注册拖动排序：容器由调用方传入——对话框与手机端面板视图各有一份树容器，
+// 用 getElementById 会永远命中先创建的那一份（resize 后再创建的那份就拖不动）。
+function initStoryTreeDrag(container) {
+  if (!container) return;
+  initRowDragReorder(
+    container,
+    '.kaleido-story__drag-handle',
+    storyNodeSiblingsOf,
+    handleStoryNodesReorder,
+    {
+      rowSelector: '.kaleido-story__row',
+      matches: (row) => row.classList.contains('kaleido-story__row--node'),
+      getBlock: storyDragBlock,
+    }
+  );
+  initRowDragReorder(
+    container,
+    '.kaleido-story__drag-handle',
+    storyScriptSiblingsOf,
+    handleStoryScriptsReorder,
+    {
+      rowSelector: '.kaleido-story__row',
+      matches: (row) => row.classList.contains('kaleido-story__row--script'),
+    }
+  );
 }
 
 // ---------- 「＋」新建菜单 ----------
@@ -860,6 +939,7 @@ ${buildStoryContentHTML('kaleido-story-dialog__editor')}
   `;
   document.body.appendChild(dialog);
   bindStoryContentEvents();
+  initStoryTreeDrag(dialog.querySelector(`#${STORY_TREE_BODY_ID}`));
   document.getElementById(STORY_CLOSE_BTN_ID)?.addEventListener('click', closeStoryWorkbench);
   if (!globalThis[STORY_DIALOG_KEY]) {
     globalThis[STORY_DIALOG_KEY] = (event) => {
@@ -889,6 +969,7 @@ ${buildStoryContentHTML('kaleido-story__editor')}
   `;
   panel.querySelector('.kaleido-panel__body')?.appendChild(section);
   bindStoryContentEvents();
+  initStoryTreeDrag(section.querySelector(`#${STORY_TREE_BODY_ID}`));
 }
 
 function initStorySection(panel) {

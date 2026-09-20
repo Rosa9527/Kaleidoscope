@@ -31,6 +31,7 @@ const FILES = [
   'js/host.js',
   'js/send-barrier.js',
   'js/ui-shell.js',
+  'js/row-drag.js',
   'js/views-api.js',
   'js/views-log.js',
   'js/views-preset.js',

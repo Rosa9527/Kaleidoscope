@@ -105,6 +105,51 @@ runner.test('移动节点到另一个父级', () => {
   assert(ctx.getStoryNodeChildren(c, ch2.id).length === 1, '第二章下应有第一章');
 });
 
+// ---------- 同级重排（拖动排序）----------
+runner.test('节点同级重排：只动同组，组外条目原地不动', () => {
+  const c = fresh();
+  const a = ctx.createStoryNode(c, { name: 'A' });
+  const b = ctx.createStoryNode(c, { name: 'B' });
+  const child = ctx.createStoryNode(c, { name: 'A-1', parentId: a.id });
+  const d = ctx.createStoryNode(c, { name: 'D' });
+  ctx.reorderStoryNodesInGroup(c, '', [d.id, a.id, b.id]);
+  assert(ctx.getStoryNodes(c).map((n) => n.name).join(',') === 'D,A,B,A-1', `顶层顺序应为 D,A,B（子节点留在原地），实际「${ctx.getStoryNodes(c).map((n) => n.name).join(',')}」`);
+  assert(ctx.getStoryNodeById(c, child.id).parentId === a.id, '子节点上级不应变化');
+  // 子级分组独立：只重排 A 的子节点不影响顶层
+  const child2 = ctx.createStoryNode(c, { name: 'A-2', parentId: a.id });
+  ctx.reorderStoryNodesInGroup(c, a.id, [child2.id, child.id]);
+  assert(ctx.getStoryNodeChildren(c, a.id).map((n) => n.name).join(',') === 'A-2,A-1', '子节点顺序应按拖动调整');
+  assert(ctx.getStoryNodes(c).map((n) => n.name).join(',') === 'D,A,B,A-2,A-1', '顶层顺序不应被子级重排打乱');
+});
+
+runner.test('节点同级重排：ids 缺项 / 多余项都不丢条目', () => {
+  const c = fresh();
+  const a = ctx.createStoryNode(c, { name: 'A' });
+  const b = ctx.createStoryNode(c, { name: 'B' });
+  const d = ctx.createStoryNode(c, { name: 'D' });
+  ctx.reorderStoryNodesInGroup(c, '', [b.id, 'no-such-id']);
+  assert(ctx.getStoryNodes(c).map((n) => n.name).join(',') === 'B,A,D', '未列出的同级应按原相对顺序补在组尾');
+  assert(ctx.getStoryNodes(c).length === 3, '不应凭空增减条目');
+  assert(a.id && d.id, '原条目应保留');
+});
+
+runner.test('事件组内重排：同节点一组，未分类（含孤儿事件）另一组', () => {
+  const c = fresh();
+  const node = ctx.createStoryNode(c, { name: '第一卷' });
+  const other = ctx.createStoryNode(c, { name: '第二卷' });
+  const s1 = ctx.createStoryScript(c, { name: 'S1', nodeId: node.id, content: 'x' });
+  const s2 = ctx.createStoryScript(c, { name: 'S2', nodeId: node.id, content: 'x' });
+  const s3 = ctx.createStoryScript(c, { name: 'S3', nodeId: other.id, content: 'x' });
+  const orphan = ctx.createStoryScript(c, { name: '孤儿', nodeId: 'gone', content: 'x' });
+  const free = ctx.createStoryScript(c, { name: '未分类', content: 'x' });
+  ctx.reorderStoryScriptsInGroup(c, [s2.id, s1.id]);
+  assert(ctx.getStoryScripts(c).map((s) => s.name).join(',') === 'S2,S1,S3,孤儿,未分类', `同组应换位、他组不动，实际「${ctx.getStoryScripts(c).map((s) => s.name).join(',')}」`);
+  // 未分类组：孤儿事件与真正的未分类事件算同一组（界面渲染在同一分组容器里）
+  ctx.reorderStoryScriptsInGroup(c, [free.id, orphan.id]);
+  assert(ctx.getStoryScripts(c).map((s) => s.name).join(',') === 'S2,S1,S3,未分类,孤儿', '未分类组应含孤儿事件并一起重排');
+  assert(ctx.getStoryScriptById(c, s3.id).nodeId === other.id, '其它节点的归属不应变化');
+});
+
 // ---------- 删除 ----------
 runner.test('删除节点：子节点上移、事件转未分类、返回统计', () => {
   const c = fresh();

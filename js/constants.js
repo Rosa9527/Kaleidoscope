@@ -1,7 +1,7 @@
 // ===== 万华镜（Kaleidoscope）全局常量 =====
 const MODULE_NAME = 'Kaleidoscope';
 const MODULE_DISPLAY_NAME = '万华镜';
-const MODULE_VERSION = '1.5.5';
+const MODULE_VERSION = '1.5.6';
 const GITHUB_REPO_URL = 'https://github.com/Rosa9527/Kaleidoscope';
 // ---------- 版本检查（GitHub 对比） ----------
 // 拉取远端 manifest.json 的两路源：raw 直链优先，失败回退 GitHub API（base64 解码）。
@@ -581,6 +581,7 @@ const STORY_SCRIPT_ICON_CLASS = 'fa-solid fa-scroll';
 const STORY_ADD_CHILD_ICON_CLASS = 'fa-solid fa-plus';
 const STORY_IMPORT_ICON_CLASS = 'fa-solid fa-file-import';
 const STORY_EDIT_ICON_CLASS = 'fa-solid fa-pen';
+const STORY_DRAG_ICON_CLASS = 'fa-solid fa-grip-vertical';
 const STORY_EXPORT_ICON_CLASS = 'fa-solid fa-download';
 const STORY_DELETE_ICON_CLASS = 'fa-solid fa-trash-can';
 // 思考强度选项：reasoning_effort 是 OpenAI 兼容标准参数（Ollama /v1/chat/completions

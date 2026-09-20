@@ -117,4 +117,33 @@ runner.test('视图内绑定徽标显示未绑定角色', () => {
   assert($('kaleido-story-binding').textContent === '未绑定角色', '无角色时应显示未绑定角色');
 });
 
+runner.test('面板视图：节点行把手拖动排序（拖动注册在视图自己的树容器上）', () => {
+  for (const node of ui.getStoryNodes(hostCtx).slice()) ui.deleteStoryNode(hostCtx, node.id);
+  for (const name of ['甲', '乙', '丙']) ui.createStoryNode(hostCtx, { name });
+  ui.renderStoryTree();
+  assert(rowNames().join(',') === '甲,乙,丙', `初始顺序应为 甲,乙,丙，实际「${rowNames().join(',')}」`);
+  const rows = treeRows();
+  rows.forEach((row, index) => {
+    row.getBoundingClientRect = () => ({
+      top: index * 30,
+      bottom: (index + 1) * 30,
+      height: 30,
+      left: 0,
+      right: 200,
+      width: 200,
+      x: 0,
+      y: index * 30,
+      toJSON() {},
+    });
+  });
+  const handle = rows[0].querySelector('.kaleido-story__drag-handle');
+  assert(handle, '面板视图的节点行也应有拖动把手');
+  const pointer = (type, clientY) => new dom.window.PointerEvent(type, { bubbles: true, cancelable: true, clientY });
+  handle.dispatchEvent(pointer('pointerdown', 15));
+  dom.window.document.dispatchEvent(pointer('pointermove', 75));
+  dom.window.document.dispatchEvent(pointer('pointerup', 75));
+  assert(rowNames().join(',') === '乙,丙,甲', `拖动后 DOM 顺序应变化，实际「${rowNames().join(',')}」`);
+  assert(ui.getStoryNodes(hostCtx).map((node) => node.name).join(',') === '乙,丙,甲', '数据层顺序应同步');
+});
+
 runner.run();

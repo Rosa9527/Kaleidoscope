@@ -886,4 +886,121 @@ runner.test('整包导入覆盖模式：清空现有内容后整体替换', asyn
   assert($('kaleido-story-import-mode').hidden, '选择后浮层应关闭');
 });
 
+// ---------- 行拖动排序（把手即拖 / 长按整行） ----------
+function stubStoryRowRects(rows, height = 30) {
+  rows.forEach((row, index) => {
+    row.getBoundingClientRect = () => ({
+      top: index * height,
+      bottom: (index + 1) * height,
+      height,
+      left: 0,
+      right: 200,
+      width: 200,
+      x: 0,
+      y: index * height,
+      toJSON() {},
+    });
+  });
+}
+
+function storyPointerEvent(type, clientY) {
+  return new dom.window.PointerEvent(type, { bubbles: true, cancelable: true, clientY });
+}
+
+function dragStoryRowByHandle(handle, fromY, toY) {
+  handle.dispatchEvent(storyPointerEvent('pointerdown', fromY));
+  dom.window.document.dispatchEvent(storyPointerEvent('pointermove', toY));
+  dom.window.document.dispatchEvent(storyPointerEvent('pointerup', toY));
+}
+
+// 长按整行（非把手）启动拖动：按下 → 越过 650ms 阈值 → 移动 → 松手。
+async function longPressStoryRow(row, fromY, toY) {
+  const target = row.querySelector('.kaleido-story__row-name') || row;
+  target.dispatchEvent(storyPointerEvent('pointerdown', fromY));
+  await flush();
+  await new Promise((resolve) => setTimeout(resolve, 700));
+  dom.window.document.dispatchEvent(storyPointerEvent('pointermove', toY));
+  dom.window.document.dispatchEvent(storyPointerEvent('pointerup', toY));
+}
+
+// 建一棵可控的树：甲 / 乙 / 丙 三个根节点，甲下两个事件，另有两条未分类事件。
+function resetStoryForDrag() {
+  for (const script of ui.getStoryScripts(hostCtx).slice()) ui.deleteStoryScript(hostCtx, script.id);
+  for (const node of ui.getStoryNodes(hostCtx).slice()) ui.deleteStoryNode(hostCtx, node.id);
+  const jia = ui.createStoryNode(hostCtx, { name: '甲' });
+  const yi = ui.createStoryNode(hostCtx, { name: '乙' });
+  const bing = ui.createStoryNode(hostCtx, { name: '丙' });
+  const s1 = ui.createStoryScript(hostCtx, { name: '甲事件一', nodeId: jia.id, content: 'x' });
+  const s2 = ui.createStoryScript(hostCtx, { name: '甲事件二', nodeId: jia.id, content: 'x' });
+  const u1 = ui.createStoryScript(hostCtx, { name: '未分类一', content: 'x' });
+  const u2 = ui.createStoryScript(hostCtx, { name: '未分类二', content: 'x' });
+  ui.openStoryWorkbench();
+  ui.renderStoryTree();
+  return { jia, yi, bing, s1, s2, u1, u2 };
+}
+
+runner.test('剧情脉络：节点 / 事件行都有拖动把手', () => {
+  resetStoryForDrag();
+  click(actionButton(rowByName('甲'), 'toggle'));
+  assert(rowByName('甲').querySelector('.kaleido-story__drag-handle'), '节点行应有拖动把手');
+  assert(rowByName('甲事件一').querySelector('.kaleido-story__drag-handle'), '事件行应有拖动把手');
+});
+
+runner.test('剧情脉络：节点行把手拖动排序，整棵子树随行并写回数据层', () => {
+  resetStoryForDrag();
+  click(actionButton(rowByName('甲'), 'toggle'));
+  assert(rowNames().join(',') === '甲,甲事件一,甲事件二,乙,丙,未分类一,未分类二', `初始顺序应展开显示，实际「${rowNames().join(',')}」`);
+  stubStoryRowRects(treeRows());
+  // 拖到所有同级之下：应落在最后一个同级块之后、未分类分组之前
+  dragStoryRowByHandle(rowByName('甲').querySelector('.kaleido-story__drag-handle'), 15, 200);
+  assert(rowNames().join(',') === '乙,丙,甲,甲事件一,甲事件二,未分类一,未分类二', `拖动后 DOM 顺序应变化且子树随行，实际「${rowNames().join(',')}」`);
+  assert(ui.getStoryNodes(hostCtx).map((node) => node.name).join(',') === '乙,丙,甲', '数据层节点顺序应同步');
+  assert(ui.getStoryScripts(hostCtx).map((script) => script.name).join(',') === '甲事件一,甲事件二,未分类一,未分类二', '事件顺序不应被节点重排打乱');
+  // 重渲染后顺序保持（顺序以数据层数组为准，不再按 createdAt 排）
+  ui.renderStoryTree();
+  assert(rowNames().join(',') === '乙,丙,甲,甲事件一,甲事件二,未分类一,未分类二', '重渲染后应保持拖动后的顺序');
+  // 再向上拖回顶部（回归：向上拖也要能落在同级块之前，不是「只能拖到末尾」）
+  stubStoryRowRects(treeRows());
+  dragStoryRowByHandle(rowByName('甲').querySelector('.kaleido-story__drag-handle'), 75, 5);
+  assert(rowNames().join(',') === '甲,甲事件一,甲事件二,乙,丙,未分类一,未分类二', `向上拖动应生效，实际「${rowNames().join(',')}」`);
+  assert(ui.getStoryNodes(hostCtx).map((node) => node.name).join(',') === '甲,乙,丙', '数据层顺序应同步');
+});
+
+runner.test('剧情脉络：长按整行拖动事件（组内换位），按钮长按不拖动', async () => {
+  resetStoryForDrag();
+  click(actionButton(rowByName('甲'), 'toggle'));
+  stubStoryRowRects(treeRows());
+  const before = ui.getStoryScripts(hostCtx).map((script) => script.name).join(',');
+  // 行内按钮上的长按留给原生行为（删除按钮不该变成拖动）
+  const button = actionButton(rowByName('甲事件一'), 'delete-script');
+  button.dispatchEvent(storyPointerEvent('pointerdown', 45));
+  await flush();
+  await new Promise((resolve) => setTimeout(resolve, 700));
+  dom.window.document.dispatchEvent(storyPointerEvent('pointermove', 75));
+  dom.window.document.dispatchEvent(storyPointerEvent('pointerup', 75));
+  assert(ui.getStoryScripts(hostCtx).map((script) => script.name).join(',') === before, '按钮上的长按不应启动拖动');
+  // 长按事件行名称区拖动：越过 650ms 阈值后移动即换位
+  await longPressStoryRow(rowByName('甲事件一'), 45, 75);
+  assert(rowNames().join(',') === '甲,甲事件二,甲事件一,乙,丙,未分类一,未分类二', `长按拖动应换位，实际「${rowNames().join(',')}」`);
+  assert(ui.getStoryScripts(hostCtx).map((script) => script.name).join(',') === '甲事件二,甲事件一,未分类一,未分类二', '数据层事件顺序应同步');
+  // 长按成立但没移动就松手：不排序、不残留拖动态
+  const row = rowByName('甲事件二');
+  row.querySelector('.kaleido-story__row-name').dispatchEvent(storyPointerEvent('pointerdown', 75));
+  await flush();
+  await new Promise((resolve) => setTimeout(resolve, 700));
+  assert(row.classList.contains('is-dragging'), '长按成立应进入拖动态');
+  dom.window.document.dispatchEvent(storyPointerEvent('pointerup', 75));
+  assert(!rowByName('甲事件二').classList.contains('is-dragging'), '松手后不应残留拖动态');
+  assert(ui.getStoryScripts(hostCtx).map((script) => script.name).join(',') === '甲事件二,甲事件一,未分类一,未分类二', '未移动松手不应改变顺序');
+});
+
+runner.test('剧情脉络：未分类事件在分组容器内可拖动（回归：落点不跳出分组）', () => {
+  resetStoryForDrag();
+  stubStoryRowRects(treeRows());
+  assert(rowNames().join(',') === '甲,乙,丙,未分类一,未分类二', `未展开时应只有根节点与未分类事件，实际「${rowNames().join(',')}」`);
+  dragStoryRowByHandle(rowByName('未分类一').querySelector('.kaleido-story__drag-handle'), 105, 135);
+  assert(rowNames().join(',') === '甲,乙,丙,未分类二,未分类一', `未分类事件应能向下换位，实际「${rowNames().join(',')}」`);
+  assert(ui.getStoryScripts(hostCtx).map((script) => script.name).join(',') === '甲事件一,甲事件二,未分类二,未分类一', '数据层未分类事件顺序应同步');
+});
+
 runner.run();
